@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "http://localhost:5173",
+      "https://metan.vercel.app",
+      "https://md-one-bice.vercel.app"
+    ],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
+    "responseHeader": ["Content-Type", "Authorization"],
+    "maxAgeSeconds": 3600
+  }
+]

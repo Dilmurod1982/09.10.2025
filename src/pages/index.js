@@ -17,3 +17,18 @@ export { default as EquipmentTypes } from "./EquipmentTypes";
 export { default as Regions } from "./Regions";
 export { default as Cities } from "./Cities";
 export { default as Employees } from "./Employees";
+export { default as DocPerpetual } from "./DocPerpetual";
+export { default as DocDeadline } from "./DocDeadline";
+
+export { default as License } from "./documents/License";
+export { default as GasCertificate } from "./documents/GasCertificate";
+export { default as GasAnalyzer } from "./documents/GasAnalyzer";
+export { default as MoistureMeter } from "./documents/MoistureMeter";
+export { default as ElectricalMeters } from "./documents/ElectricalMeters";
+export { default as Thermometers } from "./documents/Thermometers";
+export { default as Manometers } from "./documents/Manometers";
+export { default as GasUnit } from "./documents/GasUnit";
+export { default as Autopilot } from "./documents/Autopilot";
+export { default as FlowDevice } from "./documents/FlowDevice";
+export { default as ElectricityMeter } from "./documents/ElectricityMeter";
+export { default as WaterMeter } from "./documents/WaterMeter";

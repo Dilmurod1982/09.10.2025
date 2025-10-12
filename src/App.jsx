@@ -18,6 +18,20 @@ import {
   Regions,
   Cities,
   Employees,
+  DocDeadline,
+  DocPerpetual,
+  License,
+  GasCertificate,
+  GasAnalyzer,
+  MoistureMeter,
+  ElectricalMeters,
+  Thermometers,
+  Manometers,
+  GasUnit,
+  Autopilot,
+  FlowDevice,
+  ElectricityMeter,
+  WaterMeter,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -111,6 +125,63 @@ function App() {
         {
           path: "/employees",
           element: <Employees />,
+        },
+        {
+          path: "/docdeadline",
+          element: <DocDeadline />,
+        },
+        {
+          path: "/docperpetual",
+          element: <DocPerpetual />,
+        },
+        // Документы с истекающим сроком
+        {
+          path: "/license",
+          element: <License />,
+        },
+        {
+          path: "/gas-certificate",
+          element: <GasCertificate />,
+        },
+        {
+          path: "/gas-analyzer",
+          element: <GasAnalyzer />,
+        },
+        {
+          path: "/moisture-meter",
+          element: <MoistureMeter />,
+        },
+        {
+          path: "/electrical-meters",
+          element: <ElectricalMeters />,
+        },
+        {
+          path: "/thermometers",
+          element: <Thermometers />,
+        },
+        {
+          path: "/manometers",
+          element: <Manometers />,
+        },
+        {
+          path: "/gas-unit",
+          element: <GasUnit />,
+        },
+        {
+          path: "/autopilot",
+          element: <Autopilot />,
+        },
+        {
+          path: "/flow-device",
+          element: <FlowDevice />,
+        },
+        {
+          path: "/electricity-meter",
+          element: <ElectricityMeter />,
+        },
+        {
+          path: "/water-meter",
+          element: <WaterMeter />,
         },
       ],
     },
