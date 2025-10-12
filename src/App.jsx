@@ -1,3 +1,4 @@
+import React from "react";
 import {
   Home,
   Login,
@@ -44,10 +45,35 @@ import { useAppStore } from "./lib/zustand";
 import { useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase/config";
+import SessionWarning from "./components/SessionWarning";
 
 function App() {
   const setUser = useAppStore((state) => state.setUser);
   const user = useAppStore((state) => state.user);
+  const checkExistingSession = useAppStore(
+    (state) => state.checkExistingSession
+  );
+
+  // Проверяем сессию при загрузке приложения
+  useEffect(() => {
+    checkExistingSession();
+  }, [checkExistingSession]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUser(user);
+      } else {
+        setUser(null);
+        // Очищаем localStorage при выходе
+        localStorage.removeItem("sessionStartTime");
+        localStorage.removeItem("lastActivityTime");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [setUser]);
+
   const routes = createBrowserRouter([
     {
       path: "/",
@@ -134,7 +160,6 @@ function App() {
           path: "/docperpetual",
           element: <DocPerpetual />,
         },
-        // Документы с истекающим сроком
         {
           path: "/license",
           element: <License />,
@@ -188,16 +213,16 @@ function App() {
     {
       path: "/login",
       errorElement: <ErrorPage />,
-      element: user ? <Navigate to="/" /> : <Login />,
+      element: user ? <Navigate to="/" replace /> : <Login />,
     },
   ]);
 
-  useEffect(() => {
-    onAuthStateChanged(auth, (user) => {
-      setUser(user);
-    });
-  }, []);
-  return <RouterProvider router={routes} />;
+  return (
+    <>
+      <RouterProvider router={routes} />
+      {user && <SessionWarning />}
+    </>
+  );
 }
 
 export default App;

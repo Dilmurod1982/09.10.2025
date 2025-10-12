@@ -105,6 +105,24 @@ function Login() {
     setMousePosition({ x: e.clientX, y: e.clientY });
   };
 
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   const formData = new FormData(e.target);
+  //   const email = formData.get("username");
+  //   const password = formData.get("password");
+
+  //   // Анимация нажатия
+  //   if (formRef.current) {
+  //     formRef.current.classList.add("scale-95");
+  //     setTimeout(() => {
+  //       if (formRef.current) {
+  //         formRef.current.classList.remove("scale-95");
+  //       }
+  //     }, 150);
+  //   }
+
+  //   await signIn(email, password);
+  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -121,7 +139,12 @@ function Login() {
       }, 150);
     }
 
-    await signIn(email, password);
+    const result = await signIn(email, password);
+
+    if (result.success) {
+      // Сессия автоматически запустится через хук useSessionTimeout
+      console.log("Login successful, session started");
+    }
   };
 
   return (
@@ -178,7 +201,7 @@ function Login() {
                   <div className="flex items-center justify-center space-x-3 mb-4">
                     <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse"></div>
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                      Brand
+                      METAN
                     </h1>
                   </div>
                   <h2 className="text-3xl font-bold text-gray-800 mb-2">

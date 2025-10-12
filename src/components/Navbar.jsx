@@ -47,7 +47,7 @@ import Collapse from "@mui/material/Collapse";
 import BadgeIcon from "@mui/icons-material/Badge"; // Иконка для сотрудников
 
 export default function Navbar() {
-  const MotionPaper = motion(Paper);
+  const MotionPaper = motion.create(Paper);
   const setUser = useAppStore((state) => state.setUser);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [equipmentOpen, setEquipmentOpen] = React.useState(false);
