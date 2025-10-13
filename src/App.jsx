@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Home,
   Login,
@@ -21,18 +21,11 @@ import {
   Employees,
   DocDeadline,
   DocPerpetual,
-  License,
-  GasCertificate,
-  GasAnalyzer,
-  MoistureMeter,
-  ElectricalMeters,
-  Thermometers,
-  Manometers,
-  GasUnit,
-  Autopilot,
-  FlowDevice,
-  ElectricityMeter,
-  WaterMeter,
+  DocByStation,
+  DocDeadlineInf,
+  DocByStationInf,
+  StationDocs,
+  DocumentTypePage,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -42,10 +35,12 @@ import {
 import MainLayouts from "./layouts/MainLayouts";
 import ProtectedRoutes from "./components/ProtectedRoutes";
 import { useAppStore } from "./lib/zustand";
-import { useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase/config";
 import SessionWarning from "./components/SessionWarning";
+
+// ✅ Новый универсальный компонент
+import DocumentPage from "./pages/DocumentPage";
 
 function App() {
   const setUser = useAppStore((state) => state.setUser);
@@ -59,6 +54,7 @@ function App() {
     checkExistingSession();
   }, [checkExistingSession]);
 
+  // Отслеживаем авторизацию Firebase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -74,6 +70,7 @@ function App() {
     return () => unsubscribe();
   }, [setUser]);
 
+  // ✅ Маршруты
   const routes = createBrowserRouter([
     {
       path: "/",
@@ -84,130 +81,37 @@ function App() {
         </ProtectedRoutes>
       ),
       children: [
+        { index: true, element: <Home /> },
+        { path: "/stations", element: <Stations /> },
+        { path: "/users", element: <Users /> },
+        { path: "/ltds", element: <Ltds /> },
+        { path: "/banks", element: <Banks /> },
+        { path: "/compressors", element: <Compressors /> },
+        { path: "/dispensers", element: <Dispensers /> },
+        { path: "/osushka", element: <Osushka /> },
+        { path: "/chillers", element: <Chillers /> },
+        { path: "/typeofcompressors", element: <TypeOfCompressors /> },
+        { path: "/typeofdispensers", element: <TypeOfDispensers /> },
+        { path: "/typeofosushka", element: <TypeOfOsushka /> },
+        { path: "/typeofchillers", element: <TypeOfChillers /> },
+        { path: "/equipment-types", element: <EquipmentTypes /> },
+        { path: "/regions", element: <Regions /> },
+        { path: "/cities", element: <Cities /> },
+        { path: "/employees", element: <Employees /> },
+        { path: "/docdeadline", element: <DocDeadline /> },
+        { path: "/docperpetual", element: <DocPerpetual /> },
+
+        // ✅ Универсальный маршрут для всех типов документов
         {
-          index: true,
-          element: <Home />,
+          path: "/documents/:id",
+          element: <DocumentPage />,
         },
-        {
-          path: "/stations",
-          element: <Stations />,
-        },
-        {
-          path: "/users",
-          element: <Users />,
-        },
-        {
-          path: "/ltds",
-          element: <Ltds />,
-        },
-        {
-          path: "/banks",
-          element: <Banks />,
-        },
-        {
-          path: "/compressors",
-          element: <Compressors />,
-        },
-        {
-          path: "/dispensers",
-          element: <Dispensers />,
-        },
-        {
-          path: "/osushka",
-          element: <Osushka />,
-        },
-        {
-          path: "/chillers",
-          element: <Chillers />,
-        },
-        {
-          path: "/typeofcompressors",
-          element: <TypeOfCompressors />,
-        },
-        {
-          path: "/typeofdispensers",
-          element: <TypeOfDispensers />,
-        },
-        {
-          path: "/typeofosushka",
-          element: <TypeOfOsushka />,
-        },
-        {
-          path: "/typeofchillers",
-          element: <TypeOfChillers />,
-        },
-        {
-          path: "/equipment-types",
-          element: <EquipmentTypes />,
-        },
-        {
-          path: "/regions",
-          element: <Regions />,
-        },
-        {
-          path: "/cities",
-          element: <Cities />,
-        },
-        {
-          path: "/employees",
-          element: <Employees />,
-        },
-        {
-          path: "/docdeadline",
-          element: <DocDeadline />,
-        },
-        {
-          path: "/docperpetual",
-          element: <DocPerpetual />,
-        },
-        {
-          path: "/license",
-          element: <License />,
-        },
-        {
-          path: "/gas-certificate",
-          element: <GasCertificate />,
-        },
-        {
-          path: "/gas-analyzer",
-          element: <GasAnalyzer />,
-        },
-        {
-          path: "/moisture-meter",
-          element: <MoistureMeter />,
-        },
-        {
-          path: "/electrical-meters",
-          element: <ElectricalMeters />,
-        },
-        {
-          path: "/thermometers",
-          element: <Thermometers />,
-        },
-        {
-          path: "/manometers",
-          element: <Manometers />,
-        },
-        {
-          path: "/gas-unit",
-          element: <GasUnit />,
-        },
-        {
-          path: "/autopilot",
-          element: <Autopilot />,
-        },
-        {
-          path: "/flow-device",
-          element: <FlowDevice />,
-        },
-        {
-          path: "/electricity-meter",
-          element: <ElectricityMeter />,
-        },
-        {
-          path: "/water-meter",
-          element: <WaterMeter />,
-        },
+
+        { path: "/docbystation", element: <DocByStation /> },
+        { path: "/docbystationinf", element: <DocByStationInf /> },
+        { path: "/docdeadlineinf", element: <DocDeadlineInf /> },
+        { path: "/stationdocs/:id", element: <StationDocs /> },
+        { path: "/doctypepage", element: <DocumentTypePage /> },
       ],
     },
     {

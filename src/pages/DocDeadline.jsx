@@ -4,100 +4,56 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase/config";
 
 const DocDeadline = () => {
-  const [documentCounts, setDocumentCounts] = useState({});
+  const [documentTypes, setDocumentTypes] = useState([]);
+  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
 
-  const documentTypes = [
-    { id: "license", name: "Лицензия", path: "/license", color: "bg-blue-500" },
-    {
-      id: "gas_certificate",
-      name: "Сертификат на природный комприрированный газ",
-      path: "/gas-certificate",
-      color: "bg-green-500",
-    },
-    {
-      id: "gas_analyzer",
-      name: "Сертификат устройства газоанализатора",
-      path: "/gas-analyzer",
-      color: "bg-purple-500",
-    },
-    {
-      id: "moisture_meter",
-      name: "Сертификат устройства влагомера",
-      path: "/moisture-meter",
-      color: "bg-indigo-500",
-    },
-    {
-      id: "electrical_meters",
-      name: "Сертификат Ампер/вольметров",
-      path: "/electrical-meters",
-      color: "bg-yellow-500",
-    },
-    {
-      id: "thermometers",
-      name: "Сертификат термометров",
-      path: "/thermometers",
-      color: "bg-red-500",
-    },
-    {
-      id: "manometers",
-      name: "Сертификат манометров",
-      path: "/manometers",
-      color: "bg-pink-500",
-    },
-    {
-      id: "gas_unit",
-      name: "Сертификат узла учета газа",
-      path: "/gas-unit",
-      color: "bg-teal-500",
-    },
-    {
-      id: "autopilot",
-      name: "Сертификат счетчика природного газа AutoPilot",
-      path: "/autopilot",
-      color: "bg-orange-500",
-    },
-    {
-      id: "flow_device",
-      name: "Сертификат сужающего устройства",
-      path: "/flow-device",
-      color: "bg-cyan-500",
-    },
-    {
-      id: "electricity_meter",
-      name: "Сертификат счетчика электричества",
-      path: "/electricity-meter",
-      color: "bg-lime-500",
-    },
-    {
-      id: "water_meter",
-      name: "Сертификат счетчика воды",
-      path: "/water-meter",
-      color: "bg-emerald-500",
-    },
-  ];
-
   useEffect(() => {
-    fetchDocumentCounts();
+    fetchData();
   }, []);
 
-  const fetchDocumentCounts = async () => {
+  const fetchData = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "documents"));
+      // 🔹 Загружаем типы документов
+      const typesSnap = await getDocs(collection(db, "document_types"));
+      const typesData = typesSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      // 🔹 Загружаем все документы
+      const docsSnap = await getDocs(collection(db, "documents"));
       const counts = {};
 
-      querySnapshot.forEach((doc) => {
+      docsSnap.forEach((doc) => {
         const data = doc.data();
-        if (counts[data.docType]) {
-          counts[data.docType]++;
-        } else {
-          counts[data.docType] = 1;
+        const type = data.docType;
+        const expiry = new Date(data.expiryDate);
+        const now = new Date();
+        const diffDays = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+
+        if (!counts[type]) {
+          counts[type] = {
+            total: 0,
+            expired: 0,
+            less30: 0,
+            less15: 0,
+            less5: 0,
+          };
         }
+
+        counts[type].total++;
+
+        if (diffDays < 0) counts[type].expired++;
+        else if (diffDays <= 5) counts[type].less5++;
+        else if (diffDays <= 15) counts[type].less15++;
+        else if (diffDays <= 30) counts[type].less30++;
       });
 
-      setDocumentCounts(counts);
-    } catch (error) {
-      console.error("Error fetching document counts:", error);
+      setDocumentTypes(typesData);
+      setStats(counts);
+    } catch (err) {
+      console.error("Ошибка загрузки данных:", err);
     } finally {
       setLoading(false);
     }
@@ -105,69 +61,113 @@ const DocDeadline = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="h-20 w-20 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4 animate-fade-in">
-            Сроки Действия Документов
-          </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Управление документами и отслеживание сроков их действия для всех
-            станций
-          </p>
-        </div>
+  // 🔹 Сортировка: сначала типы с просроченными/срочными документами
+  const sortedTypes = [...documentTypes].sort((a, b) => {
+    const aStats = stats[a.id] || {};
+    const bStats = stats[b.id] || {};
+    const aScore =
+      (aStats.expired || 0) * 100 +
+      (aStats.less5 || 0) * 50 +
+      (aStats.less15 || 0) * 30 +
+      (aStats.less30 || 0) * 10;
+    const bScore =
+      (bStats.expired || 0) * 100 +
+      (bStats.less5 || 0) * 50 +
+      (bStats.less15 || 0) * 30 +
+      (bStats.less30 || 0) * 10;
+    return bScore - aScore;
+  });
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {documentTypes.map((docType, index) => (
-            <Link key={docType.id} to={docType.path} className="group">
-              <div
-                className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 p-6 border border-gray-200 hover:border-blue-300 animate-slide-up"
-                style={{ animationDelay: `${index * 100}ms` }}>
-                <div
-                  className={`w-12 h-12 ${docType.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-10 px-6">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold text-gray-800 text-center mb-10">
+          Сроки Действия Документов
+        </h1>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {sortedTypes.map((docType) => {
+            const typeStats = stats[docType.id] || {
+              total: 0,
+              expired: 0,
+              less30: 0,
+              less15: 0,
+              less5: 0,
+            };
+
+            return (
+              <Link
+                key={docType.id}
+                to={`/documents/${docType.id}`}
+                className="group">
+                <div className="bg-white rounded-2xl shadow-md hover:shadow-2xl p-6 transition-transform transform hover:-translate-y-2 border border-gray-200 hover:border-blue-300 duration-300">
+                  <div
+                    className={`w-12 h-12 ${
+                      docType.color || "bg-blue-500"
+                    } rounded-xl flex items-center justify-center mb-4`}>
+                    <svg
+                      className="w-6 h-6 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                  </div>
+
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors">
+                    {docType.name}
+                  </h3>
+
+                  {typeStats.total > 0 ? (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between text-gray-700 font-medium">
+                        <span>Всего:</span>
+                        <span>{typeStats.total}</span>
+                      </div>
+
+                      {typeStats.less30 > 0 && (
+                        <div className="flex justify-between text-green-600">
+                          <span>Меньше 30 дней:</span>
+                          <span>{typeStats.less30}</span>
+                        </div>
+                      )}
+                      {typeStats.less15 > 0 && (
+                        <div className="flex justify-between text-orange-500">
+                          <span>Меньше 15 дней:</span>
+                          <span>{typeStats.less15}</span>
+                        </div>
+                      )}
+                      {typeStats.less5 > 0 && (
+                        <div className="flex justify-between text-yellow-500 font-medium">
+                          <span>Меньше 5 дней:</span>
+                          <span>{typeStats.less5}</span>
+                        </div>
+                      )}
+                      {typeStats.expired > 0 && (
+                        <div className="flex justify-between text-red-600 font-semibold">
+                          <span>Просрочено:</span>
+                          <span>{typeStats.expired}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm italic">Нет данных</p>
+                  )}
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors duration-300">
-                  {docType.name}
-                </h3>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">
-                    Документов: {documentCounts[docType.id] || 0}
-                  </span>
-                  <svg
-                    className="w-5 h-5 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all duration-300"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </div>

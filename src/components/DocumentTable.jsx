@@ -10,12 +10,20 @@ const DocumentTable = ({ docType, docTypeName }) => {
   const [loading, setLoading] = useState(true);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [stations, setStations] = useState([]);
+
+  // Фильтры
+  const [filterLatestOnly, setFilterLatestOnly] = useState("all"); // all | latest
+  const [selectedStation, setSelectedStation] = useState("all");
+  const [expiryFilter, setExpiryFilter] = useState("all"); // all | 30 | 15 | 5 | expired
 
   useEffect(() => {
     fetchDocuments();
+    fetchStations();
   }, [docType]);
 
   const fetchDocuments = async () => {
+    setLoading(true);
     try {
       const q = query(
         collection(db, "documents"),
@@ -27,7 +35,6 @@ const DocumentTable = ({ docType, docTypeName }) => {
       querySnapshot.forEach((doc) => {
         docs.push({ id: doc.id, ...doc.data() });
       });
-
       setDocuments(docs);
     } catch (error) {
       console.error("Error fetching documents:", error);
@@ -36,17 +43,70 @@ const DocumentTable = ({ docType, docTypeName }) => {
     }
   };
 
+  const fetchStations = async () => {
+    try {
+      const q = collection(db, "stations");
+      const snap = await getDocs(q);
+      const data = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setStations(data);
+    } catch (err) {
+      console.error("Error fetching stations:", err);
+    }
+  };
+
   const getRowColor = (expiryDate) => {
     const color = getStatusColor(expiryDate);
     const colorClasses = {
-      red: "bg-red-50 hover:bg-red-100 border-l-4 border-red-500",
-      yellow: "bg-yellow-50 hover:bg-yellow-100 border-l-4 border-yellow-500",
-      orange: "bg-orange-50 hover:bg-orange-100 border-l-4 border-orange-500",
-      green: "bg-green-50 hover:bg-green-100 border-l-4 border-green-500",
-      default: "bg-white hover:bg-gray-50 border-l-4 border-gray-300",
+      "bg-red-200": "bg-red-50 hover:bg-red-100 border-l-4 border-red-500",
+      "bg-yellow-200":
+        "bg-yellow-50 hover:bg-yellow-100 border-l-4 border-yellow-500",
+      "bg-orange-200":
+        "bg-orange-50 hover:bg-orange-100 border-l-4 border-orange-500",
+      "bg-green-200":
+        "bg-green-50 hover:bg-green-100 border-l-4 border-green-500",
+      "bg-white": "bg-white hover:bg-gray-50 border-l-4 border-gray-300",
     };
-    return colorClasses[color];
+    return colorClasses[color] || colorClasses["bg-white"];
   };
+
+  // Применяем фильтры
+  const filteredDocuments = (() => {
+    let filtered = [...documents];
+    const today = new Date();
+
+    // фильтр по станции
+    if (selectedStation !== "all") {
+      filtered = filtered.filter((doc) => doc.stationId === selectedStation);
+    }
+
+    // фильтр по срокам
+    filtered = filtered.filter((doc) => {
+      const expiry = new Date(doc.expiryDate);
+      const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+      if (expiryFilter === "expired") return diffDays < 0;
+      if (expiryFilter === "5") return diffDays <= 5 && diffDays >= 0;
+      if (expiryFilter === "15") return diffDays <= 15 && diffDays > 5;
+      if (expiryFilter === "30") return diffDays <= 30 && diffDays > 15;
+      return true;
+    });
+
+    // фильтр "только последние документы по станции"
+    if (filterLatestOnly === "latest") {
+      const byStation = {};
+      for (const doc of filtered) {
+        if (
+          !byStation[doc.stationId] ||
+          new Date(doc.expiryDate) >
+            new Date(byStation[doc.stationId].expiryDate)
+        ) {
+          byStation[doc.stationId] = doc;
+        }
+      }
+      filtered = Object.values(byStation);
+    }
+
+    return filtered;
+  })();
 
   if (loading) {
     return (
@@ -59,38 +119,46 @@ const DocumentTable = ({ docType, docTypeName }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {docTypeName}
-              </h1>
-              <p className="text-gray-600">
-                Управление документами и отслеживание сроков
-              </p>
-            </div>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 flex items-center space-x-2">
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              <span>Добавить документ</span>
-            </button>
+        {/* Header и Фильтры */}
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-wrap gap-4 items-center">
+            <select
+              value={filterLatestOnly}
+              onChange={(e) => setFilterLatestOnly(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm">
+              <option value="latest">Только последние документы</option>
+              <option value="all">Все документы</option>
+            </select>
+            <select
+              value={selectedStation}
+              onChange={(e) => setSelectedStation(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm">
+              <option value="all">Все станции</option>
+              {stations.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={expiryFilter}
+              onChange={(e) => setExpiryFilter(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 bg-white shadow-sm">
+              <option value="all">Все сроки</option>
+              <option value="30">Осталось 30 дней</option>
+              <option value="15">Осталось 15 дней</option>
+              <option value="5">Осталось 5 дней</option>
+              <option value="expired">Просрочено</option>
+            </select>
           </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200">
+            Добавить документ
+          </button>
         </div>
 
-        {/* Table */}
+        {/* Таблица */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden animate-fade-in">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -117,7 +185,7 @@ const DocumentTable = ({ docType, docTypeName }) => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {documents.map((doc, index) => (
+                {filteredDocuments.map((doc, index) => (
                   <tr
                     key={doc.id}
                     onClick={() => setSelectedDocument(doc)}
@@ -125,36 +193,28 @@ const DocumentTable = ({ docType, docTypeName }) => {
                       doc.expiryDate
                     )}`}
                     style={{ animationDelay: `${index * 50}ms` }}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {doc.stationName}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {doc.stationName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {doc.docNumber}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {doc.docNumber}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {new Date(doc.issueDate).toLocaleDateString("ru-RU")}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(doc.issueDate).toLocaleDateString("ru-RU")}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {new Date(doc.expiryDate).toLocaleDateString("ru-RU")}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(doc.expiryDate).toLocaleDateString("ru-RU")}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                          getStatusColor(doc.expiryDate) === "red"
+                          getStatusColor(doc.expiryDate) === "bg-red-200"
                             ? "bg-red-100 text-red-800"
-                            : getStatusColor(doc.expiryDate) === "yellow"
+                            : getStatusColor(doc.expiryDate) === "bg-yellow-200"
                             ? "bg-yellow-100 text-yellow-800"
-                            : getStatusColor(doc.expiryDate) === "orange"
+                            : getStatusColor(doc.expiryDate) === "bg-orange-200"
                             ? "bg-orange-100 text-orange-800"
-                            : getStatusColor(doc.expiryDate) === "green"
+                            : getStatusColor(doc.expiryDate) === "bg-green-200"
                             ? "bg-green-100 text-green-800"
                             : "bg-gray-100 text-gray-800"
                         }`}>
@@ -169,18 +229,7 @@ const DocumentTable = ({ docType, docTypeName }) => {
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
                           className="text-blue-600 hover:text-blue-800 transition-colors duration-200">
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                          </svg>
+                          🔗
                         </a>
                       )}
                     </td>
@@ -191,26 +240,14 @@ const DocumentTable = ({ docType, docTypeName }) => {
           </div>
         </div>
 
-        {/* Empty State */}
-        {documents.length === 0 && (
+        {/* Empty state */}
+        {filteredDocuments.length === 0 && (
           <div className="text-center py-12 animate-fade-in">
-            <svg
-              className="mx-auto h-24 w-24 text-gray-400 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               Документы не найдены
             </h3>
             <p className="text-gray-500 mb-4">
-              Начните с добавления первого документа
+              Измените фильтры или добавьте новый документ
             </p>
             <button
               onClick={() => setShowAddModal(true)}
@@ -220,15 +257,13 @@ const DocumentTable = ({ docType, docTypeName }) => {
           </div>
         )}
 
-        {/* Document Detail Modal */}
+        {/* Modals */}
         {selectedDocument && (
           <DocumentDetailModal
             document={selectedDocument}
             onClose={() => setSelectedDocument(null)}
           />
         )}
-
-        {/* Add Document Modal */}
         {showAddModal && (
           <AddDocumentModal
             docType={docType}

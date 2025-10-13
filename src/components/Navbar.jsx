@@ -10,8 +10,6 @@ import { signOut } from "firebase/auth";
 import { auth } from "../firebase/config";
 import { toast } from "react-toastify";
 import { useAppStore } from "../lib/zustand/index";
-
-// Добавляем необходимые импорты Material-UI
 import { motion } from "framer-motion";
 import { Paper } from "@mui/material";
 import Drawer from "@mui/material/Drawer";
@@ -21,7 +19,7 @@ import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Divider from "@mui/material/Divider";
-import { styled, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import LocalGasStationIcon from "@mui/icons-material/LocalGasStation";
 import PeopleIcon from "@mui/icons-material/People";
 import CorporateFareIcon from "@mui/icons-material/CorporateFare";
@@ -39,12 +37,12 @@ import ChillerIcon from "@mui/icons-material/DeviceThermostat";
 import MapIcon from "@mui/icons-material/Map";
 import LocationCityIcon from "@mui/icons-material/LocationCity";
 import PublicIcon from "@mui/icons-material/Public";
-import DescriptionIcon from "@mui/icons-material/Description"; // Иконка для документов
-import ScheduleIcon from "@mui/icons-material/Schedule"; // Иконка для документов с сроком
-import AllInclusiveIcon from "@mui/icons-material/AllInclusive"; // Иконка для бессрочных документов
+import DescriptionIcon from "@mui/icons-material/Description";
+import ScheduleIcon from "@mui/icons-material/Schedule";
+import AllInclusiveIcon from "@mui/icons-material/AllInclusive";
 import { useNavigate } from "react-router-dom";
 import Collapse from "@mui/material/Collapse";
-import BadgeIcon from "@mui/icons-material/Badge"; // Иконка для сотрудников
+import BadgeIcon from "@mui/icons-material/Badge";
 
 export default function Navbar() {
   const MotionPaper = motion.create(Paper);
@@ -54,7 +52,12 @@ export default function Navbar() {
   const [equipmentDetailsOpen, setEquipmentDetailsOpen] = React.useState(false);
   const [equipmentTypesOpen, setEquipmentTypesOpen] = React.useState(false);
   const [regionsOpen, setRegionsOpen] = React.useState(false);
-  const [documentsOpen, setDocumentsOpen] = React.useState(false); // Новое состояние для документов
+
+  // Документы
+  const [documentsOpen, setDocumentsOpen] = React.useState(false);
+  const [docsTimedOpen, setDocsTimedOpen] = React.useState(false);
+  const [docsPerpOpen, setDocsPerpOpen] = React.useState(false);
+
   const navigate = useNavigate();
   const theme = useTheme();
 
@@ -68,17 +71,17 @@ export default function Navbar() {
     if (
       event.type === "keydown" &&
       (event.key === "Tab" || event.key === "Shift")
-    ) {
+    )
       return;
-    }
     setDrawerOpen(open);
-    // Сбрасываем состояния меню при закрытии drawer
     if (!open) {
       setEquipmentOpen(false);
       setEquipmentDetailsOpen(false);
       setEquipmentTypesOpen(false);
       setRegionsOpen(false);
-      setDocumentsOpen(false); // Сбрасываем состояние документов
+      setDocumentsOpen(false);
+      setDocsTimedOpen(false);
+      setDocsPerpOpen(false);
     }
   };
 
@@ -87,25 +90,15 @@ export default function Navbar() {
     navigate(path);
   };
 
-  const handleEquipmentClick = () => {
-    setEquipmentOpen(!equipmentOpen);
-  };
-
-  const handleEquipmentDetailsClick = () => {
+  const handleEquipmentClick = () => setEquipmentOpen(!equipmentOpen);
+  const handleEquipmentDetailsClick = () =>
     setEquipmentDetailsOpen(!equipmentDetailsOpen);
-  };
-
-  const handleEquipmentTypesClick = () => {
+  const handleEquipmentTypesClick = () =>
     setEquipmentTypesOpen(!equipmentTypesOpen);
-  };
-
-  const handleRegionsClick = () => {
-    setRegionsOpen(!regionsOpen);
-  };
-
-  const handleDocumentsClick = () => {
-    setDocumentsOpen(!documentsOpen);
-  };
+  const handleRegionsClick = () => setRegionsOpen(!regionsOpen);
+  const handleDocumentsClick = () => setDocumentsOpen(!documentsOpen);
+  const handleDocsTimedClick = () => setDocsTimedOpen(!docsTimedOpen);
+  const handleDocsPerpClick = () => setDocsPerpOpen(!docsPerpOpen);
 
   const menuItems = [
     { text: "Станции", icon: <LocalGasStationIcon />, path: "/stations" },
@@ -150,29 +143,33 @@ export default function Navbar() {
   ];
 
   const regionsItems = [
-    {
-      text: "Области",
-      icon: <PublicIcon />,
-      path: "/regions",
-    },
-    {
-      text: "Города и районы",
-      icon: <LocationCityIcon />,
-      path: "/cities",
-    },
+    { text: "Области", icon: <PublicIcon />, path: "/regions" },
+    { text: "Города и районы", icon: <LocationCityIcon />, path: "/cities" },
   ];
 
-  // Новые элементы для меню документов
-  const documentsItems = [
+  const docsTimedItems = [
     {
-      text: "Документы с сроком",
-      icon: <ScheduleIcon />,
+      text: "Документы по типам",
+      icon: <DescriptionIcon />,
       path: "/docdeadline",
     },
     {
-      text: "Бессрочные документы",
-      icon: <AllInclusiveIcon />,
-      path: "/docperpetual",
+      text: "Документы по станциям",
+      icon: <LocalGasStationIcon />,
+      path: "/docbystation",
+    },
+  ];
+
+  const docsPerpItems = [
+    {
+      text: "Документы по типам",
+      icon: <DescriptionIcon />,
+      path: "/docdeadlineinf",
+    },
+    {
+      text: "Документы по станциям",
+      icon: <LocalGasStationIcon />,
+      path: "/docbystationinf",
     },
   ];
 
@@ -198,10 +195,10 @@ export default function Navbar() {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            News
+            Метан
           </Typography>
           <Button onClick={signOutProfile} color="inherit">
-            Logout
+            Выход
           </Button>
         </Toolbar>
       </AppBar>
@@ -224,7 +221,6 @@ export default function Navbar() {
             display: "flex",
             flexDirection: "column",
           }}>
-          {/* Заголовок меню */}
           <Box
             sx={{
               display: "flex",
@@ -243,23 +239,14 @@ export default function Navbar() {
 
           <Divider />
 
-          {/* Прокручиваемая область меню */}
           <Box
             sx={{
               flex: 1,
               overflow: "auto",
-              "&::-webkit-scrollbar": {
-                width: "8px",
-              },
-              "&::-webkit-scrollbar-track": {
-                background: theme.palette.grey[100],
-              },
+              "&::-webkit-scrollbar": { width: "8px" },
               "&::-webkit-scrollbar-thumb": {
                 background: theme.palette.grey[400],
                 borderRadius: "4px",
-              },
-              "&::-webkit-scrollbar-thumb:hover": {
-                background: theme.palette.grey[600],
               },
             }}>
             <List sx={{ padding: "8px" }}>
@@ -293,274 +280,186 @@ export default function Navbar() {
                 </motion.div>
               ))}
 
-              {/* Меню Регионы */}
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: menuItems.length * 0.1 }}>
-                <ListItem disablePadding sx={{ mb: 1 }}>
-                  <ListItemButton
-                    onClick={handleRegionsClick}
-                    sx={{
-                      borderRadius: "8px",
-                      "&:hover": {
-                        backgroundColor: theme.palette.action.hover,
-                      },
-                    }}>
-                    <ListItemIcon sx={{ minWidth: "40px" }}>
-                      <MapIcon />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Регионы"
-                      primaryTypographyProps={{
-                        fontSize: "15px",
-                        fontWeight: "500",
-                      }}
-                    />
-                    {regionsOpen ? <ExpandLess /> : <ExpandMore />}
-                  </ListItemButton>
-                </ListItem>
-
-                <Collapse in={regionsOpen} timeout="auto" unmountOnExit>
-                  <List component="div" disablePadding>
-                    {regionsItems.map((item, index) => (
-                      <ListItem
-                        key={item.text}
-                        disablePadding
-                        sx={{ mb: 0.5, pl: 2 }}>
-                        <ListItemButton
-                          onClick={() => handleMenuClick(item.path)}
-                          sx={{
-                            borderRadius: "6px",
-                            "&:hover": {
-                              backgroundColor: theme.palette.action.hover,
-                            },
-                          }}>
-                          <ListItemIcon sx={{ minWidth: "36px" }}>
-                            {item.icon}
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={item.text}
-                            primaryTypographyProps={{
-                              fontSize: "14px",
-                              fontWeight: "500",
-                            }}
-                          />
-                        </ListItemButton>
-                      </ListItem>
-                    ))}
-                  </List>
-                </Collapse>
-              </motion.div>
-
-              {/* Меню Оборудования */}
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: (menuItems.length + 1) * 0.1 }}>
-                <ListItem disablePadding sx={{ mb: 1 }}>
-                  <ListItemButton
-                    onClick={handleEquipmentClick}
-                    sx={{
-                      borderRadius: "8px",
-                      "&:hover": {
-                        backgroundColor: theme.palette.action.hover,
-                      },
-                    }}>
-                    <ListItemIcon sx={{ minWidth: "40px" }}>
-                      <BuildIcon />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Оборудования"
-                      primaryTypographyProps={{
-                        fontSize: "15px",
-                        fontWeight: "500",
-                      }}
-                    />
-                    {equipmentOpen ? <ExpandLess /> : <ExpandMore />}
-                  </ListItemButton>
-                </ListItem>
-
-                <Collapse in={equipmentOpen} timeout="auto" unmountOnExit>
-                  <List component="div" disablePadding>
-                    {/* Подменю Сведения об оборудованиях */}
-                    <ListItem disablePadding sx={{ mb: 1, pl: 2 }}>
+              {/* --- Регионы --- */}
+              <ListItem disablePadding sx={{ mb: 1 }}>
+                <ListItemButton onClick={handleRegionsClick}>
+                  <ListItemIcon>
+                    <MapIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Регионы" />
+                  {regionsOpen ? <ExpandLess /> : <ExpandMore />}
+                </ListItemButton>
+              </ListItem>
+              <Collapse in={regionsOpen} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  {regionsItems.map((item) => (
+                    <ListItem key={item.text} disablePadding sx={{ pl: 2 }}>
                       <ListItemButton
-                        onClick={handleEquipmentDetailsClick}
-                        sx={{
-                          borderRadius: "6px",
-                          "&:hover": {
-                            backgroundColor: theme.palette.action.hover,
-                          },
-                        }}>
-                        <ListItemIcon sx={{ minWidth: "36px" }}>
-                          <SettingsInputComponentIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Сведения об оборудованиях"
-                          primaryTypographyProps={{
-                            fontSize: "14px",
-                            fontWeight: "500",
-                          }}
-                        />
-                        {equipmentDetailsOpen ? <ExpandLess /> : <ExpandMore />}
+                        onClick={() => handleMenuClick(item.path)}>
+                        <ListItemIcon>{item.icon}</ListItemIcon>
+                        <ListItemText primary={item.text} />
                       </ListItemButton>
                     </ListItem>
+                  ))}
+                </List>
+              </Collapse>
 
-                    <Collapse
-                      in={equipmentDetailsOpen}
-                      timeout="auto"
-                      unmountOnExit>
-                      <List component="div" disablePadding>
-                        {equipmentDetailsItems.map((item, index) => (
-                          <ListItem
-                            key={item.text}
-                            disablePadding
-                            sx={{ mb: 0.5, pl: 4 }}>
-                            <ListItemButton
-                              onClick={() => handleMenuClick(item.path)}
-                              sx={{
-                                borderRadius: "4px",
-                                py: 0.5,
-                                "&:hover": {
-                                  backgroundColor: theme.palette.action.hover,
-                                },
-                              }}>
-                              <ListItemIcon sx={{ minWidth: "32px" }}>
-                                {item.icon}
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={item.text}
-                                primaryTypographyProps={{
-                                  fontSize: "13px",
-                                }}
-                              />
-                            </ListItemButton>
-                          </ListItem>
-                        ))}
-                      </List>
-                    </Collapse>
+              {/* --- Оборудования --- */}
+              <ListItem disablePadding sx={{ mb: 1 }}>
+                <ListItemButton onClick={handleEquipmentClick}>
+                  <ListItemIcon>
+                    <BuildIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Оборудования" />
+                  {equipmentOpen ? <ExpandLess /> : <ExpandMore />}
+                </ListItemButton>
+              </ListItem>
+              <Collapse in={equipmentOpen} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  {/* Сведения */}
+                  <ListItem disablePadding sx={{ pl: 2 }}>
+                    <ListItemButton onClick={handleEquipmentDetailsClick}>
+                      <ListItemIcon>
+                        <SettingsInputComponentIcon />
+                      </ListItemIcon>
+                      <ListItemText primary="Сведения об оборудованиях" />
+                      {equipmentDetailsOpen ? <ExpandLess /> : <ExpandMore />}
+                    </ListItemButton>
+                  </ListItem>
+                  <Collapse
+                    in={equipmentDetailsOpen}
+                    timeout="auto"
+                    unmountOnExit>
+                    <List component="div" disablePadding>
+                      {equipmentDetailsItems.map((item) => (
+                        <ListItem key={item.text} disablePadding sx={{ pl: 4 }}>
+                          <ListItemButton
+                            onClick={() => handleMenuClick(item.path)}>
+                            <ListItemIcon>{item.icon}</ListItemIcon>
+                            <ListItemText primary={item.text} />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Collapse>
 
-                    {/* Подменю Типы оборудования */}
-                    <ListItem disablePadding sx={{ mb: 1, pl: 2 }}>
-                      <ListItemButton
-                        onClick={handleEquipmentTypesClick}
-                        sx={{
-                          borderRadius: "6px",
-                          "&:hover": {
-                            backgroundColor: theme.palette.action.hover,
-                          },
-                        }}>
-                        <ListItemIcon sx={{ minWidth: "36px" }}>
-                          <CategoryIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Типы оборудования"
-                          primaryTypographyProps={{
-                            fontSize: "14px",
-                            fontWeight: "500",
-                          }}
-                        />
-                        {equipmentTypesOpen ? <ExpandLess /> : <ExpandMore />}
-                      </ListItemButton>
-                    </ListItem>
+                  {/* Типы оборудования */}
+                  <ListItem disablePadding sx={{ pl: 2 }}>
+                    <ListItemButton onClick={handleEquipmentTypesClick}>
+                      <ListItemIcon>
+                        <CategoryIcon />
+                      </ListItemIcon>
+                      <ListItemText primary="Типы оборудования" />
+                      {equipmentTypesOpen ? <ExpandLess /> : <ExpandMore />}
+                    </ListItemButton>
+                  </ListItem>
+                  <Collapse
+                    in={equipmentTypesOpen}
+                    timeout="auto"
+                    unmountOnExit>
+                    <List component="div" disablePadding>
+                      {equipmentTypesItems.map((item) => (
+                        <ListItem key={item.text} disablePadding sx={{ pl: 4 }}>
+                          <ListItemButton
+                            onClick={() => handleMenuClick(item.path)}>
+                            <ListItemIcon>{item.icon}</ListItemIcon>
+                            <ListItemText primary={item.text} />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Collapse>
+                </List>
+              </Collapse>
 
-                    <Collapse
-                      in={equipmentTypesOpen}
-                      timeout="auto"
-                      unmountOnExit>
-                      <List component="div" disablePadding>
-                        {equipmentTypesItems.map((item, index) => (
-                          <ListItem
-                            key={item.text}
-                            disablePadding
-                            sx={{ mb: 0.5, pl: 4 }}>
-                            <ListItemButton
-                              onClick={() => handleMenuClick(item.path)}
-                              sx={{
-                                borderRadius: "4px",
-                                py: 0.5,
-                                "&:hover": {
-                                  backgroundColor: theme.palette.action.hover,
-                                },
-                              }}>
-                              <ListItemIcon sx={{ minWidth: "32px" }}>
-                                {item.icon}
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={item.text}
-                                primaryTypographyProps={{
-                                  fontSize: "13px",
-                                }}
-                              />
-                            </ListItemButton>
-                          </ListItem>
-                        ))}
-                      </List>
-                    </Collapse>
-                  </List>
-                </Collapse>
-              </motion.div>
+              {/* --- Документы --- */}
+              <ListItem disablePadding sx={{ mb: 1 }}>
+                <ListItemButton onClick={handleDocumentsClick}>
+                  <ListItemIcon>
+                    <DescriptionIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Документы" />
+                  {documentsOpen ? <ExpandLess /> : <ExpandMore />}
+                </ListItemButton>
+              </ListItem>
+              <Collapse in={documentsOpen} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  {/* ✅ Новый пункт */}
+                  <ListItem disablePadding sx={{ mb: 0.5, pl: 2 }}>
+                    <ListItemButton
+                      onClick={() => handleMenuClick("/doctypepage")}
+                      sx={{
+                        borderRadius: "6px",
+                        "&:hover": {
+                          backgroundColor: theme.palette.action.hover,
+                        },
+                      }}>
+                      <ListItemIcon sx={{ minWidth: "36px" }}>
+                        <CategoryIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Типы документов"
+                        primaryTypographyProps={{
+                          fontSize: "14px",
+                          fontWeight: "500",
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
 
-              {/* Новое меню Документы */}
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: (menuItems.length + 2) * 0.1 }}>
-                <ListItem disablePadding sx={{ mb: 1 }}>
-                  <ListItemButton
-                    onClick={handleDocumentsClick}
-                    sx={{
-                      borderRadius: "8px",
-                      "&:hover": {
-                        backgroundColor: theme.palette.action.hover,
-                      },
-                    }}>
-                    <ListItemIcon sx={{ minWidth: "40px" }}>
-                      <DescriptionIcon />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Документы"
-                      primaryTypographyProps={{
-                        fontSize: "15px",
-                        fontWeight: "500",
-                      }}
-                    />
-                    {documentsOpen ? <ExpandLess /> : <ExpandMore />}
-                  </ListItemButton>
-                </ListItem>
+                  <Divider sx={{ my: 1 }} />
 
-                <Collapse in={documentsOpen} timeout="auto" unmountOnExit>
-                  <List component="div" disablePadding>
-                    {documentsItems.map((item, index) => (
-                      <ListItem
-                        key={item.text}
-                        disablePadding
-                        sx={{ mb: 0.5, pl: 2 }}>
-                        <ListItemButton
-                          onClick={() => handleMenuClick(item.path)}
-                          sx={{
-                            borderRadius: "6px",
-                            "&:hover": {
-                              backgroundColor: theme.palette.action.hover,
-                            },
-                          }}>
-                          <ListItemIcon sx={{ minWidth: "36px" }}>
-                            {item.icon}
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={item.text}
-                            primaryTypographyProps={{
-                              fontSize: "14px",
-                              fontWeight: "500",
-                            }}
-                          />
-                        </ListItemButton>
-                      </ListItem>
-                    ))}
-                  </List>
-                </Collapse>
-              </motion.div>
+                  {/* Документы со сроком */}
+                  <ListItem disablePadding sx={{ pl: 2 }}>
+                    <ListItemButton onClick={handleDocsTimedClick}>
+                      <ListItemIcon>
+                        <ScheduleIcon />
+                      </ListItemIcon>
+                      <ListItemText primary="Документы со сроком" />
+                      {docsTimedOpen ? <ExpandLess /> : <ExpandMore />}
+                    </ListItemButton>
+                  </ListItem>
+                  <Collapse in={docsTimedOpen} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                      {docsTimedItems.map((item) => (
+                        <ListItem key={item.text} disablePadding sx={{ pl: 4 }}>
+                          <ListItemButton
+                            onClick={() => handleMenuClick(item.path)}>
+                            <ListItemIcon>{item.icon}</ListItemIcon>
+                            <ListItemText primary={item.text} />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Collapse>
+
+                  <Divider sx={{ my: 1 }} />
+
+                  {/* Бессрочные документы */}
+                  <ListItem disablePadding sx={{ pl: 2 }}>
+                    <ListItemButton onClick={handleDocsPerpClick}>
+                      <ListItemIcon>
+                        <AllInclusiveIcon />
+                      </ListItemIcon>
+                      <ListItemText primary="Бессрочные документы" />
+                      {docsPerpOpen ? <ExpandLess /> : <ExpandMore />}
+                    </ListItemButton>
+                  </ListItem>
+                  <Collapse in={docsPerpOpen} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                      {docsPerpItems.map((item) => (
+                        <ListItem key={item.text} disablePadding sx={{ pl: 4 }}>
+                          <ListItemButton
+                            onClick={() => handleMenuClick(item.path)}>
+                            <ListItemIcon>{item.icon}</ListItemIcon>
+                            <ListItemText primary={item.text} />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Collapse>
+                </List>
+              </Collapse>
             </List>
           </Box>
         </Paper>

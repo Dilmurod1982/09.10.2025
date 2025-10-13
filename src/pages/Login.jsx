@@ -143,7 +143,6 @@ function Login() {
 
     if (result.success) {
       // Сессия автоматически запустится через хук useSessionTimeout
-      console.log("Login successful, session started");
     }
   };
 
