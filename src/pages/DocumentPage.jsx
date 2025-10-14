@@ -71,14 +71,7 @@ const DocumentPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-6 px-4">
       {/* Верхняя панель фильтров */}
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
-        {/* Кнопка Назад */}
-        <button
-          onClick={() => navigate(-1)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-          ← Назад
-        </button>
-      </div>
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4"></div>
 
       {/* Таблица документов */}
       <DocumentTable
