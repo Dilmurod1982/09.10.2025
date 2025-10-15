@@ -58,71 +58,53 @@ const DocByStation = () => {
     }
   };
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="h-20 w-20 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-10 px-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-bold text-gray-800 text-center mb-10">
-          Документы по станциям
-        </h1>
+    <div className="p-6">
+      <h1 className="text-2xl font-semibold mb-6">Документы по станциям</h1>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {stations.map((station) => {
-            const s = stats[station.id];
-            if (!s) return null;
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {stations.map((station) => {
+          const s = stats[station.id];
+          if (!s) return null;
 
-            // если все равно нули — не показываем
-            if (s.expired + s.less5 + s.less15 + s.less30 === 0) return null;
+          // если все равно нули — не показываем
+          if (s.expired + s.less5 + s.less15 + s.less30 === 0) return null;
 
-            return (
-              <Link
-                key={station.id}
-                to={`/stationdocs/${station.id}`}
-                className="group">
-                <div className="bg-white rounded-2xl shadow-md hover:shadow-2xl p-6 transition-transform transform hover:-translate-y-2 border border-gray-200 hover:border-blue-300 duration-300">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                      {station.stationName}
-                    </h3>
-                  </div>
-
-                  <div className="space-y-2 text-sm">
-                    {s.less30 > 0 && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Меньше 30 дней:</span>
-                        <span>{s.less30}</span>
-                      </div>
-                    )}
-                    {s.less15 > 0 && (
-                      <div className="flex justify-between text-orange-500">
-                        <span>Меньше 15 дней:</span>
-                        <span>{s.less15}</span>
-                      </div>
-                    )}
-                    {s.less5 > 0 && (
-                      <div className="flex justify-between text-yellow-500 font-medium">
-                        <span>Меньше 5 дней:</span>
-                        <span>{s.less5}</span>
-                      </div>
-                    )}
-                    {s.expired > 0 && (
-                      <div className="flex justify-between text-red-600 font-semibold">
-                        <span>Просрочено:</span>
-                        <span>{s.expired}</span>
-                      </div>
-                    )}
-                  </div>
+          return (
+            <Link
+              key={station.id}
+              to={`/stationdocs/${station.id}`}
+              className="border rounded-lg p-4 hover:shadow-md transition bg-white">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-medium text-lg">{station.stationName}</h2>
+                <div className="w-8 h-8 rounded-md bg-blue-500 flex items-center justify-center text-white text-xs font-semibold">
+                  {s.total || 0}
                 </div>
-              </Link>
-            );
-          })}
-        </div>
+              </div>
+
+              <div className="space-y-1 text-sm">
+                <p className="text-green-600">
+                  Меньше 30 дней: {s.less30 || 0}
+                </p>
+                <p className="text-yellow-500">
+                  Меньше 15 дней: {s.less15 || 0}
+                </p>
+                <p className="text-orange-500">Меньше 5 дней: {s.less5 || 0}</p>
+                <p className="text-red-600 font-semibold">
+                  Просрочено: {s.expired || 0}
+                </p>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

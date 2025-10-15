@@ -1,111 +1,343 @@
-import React, { useState, useEffect } from "react";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
-import { db } from "../firebase/config";
+import React, { useEffect, useMemo, useState } from "react";
+import { useAppStore } from "../lib/zustand";
 import { getStatusColor, getStatusText } from "../utils/dateUtils";
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
+import * as XLSX from "xlsx"; // <== обязательно установить: npm install xlsx
 
-const DocumentTable = ({ docType, docTypeName }) => {
-  const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
+const safeGetNumber = (doc) =>
+  doc.docNumber ||
+  doc.doc_number ||
+  doc.number ||
+  doc.docNo ||
+  doc.number_doc ||
+  "";
 
-  // Загружаем документы
+const safeGetIssueDate = (doc) =>
+  doc.issueDate || doc.date_of_issue || doc.startDate || doc.issued_at || "";
+
+const safeGetExpiryDate = (doc) =>
+  doc.expiryDate || doc.date_of_expiry || doc.valid_until || "";
+
+const safeGetFileUrl = (doc) => doc.fileUrl || doc.file_url || doc.url || "";
+const safeGetFileName = (doc) => doc.fileName || doc.file_name || "";
+
+const parseDate = (d) => {
+  if (!d) return null;
+  if (typeof d === "object" && d !== null && typeof d.toDate === "function") {
+    return d.toDate();
+  }
+  const parsed = new Date(d);
+  if (!isNaN(parsed)) return parsed;
+  return null;
+};
+
+const daysUntil = (expiryDate) => {
+  const expiry = parseDate(expiryDate);
+  if (!expiry) return Infinity;
+  const now = new Date();
+  return Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+};
+
+const DocumentTable = ({ docType, docTypeData, refreshTrigger = 0 }) => {
+  const { documents, refreshDocuments } = useAppStore();
+
+  const [latestOnly, setLatestOnly] = useState("all");
+  const [selectedStation, setSelectedStation] = useState("all");
+  const [expiryFilter, setExpiryFilter] = useState("all");
+  const [search, setSearch] = useState("");
+
   useEffect(() => {
-    const fetchDocuments = async () => {
-      try {
-        const q = query(collection(db, docType), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        const docsData = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setDocuments(docsData);
-      } catch (error) {
-        console.error("Ошибка загрузки документов:", error);
-      } finally {
-        setLoading(false);
+    if (refreshDocuments) {
+      refreshDocuments();
+    }
+  }, [refreshTrigger, refreshDocuments]);
+
+  const stations = useMemo(() => {
+    const map = {};
+    documents.forEach((d) => {
+      if (d.docType !== docType) return;
+      const id = d.stationId || d.station_id || "";
+      const name = d.stationName || d.station_name || d.station || "";
+      if (!id && !name) return;
+      map[id || name] = name || id;
+    });
+    return Object.entries(map).map(([id, name]) => ({ id, name }));
+  }, [documents, docType]);
+
+  const docsOfType = useMemo(
+    () => documents.filter((d) => d.docType === docType),
+    [documents, docType]
+  );
+
+  const lastPerStation = useMemo(() => {
+    if (latestOnly !== "latest") return null;
+    const perStation = {};
+    docsOfType.forEach((d) => {
+      const sid =
+        d.stationId ||
+        d.station_id ||
+        d.stationName ||
+        d.station_name ||
+        d.station ||
+        "unknown";
+      const currentBest = perStation[sid];
+      const currExpiry = parseDate(safeGetExpiryDate(d));
+      if (!currentBest) {
+        perStation[sid] = d;
+      } else {
+        const bestExpiry = parseDate(safeGetExpiryDate(currentBest));
+        if (!bestExpiry && currExpiry) perStation[sid] = d;
+        else if (currExpiry && bestExpiry && currExpiry > bestExpiry)
+          perStation[sid] = d;
       }
-    };
+    });
+    return Object.values(perStation);
+  }, [docsOfType, latestOnly]);
 
-    fetchDocuments();
-  }, [docType]);
+  const filtered = useMemo(() => {
+    let list =
+      latestOnly === "latest" ? lastPerStation || [] : docsOfType.slice();
 
-  // Экспорт в Excel
-  const handleExportToExcel = () => {
-    if (documents.length === 0) {
-      alert("Нет данных для экспорта!");
-      return;
+    if (selectedStation !== "all") {
+      list = list.filter((d) => {
+        const sid =
+          d.stationId ||
+          d.station_id ||
+          d.stationName ||
+          d.station_name ||
+          d.station ||
+          "";
+        return sid === selectedStation;
+      });
     }
 
-    // Преобразуем данные в формат таблицы
-    const exportData = documents.map((doc) => ({
-      ID: doc.id,
-      "Номер документа": doc.number || "",
-      "Дата принятия": doc.date_of_issue || "",
-      "Срок действия": doc.date_of_expiry || "",
-      Статус: getStatusText(doc.date_of_expiry),
-      Название: docTypeName,
-    }));
+    if (expiryFilter !== "all") {
+      list = list.filter((d) => {
+        const days = daysUntil(safeGetExpiryDate(d));
+        if (expiryFilter === "expired") return days < 0;
+        const n = Number(expiryFilter);
+        if (isNaN(n)) return true;
+        return days <= n && days >= 0;
+      });
+    }
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Документы");
+    if (search.trim() !== "") {
+      const q = search.trim().toLowerCase();
+      list = list.filter((d) => {
+        const number = (safeGetNumber(d) || "").toString().toLowerCase();
+        const station = (d.stationName || d.station_name || "").toLowerCase();
+        const fname = (safeGetFileName(d) || "").toLowerCase();
+        return number.includes(q) || station.includes(q) || fname.includes(q);
+      });
+    }
 
-    const excelBuffer = XLSX.write(workbook, {
-      bookType: "xlsx",
-      type: "array",
+    list.sort((a, b) => {
+      const ea = parseDate(safeGetExpiryDate(a));
+      const eb = parseDate(safeGetExpiryDate(b));
+      if (ea && eb) {
+        if (ea < eb) return -1;
+        if (ea > eb) return 1;
+      } else if (ea && !eb) return -1;
+      else if (!ea && eb) return 1;
+      const ca = parseDate(
+        a.createdAt || a.created_at || a.createdDate || safeGetIssueDate(a)
+      );
+      const cb = parseDate(
+        b.createdAt || b.created_at || b.createdDate || safeGetIssueDate(b)
+      );
+      if (ca && cb) return cb - ca;
+      return 0;
     });
-    const data = new Blob([excelBuffer], { type: "application/octet-stream" });
-    saveAs(data, `${docTypeName}.xlsx`);
+
+    return list;
+  }, [
+    docsOfType,
+    lastPerStation,
+    latestOnly,
+    selectedStation,
+    expiryFilter,
+    search,
+  ]);
+
+  // === 📤 Экспорт в Excel ===
+
+  const exportToExcel = () => {
+    try {
+      const data = filtered.map((doc, idx) => ({
+        "№": idx + 1,
+        "Номер документа": safeGetNumber(doc) || "—",
+        "Дата принятия": safeGetIssueDate(doc) || "—",
+        "Дата окончания": safeGetExpiryDate(doc) || "—",
+        Станция: doc.stationName || doc.station_name || "—",
+        Статус: getStatusText(safeGetExpiryDate(doc)) || "—",
+      }));
+
+      if (data.length === 0) {
+        alert("Нет данных для экспорта.");
+        return;
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Документы");
+
+      XLSX.writeFile(workbook, `Документы_${docType}.xlsx`);
+    } catch (error) {
+      console.error("Ошибка при экспорте:", error);
+    }
   };
 
-  if (loading) {
-    return <p className="text-center text-gray-500">Загрузка...</p>;
-  }
-
-  if (documents.length === 0) {
-    return <p className="text-center text-gray-500">Документы отсутствуют</p>;
-  }
-
   return (
-    <div className="p-4 bg-white rounded-2xl shadow-md">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold">{docTypeName}</h2>
-        <button
-          onClick={handleExportToExcel}
-          className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl transition">
-          Экспорт в Excel
-        </button>
+    <div className="bg-white rounded-2xl p-4 shadow-sm">
+      {/* Верхняя панель фильтров */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+          <div className="flex items-center gap-2">
+            <label className="text-sm">Показывать:</label>
+            <select
+              value={latestOnly}
+              onChange={(e) => setLatestOnly(e.target.value)}
+              className="border rounded px-2 py-1 text-sm">
+              <option value="all">Все документы</option>
+              <option value="latest">Только последние</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm">Станция:</label>
+            <select
+              value={selectedStation}
+              onChange={(e) => setSelectedStation(e.target.value)}
+              className="border rounded px-2 py-1 text-sm">
+              <option value="all">Все станции</option>
+              {stations.map((s) => (
+                <option key={s.id || s.name} value={s.id || s.name}>
+                  {s.name || s.id}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm">Срок:</label>
+            <select
+              value={expiryFilter}
+              onChange={(e) => setExpiryFilter(e.target.value)}
+              className="border rounded px-2 py-1 text-sm">
+              <option value="all">Все</option>
+              <option value="30">Осталось 30 дней</option>
+              <option value="15">Осталось 15 дней</option>
+              <option value="5">Осталось 5 дней</option>
+              <option value="expired">Просрочено</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Поиск..."
+            className="border rounded px-3 py-1 text-sm w-48"
+          />
+          <button
+            onClick={exportToExcel}
+            className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1 rounded">
+            Экспорт в Excel
+          </button>
+        </div>
       </div>
 
+      {/* Таблица */}
       <div className="overflow-x-auto">
-        <table className="min-w-full border border-gray-200 text-sm">
-          <thead className="bg-gray-100 text-left">
+        <table className="min-w-full text-sm">
+          <thead className="bg-gray-100 sticky top-0">
             <tr>
-              <th className="p-3 border-b">№</th>
-              <th className="p-3 border-b">Номер документа</th>
-              <th className="p-3 border-b">Дата принятия</th>
-              <th className="p-3 border-b">Срок действия</th>
-              <th className="p-3 border-b">Статус</th>
+              <th className="p-2 border text-left">#</th>
+              <th className="p-2 border text-left">Номер документа</th>
+              <th className="p-2 border text-left">Дата принятия</th>
+              <th className="p-2 border text-left">Дата окончания</th>
+              <th className="p-2 border text-left">Станция</th>
+              <th className="p-2 border text-left">Файл</th>
+              <th className="p-2 border text-left">Статус</th>
             </tr>
           </thead>
+
           <tbody>
-            {documents.map((doc, index) => (
-              <tr key={doc.id} className="hover:bg-gray-50">
-                <td className="p-3 border-b">{index + 1}</td>
-                <td className="p-3 border-b">{doc.number || "—"}</td>
-                <td className="p-3 border-b">{doc.date_of_issue || "—"}</td>
-                <td className="p-3 border-b">{doc.date_of_expiry || "—"}</td>
-                <td className="p-3 border-b">
-                  <span
-                    className={`px-3 py-1 rounded-full text-white text-xs ${getStatusColor(
-                      doc.date_of_expiry
-                    )}`}>
-                    {getStatusText(doc.date_of_expiry)}
-                  </span>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="p-4 text-center text-gray-500">
+                  Документы отсутствуют
                 </td>
               </tr>
-            ))}
+            ) : (
+              filtered.map((doc, idx) => {
+                const number = safeGetNumber(doc);
+                const issueDate = safeGetIssueDate(doc);
+                const expiryDate = safeGetExpiryDate(doc);
+                const fileUrl = safeGetFileUrl(doc);
+                const fileName =
+                  safeGetFileName(doc) ||
+                  (fileUrl ? fileUrl.split("/").pop() : "");
+                const stationName =
+                  doc.stationName || doc.station_name || doc.station || "";
+
+                const statusText = getStatusText(expiryDate);
+                const statusColor = getStatusColor(expiryDate);
+
+                return (
+                  <tr
+                    key={doc.id || `${docType}-${idx}`}
+                    className="hover:bg-gray-50">
+                    <td className="p-2 border w-10">{idx + 1}</td>
+                    <td className="p-2 border">{number || "—"}</td>
+                    <td className="p-2 border">{issueDate || "—"}</td>
+                    <td className="p-2 border">{expiryDate || "—"}</td>
+                    <td className="p-2 border">{stationName || "—"}</td>
+                    <td className="p-2 border">
+                      {fileUrl ? (
+                        <a
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 hover:underline"
+                          title={fileName}>
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 2v10l3-3 3 3V2z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M3 13h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8z"
+                            />
+                          </svg>
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="p-2 border text-center">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-semibold text-black shadow-sm ${
+                          statusColor || "bg-black-400"
+                        }`}
+                        style={{ opacity: 1, filter: "none" }} // 💡 убирает "туманность"
+                      >
+                        {statusText}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>

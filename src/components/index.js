@@ -6,3 +6,4 @@ export { default as StationsSelection } from "./StationsSelection";
 export { default as DocumentTable } from "./DocumentTable";
 export { default as DocumentDetailModal } from "./DocumentDetailModal";
 export { default as AddDocumentModal } from "./AddDocumentModal";
+export { default as AddDocumentModalByType } from "./AddDocumentModalByType";
