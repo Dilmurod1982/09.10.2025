@@ -2,11 +2,19 @@ import { create } from "zustand";
 import { auth, db } from "../../firebase/config";
 import { signOut } from "firebase/auth";
 import { toast } from "react-toastify";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  doc,
+  getDoc,
+  where,
+} from "firebase/firestore";
 
 export const useAppStore = create((set, get) => ({
   user: JSON.parse(localStorage.getItem("user")) || null,
-  userData: null,
+  userData: JSON.parse(localStorage.getItem("userData")) || null, // Сохраняем в localStorage
   users: null,
   loginTime: null,
   logoutTimer: null,
@@ -21,12 +29,55 @@ export const useAppStore = create((set, get) => ({
         localStorage.setItem("user", JSON.stringify(user));
       } else {
         localStorage.removeItem("user");
+        localStorage.removeItem("userData"); // Очищаем и userData при logout
       }
       return { user };
     });
   },
+
+  setUserData: (userData) => {
+    set(() => {
+      if (userData) {
+        localStorage.setItem("userData", JSON.stringify(userData));
+      } else {
+        localStorage.removeItem("userData");
+      }
+      return { userData };
+    });
+  },
+
+  // 🔹 НОВАЯ ФУНКЦИЯ: Загрузка данных пользователя из Firestore
+  loadUserData: async (user) => {
+    if (!user || !user.email) return null;
+
+    try {
+      // console.log("🔄 Загрузка данных пользователя из Firestore...");
+
+      // Ищем пользователя в Firestore по email
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("email", "==", user.email));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        console.error("❌ Пользователь не найден в Firestore");
+        return null;
+      }
+
+      const userDoc = querySnapshot.docs[0];
+      const userDataFromFirestore = userDoc.data();
+
+      // console.log("✅ Данные пользователя загружены:", userDataFromFirestore);
+
+      // Сохраняем в стейт и localStorage
+      get().setUserData(userDataFromFirestore);
+      return userDataFromFirestore;
+    } catch (error) {
+      console.error("❌ Ошибка загрузки данных пользователя:", error);
+      return null;
+    }
+  },
+
   setUsers: (users) => set({ users }),
-  setUserData: (userData) => set({ userData }),
   setLoginTime: (loginTime) => set({ loginTime }),
   setLastActivity: (time) => set({ lastActivity: time }),
 
@@ -73,6 +124,7 @@ export const useAppStore = create((set, get) => ({
       });
       localStorage.removeItem("sessionStartTime");
       localStorage.removeItem("lastActivityTime");
+      localStorage.removeItem("userData"); // Очищаем userData
     }
   },
 
@@ -112,6 +164,7 @@ export const useAppStore = create((set, get) => ({
     const state = get();
     state.setupAutoLogout();
   },
+
   refreshDocuments: async () => {
     try {
       const q = query(

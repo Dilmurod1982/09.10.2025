@@ -37,7 +37,7 @@ const daysUntil = (expiryDate) => {
   return Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
 };
 
-const DocumentTable = ({ docType, docTypeData, refreshTrigger = 0 }) => {
+const DocumentTableInf = ({ docType, docTypeData, refreshTrigger = 0 }) => {
   const { documents, refreshDocuments } = useAppStore();
   const [stations, setStations] = useState([]);
   const [latestOnly, setLatestOnly] = useState("all");
@@ -186,7 +186,7 @@ const DocumentTable = ({ docType, docTypeData, refreshTrigger = 0 }) => {
         "№": data.length + 1,
         "Номер документа": "—",
         "Дата принятия": "—",
-        "Дата окончания": "—",
+
         Станция: s.stationName || s.id,
         Статус: "Не введён",
       });
@@ -262,7 +262,6 @@ const DocumentTable = ({ docType, docTypeData, refreshTrigger = 0 }) => {
               <th className="p-2 border text-left">Станция</th>
               <th className="p-2 border text-left">Номер документа</th>
               <th className="p-2 border text-left">Дата принятия</th>
-              <th className="p-2 border text-left">Дата окончания</th>
               <th className="p-2 border text-left">Статус</th>
               <th className="p-2 border text-left">Файл</th>
             </tr>
@@ -285,11 +284,11 @@ const DocumentTable = ({ docType, docTypeData, refreshTrigger = 0 }) => {
                   <td className="p-2 border">{stationName}</td>
                   <td className="p-2 border">{number || "—"}</td>
                   <td className="p-2 border">{issueDate || "—"}</td>
-                  <td className="p-2 border">{expiryDate || "—"}</td>
+
                   <td className="p-2 border text-center">
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-semibold text-black ${statusColor}`}>
-                      {statusText}
+                      введён
                     </span>
                   </td>
                   <td className="p-2 border text-center">
@@ -316,7 +315,7 @@ const DocumentTable = ({ docType, docTypeData, refreshTrigger = 0 }) => {
                 <td className="p-2 border">{s.stationName || s.id}</td>
                 <td className="p-2 border text-gray-400">—</td>
                 <td className="p-2 border text-gray-400">—</td>
-                <td className="p-2 border text-gray-400">—</td>
+
                 <td className="p-2 border text-center">
                   <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-300 text-black">
                     Не введён
@@ -332,4 +331,4 @@ const DocumentTable = ({ docType, docTypeData, refreshTrigger = 0 }) => {
   );
 };
 
-export default DocumentTable;
+export default DocumentTableInf;

@@ -1,74 +1,4 @@
-// import React, { useEffect, useState } from "react";
-// import { UpdateIcon } from "@radix-ui/react-icons";
-// import { useAppStore } from "../lib/zustand";
-// import Button from "@mui/material/Button";
-// import { useLogin } from "../hooks/useLogin";
-
-// function Login() {
-//   const setUser = useAppStore((state) => state.setUser);
-//   const setUserData = useAppStore((state) => state.setUserData);
-//   const user = useAppStore((state) => state.user);
-//   const userData = useAppStore((state) => state.userData);
-//   const { isPending, signIn } = useLogin();
-
-//   useEffect(() => {
-//     if (userData && user?.email && user?.password) {
-//       signIn(user.email, user.password);
-//     }
-//   }, [userData, user, signIn]);
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     const formData = new FormData(e.target);
-//     const email = formData.get("username");
-//     const password = formData.get("password");
-
-//     await signIn(email, password);
-//   };
-
-//   return (
-//     <div className="grid grid-cols-1 lg:grid-cols-2 min-h-screen w-full">
-//       <div className="hidden lg:block bg-[url('https://picsum.photos/1000/1300')] bg-cover bg-no-repeat bg-center"></div>
-//       <div className="bg-[url('https://picsum.photos/1000/1300')] bg-cover bg-no-repeat bg-center lg:bg-none grid place-items-center">
-//         <div className="grid gap-3 w-full place-items-center">
-//           <form onSubmit={handleSubmit} className="grid place-items-center">
-//             <label className="form-control w-full place-items-center">
-//               <div className="label w-full">
-//                 <span className="label-text">Email</span>
-//               </div>
-//               <input
-//                 type="email"
-//                 name="username"
-//                 placeholder="Emailingizni kiriting"
-//                 className="input input-bordered w-full max-w-xs"
-//                 required
-//               />
-//             </label>
-//             <label className="form-control w-full mb-5">
-//               <div className="label w-full">
-//                 <span className="label-text">Parol</span>
-//               </div>
-//               <input
-//                 type="password"
-//                 name="password"
-//                 placeholder="Parolingizni kiriting"
-//                 className="input input-bordered w-full max-w-xs"
-//                 required
-//               />
-//             </label>
-
-//             <Button variant="contained" type="submit" disabled={isPending}>
-//               {isPending ? <UpdateIcon className="animate-spin" /> : "Kirish"}
-//             </Button>
-//           </form>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-// export default Login;
-
+// components/Login.js
 import React, { useEffect, useState, useRef } from "react";
 import { UpdateIcon } from "@radix-ui/react-icons";
 import { useAppStore } from "../lib/zustand";
@@ -87,11 +17,12 @@ function Login() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const formRef = useRef(null);
 
-  useEffect(() => {
-    if (userData && user?.email && user?.password) {
-      signIn(user.email, user.password);
-    }
-  }, [userData, user, signIn]);
+  // Убрать этот useEffect если он не нужен
+  // useEffect(() => {
+  //   if (userData && user?.email && user?.password) {
+  //     signIn(user.email, user.password);
+  //   }
+  // }, [userData, user, signIn]);
 
   const handleFocus = (field) => () => {
     setIsFocused((prev) => ({ ...prev, [field]: true }));
@@ -105,24 +36,6 @@ function Login() {
     setMousePosition({ x: e.clientX, y: e.clientY });
   };
 
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   const formData = new FormData(e.target);
-  //   const email = formData.get("username");
-  //   const password = formData.get("password");
-
-  //   // Анимация нажатия
-  //   if (formRef.current) {
-  //     formRef.current.classList.add("scale-95");
-  //     setTimeout(() => {
-  //       if (formRef.current) {
-  //         formRef.current.classList.remove("scale-95");
-  //       }
-  //     }, 150);
-  //   }
-
-  //   await signIn(email, password);
-  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -143,6 +56,7 @@ function Login() {
 
     if (result.success) {
       // Сессия автоматически запустится через хук useSessionTimeout
+      // Редирект произойдет автоматически через Router
     }
   };
 
@@ -233,9 +147,7 @@ function Login() {
                       />
                       <span
                         className={`absolute left-4 transition-all duration-300 pointer-events-none ${
-                          isFocused.email ||
-                          document.querySelector('input[name="username"]')
-                            ?.value
+                          isFocused.email
                             ? "top-0 -translate-y-1/2 bg-white px-2 text-xs text-purple-600"
                             : "top-1/2 -translate-y-1/2 text-gray-400"
                         }`}>
@@ -265,33 +177,13 @@ function Login() {
                       />
                       <span
                         className={`absolute left-4 transition-all duration-300 pointer-events-none ${
-                          isFocused.password ||
-                          document.querySelector('input[name="password"]')
-                            ?.value
+                          isFocused.password
                             ? "top-0 -translate-y-1/2 bg-white px-2 text-xs text-purple-600"
                             : "top-1/2 -translate-y-1/2 text-gray-400"
                         }`}>
                         Parolingizni kiriting
                       </span>
                     </div>
-                  </div>
-
-                  {/* Дополнительные опции */}
-                  <div className="flex items-center justify-between text-sm">
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <div className="relative">
-                        <input type="checkbox" className="sr-only" />
-                        <div className="w-5 h-5 border-2 border-gray-300 rounded transition-colors duration-300 group-hover:border-purple-500">
-                          <div className="w-full h-full bg-purple-500 rounded scale-0 transition-transform duration-300"></div>
-                        </div>
-                      </div>
-                      <span className="text-gray-600">Eslab qolish</span>
-                    </label>
-                    <a
-                      href="#"
-                      className="text-purple-600 hover:text-purple-700 transition-colors duration-300 font-medium">
-                      Parolni unutdingizmi?
-                    </a>
                   </div>
 
                   {/* Кнопка входа */}

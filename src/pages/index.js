@@ -24,6 +24,15 @@ export { default as DocDeadlineInf } from "./DocDeadlineInf";
 export { default as DocByStationInf } from "./DocByStationInf";
 export { default as StationDocs } from "./StationDocs";
 export { default as DocumentTypePage } from "./DocumentTypePage";
+export { default as DocumentPageInf } from "./DocumentPageInf";
+export { default as StationDocsInf } from "./StationDocsInf";
+export { default as Partners } from "./Partners";
+export { default as PartnersList } from "./PartnersList";
+export { default as HomeBooker } from "./HomeBooker";
+export { default as HomeOperator } from "./HomeOperator";
+export { default as GeneralDailyReport } from "./GeneralDailyReport";
+export { default as DailyHoseReport } from "./DailyHoseReport";
+export { default as DailyReportPartners } from "./DailyReportPartners";
 
 // export { default as License } from "./documents/License";
 // export { default as GasCertificate } from "./documents/GasCertificate";

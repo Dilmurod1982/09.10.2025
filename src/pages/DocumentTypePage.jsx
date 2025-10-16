@@ -30,6 +30,7 @@ const DocumentTypePage = () => {
   const [newType, setNewType] = useState({
     id: "",
     name: "",
+    number: "",
     path: "",
     color: "#16a34a",
     validity: "",
@@ -65,6 +66,7 @@ const DocumentTypePage = () => {
     setNewType({
       id: "",
       name: "",
+      number: "",
       path: "",
       color: "#16a34a",
       validity: "",
@@ -79,7 +81,6 @@ const DocumentTypePage = () => {
   // 💾 Сохранить новый тип
   const handleSaveCreate = async () => {
     try {
-      // создаём документ с ID равным полю id
       await setDoc(doc(db, "document_types", newType.id), newType);
       setOpenCreate(false);
     } catch (e) {
@@ -90,9 +91,9 @@ const DocumentTypePage = () => {
   // ✏️ Сохранить изменения типа
   const handleSaveEdit = async () => {
     try {
-      // обновляем документ по реальному Firestore ID
       await updateDoc(doc(db, "document_types", current.firebaseId), {
         name: current.name,
+        number: current.number,
         path: current.path,
         color: current.color,
         validity: current.validity,
@@ -107,6 +108,7 @@ const DocumentTypePage = () => {
   const isCreateDisabled =
     !newType.id ||
     !newType.name ||
+    !newType.number ||
     !newType.path ||
     !newType.color ||
     !newType.validity;
@@ -146,6 +148,7 @@ const DocumentTypePage = () => {
           <thead className="bg-gray-100">
             <tr>
               <th className="py-3 px-4">ID</th>
+              <th className="py-3 px-4">Номер</th>
               <th className="py-3 px-4">Название</th>
               <th className="py-3 px-4">Путь</th>
               <th className="py-3 px-4">Цвет</th>
@@ -159,6 +162,7 @@ const DocumentTypePage = () => {
                 className="hover:bg-gray-50 cursor-pointer transition-all"
                 onClick={() => handleOpenView(type)}>
                 <td className="py-3 px-4">{type.id}</td>
+                <td className="py-3 px-4">{type.number || "—"}</td>
                 <td className="py-3 px-4">{type.name}</td>
                 <td className="py-3 px-4">{type.path}</td>
                 <td className="py-3 px-4">
@@ -204,6 +208,15 @@ const DocumentTypePage = () => {
           {current && (
             <div className="flex flex-col gap-4 mt-2">
               <TextField label="ID" value={current.id} disabled fullWidth />
+              <TextField
+                label="Номер"
+                value={current.number || ""}
+                onChange={(e) =>
+                  setCurrent({ ...current, number: e.target.value })
+                }
+                disabled={!editable}
+                fullWidth
+              />
               <TextField
                 label="Название"
                 value={current.name}
@@ -305,6 +318,14 @@ const DocumentTypePage = () => {
               label="ID"
               value={newType.id}
               onChange={(e) => setNewType({ ...newType, id: e.target.value })}
+              fullWidth
+            />
+            <TextField
+              label="Номер"
+              value={newType.number}
+              onChange={(e) =>
+                setNewType({ ...newType, number: e.target.value })
+              }
               fullWidth
             />
             <TextField

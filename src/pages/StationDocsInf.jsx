@@ -6,8 +6,9 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { getStatusColor } from "../utils/dateUtils";
 import AddDocumentModalByStation from "../components/AddDocumentModalByStation";
+import AddDocumentModalByStationInf from "../components/AddDocumentModalByStationInf";
 
-const StationDocs = () => {
+const StationDocsInf = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -55,7 +56,7 @@ const StationDocs = () => {
       typesArray.sort((a, b) => a.number - b.number);
 
       typesArray.forEach((t) => {
-        if (t.validity === "expiration") {
+        if (t.validity === "infinity") {
           types[t.id] = t.name;
           validIds.push(t.id);
         }
@@ -119,9 +120,7 @@ const StationDocs = () => {
       // === Вычисляем отсутствующие документы ===
       const existingTypeIds = new Set(sortedDocs.map((d) => d.typeId));
       const missing = typesArray
-        .filter(
-          (t) => t.validity === "expiration" && !existingTypeIds.has(t.id)
-        )
+        .filter((t) => t.validity === "infinity" && !existingTypeIds.has(t.id))
         .map((t) => ({ id: t.id, name: t.name }));
 
       setMissingDocs(missing); // ✅ сохраняем отсутствующие типы
@@ -271,10 +270,7 @@ const StationDocs = () => {
               <p className="text-sm text-gray-600">
                 <b>Выдан:</b> {d.issueDate}
               </p>
-              <p className="text-sm text-gray-600">
-                <b>Истекает:</b> {d.expiryDate}
-              </p>
-              <p className="mt-2 text-sm font-medium">{d.daysLeft}</p>
+
               {d.fileUrl && (
                 <a
                   href={d.fileUrl}
@@ -307,7 +303,7 @@ const StationDocs = () => {
       )}
 
       {/* Модальное окно добавления документа */}
-      <AddDocumentModalByStation
+      <AddDocumentModalByStationInf
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         stationId={id}
@@ -318,4 +314,4 @@ const StationDocs = () => {
   );
 };
 
-export default StationDocs;
+export default StationDocsInf;

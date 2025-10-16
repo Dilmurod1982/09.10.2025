@@ -72,11 +72,7 @@ const DocByStation = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {stations.map((station) => {
-          const s = stats[station.id];
-          if (!s) return null;
-
-          // если все равно нули — не показываем
-          if (s.expired + s.less5 + s.less15 + s.less30 === 0) return null;
+          const s = stats[station.id] || {}; // ✅ пустой объект, если нет документов
 
           return (
             <Link

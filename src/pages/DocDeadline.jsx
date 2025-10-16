@@ -17,7 +17,8 @@ const DocDeadline = () => {
         const typesSnap = await getDocs(collection(db, "document_types"));
         const typesData = typesSnap.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter((type) => type.validity === "expiration");
+          .filter((type) => type.validity === "expiration")
+          .sort((a, b) => (a.number || 0) - (b.number || 0)); // ✅ сортировка по полю number
 
         const docsSnap = await getDocs(collection(db, "documents"));
         const docsData = docsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
