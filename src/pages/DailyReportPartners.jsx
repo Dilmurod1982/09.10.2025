@@ -279,7 +279,7 @@ const DailyReportPartners = () => {
 
     const worksheetData = [
       // Заголовок
-      ["Месячный отчет по партнерам", "", "", "", "", "", "", "", ""],
+      ["Месячный отчет по партнерам", "", "", "", "", "", "", "", "", "", ""],
       [
         `Период: ${new Date(selectedMonth + "-01").toLocaleDateString("ru-RU", {
           month: "long",
@@ -293,8 +293,22 @@ const DailyReportPartners = () => {
         "",
         "",
         "",
+        "",
+        "",
       ],
-      ["Станция:", selectedStation?.stationName, "", "", "", "", "", "", ""],
+      [
+        "Станция:",
+        selectedStation?.stationName,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ],
       [], // Пустая строка
 
       // Заголовки таблицы
@@ -308,6 +322,8 @@ const DailyReportPartners = () => {
         "Продано руб.",
         "Оплачено",
         "Сальдо тек. день",
+        "Общее кол-во газа",
+        "Общая сумма газа",
       ],
 
       // Данные
@@ -323,6 +339,9 @@ const DailyReportPartners = () => {
           monthlyData.totalSoldAmount || 0,
           monthlyData.totalPaid || 0,
           monthlyData.currentBalance || 0,
+          // Добавляем общие поля из отчета (если нужно)
+          "", // или рассчитайте соответствующие значения
+          "", // или рассчитайте соответствующие значения
         ];
       }),
 
@@ -337,14 +356,12 @@ const DailyReportPartners = () => {
         monthlyTotals.totalSoldAmount,
         monthlyTotals.totalPaid,
         monthlyTotals.totalCurrentBalance,
+        "", // общее количество за месяц
+        "", // общая сумма за месяц
       ],
     ];
 
-    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Месячный отчет");
-
-    // Авто-ширина колонок
+    // Также обновите ширину колонок:
     const colWidths = [
       { wch: 5 }, // №
       { wch: 30 }, // Партнер
@@ -355,6 +372,8 @@ const DailyReportPartners = () => {
       { wch: 15 }, // Продано руб.
       { wch: 12 }, // Оплачено
       { wch: 15 }, // Сальдо тек. день
+      { wch: 15 }, // Общее кол-во газа
+      { wch: 15 }, // Общая сумма газа
     ];
     ws["!cols"] = colWidths;
 
@@ -605,65 +624,103 @@ const DailyReportPartners = () => {
           {/* История отчетов */}
           <div>
             <h3 className="text-xl font-semibold mb-4">
-              История ежедневных отчетов ({reports.length} отчетов)
+              История ежедневных отчетов (последние 3 дня)
             </h3>
-            {reports.length === 0 ? (
-              <div className="text-center p-8 text-gray-500">
-                Нет сохраненных отчетов
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {reports.map((report) => (
-                  <div
-                    key={report.id}
-                    className="bg-white rounded-2xl shadow-md p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <h4 className="font-semibold">
-                        Отчет за{" "}
-                        {new Date(report.reportDate).toLocaleDateString(
-                          "ru-RU"
-                        )}
-                      </h4>
-                      <div className="text-sm text-gray-500">
-                        Создан: {report.createdBy} •{" "}
-                        {new Date(report.createdAt?.toDate()).toLocaleString(
-                          "ru-RU"
-                        )}
+
+            {/* Функция для получения последних 3 дней отчетов */}
+            {(() => {
+              // Сортируем отчеты по дате (от новых к старым)
+              const sortedReports = [...reports].sort(
+                (a, b) => new Date(b.reportDate) - new Date(a.reportDate)
+              );
+
+              // Берем только последние 3 дня
+              const lastThreeDaysReports = sortedReports.slice(0, 3);
+
+              return lastThreeDaysReports.length === 0 ? (
+                <div className="text-center p-8 text-gray-500">
+                  Нет сохраненных отчетов за последние 3 дня
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {lastThreeDaysReports.map((report) => (
+                    <div
+                      key={report.id}
+                      className="bg-white rounded-2xl shadow-md p-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="font-semibold">
+                          Отчет за{" "}
+                          {new Date(report.reportDate).toLocaleDateString(
+                            "ru-RU",
+                            {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            }
+                          )}
+                        </h4>
+                        <div className="text-sm text-gray-500">
+                          Создан: {report.createdBy} •{" "}
+                          {new Date(report.createdAt?.toDate()).toLocaleString(
+                            "ru-RU"
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Общие итоги отчета */}
+                      <div className="mb-3 p-3 bg-blue-50 rounded-lg">
+                        <div className="flex justify-between text-sm font-semibold">
+                          <span>
+                            Общее количество газа:{" "}
+                            {report.totalgaspartner?.toLocaleString("ru-RU") ||
+                              "0"}{" "}
+                            м³
+                          </span>
+                          <span>
+                            Общая сумма:{" "}
+                            {report.totalsumgaspartner?.toLocaleString(
+                              "ru-RU"
+                            ) || "0"}{" "}
+                            ₽
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-gray-50">
+                              <th className="p-2 text-left">Партнер</th>
+                              <th className="p-2 text-right">Цена за м³</th>
+                              <th className="p-2 text-right">Продано м³</th>
+                              <th className="p-2 text-right">Сумма</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {report.partnerData?.map((partner, idx) => (
+                              <tr key={idx} className="border-t">
+                                <td className="p-2">{partner.partnerName}</td>
+                                <td className="p-2 text-right">
+                                  {partner.pricePerM3?.toLocaleString("ru-RU")}{" "}
+                                  ₽
+                                </td>
+                                <td className="p-2 text-right">
+                                  {partner.soldM3?.toLocaleString("ru-RU")} м³
+                                </td>
+                                <td className="p-2 text-right font-semibold">
+                                  {partner.totalAmount?.toLocaleString("ru-RU")}{" "}
+                                  ₽
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-gray-50">
-                            <th className="p-2 text-left">Партнер</th>
-                            <th className="p-2 text-right">Цена за м³</th>
-                            <th className="p-2 text-right">Продано м³</th>
-                            <th className="p-2 text-right">Сумма</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {report.partnerData?.map((partner, idx) => (
-                            <tr key={idx} className="border-t">
-                              <td className="p-2">{partner.partnerName}</td>
-                              <td className="p-2 text-right">
-                                {partner.pricePerM3?.toLocaleString("ru-RU")} ₽
-                              </td>
-                              <td className="p-2 text-right">
-                                {partner.soldM3?.toLocaleString("ru-RU")} м³
-                              </td>
-                              <td className="p-2 text-right font-semibold">
-                                {partner.totalAmount?.toLocaleString("ru-RU")} ₽
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </>
       )}

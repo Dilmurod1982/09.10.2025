@@ -19,6 +19,7 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
   const [dateDisabled, setDateDisabled] = useState(false);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalSum, setTotalSum] = useState(0); // Новое состояние для общей суммы
 
   // Получаем количество шлангов
   const hosesCount = useMemo(() => {
@@ -40,24 +41,35 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
     return date.toISOString().split("T")[0];
   }, []);
 
-  // Функция для расчета разницы и тотала
+  // Функция для расчета разницы, суммы и тотала
   const calculateRowDiff = useCallback((row) => {
     const prev = Number(row.prev) || 0;
     const current = row.current === "" ? 0 : Number(row.current);
+    const price = Number(row.price) || 0;
     const diff = current >= prev ? current - prev : 0;
+    const sum = diff * price;
 
     return {
       ...row,
       diff: isNaN(diff) ? 0 : diff,
+      sum: isNaN(sum) ? 0 : sum,
     };
   }, []);
 
-  // Функция для расчета общего тотала
-  const calculateTotal = useCallback((rows) => {
-    return rows.reduce((sum, row) => {
-      const diff = Number(row.diff) || 0;
-      return sum + (diff > 0 ? diff : 0);
-    }, 0);
+  // Функция для расчета общего тотала и общей суммы
+  const calculateTotals = useCallback((rows) => {
+    const totals = rows.reduce(
+      (acc, row) => {
+        const diff = Number(row.diff) || 0;
+        const sum = Number(row.sum) || 0;
+        return {
+          totalGas: acc.totalGas + (diff > 0 ? diff : 0),
+          totalSum: acc.totalSum + sum,
+        };
+      },
+      { totalGas: 0, totalSum: 0 }
+    );
+    return totals;
   }, []);
 
   // Загружаем последний отчет
@@ -85,7 +97,7 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
           setDate(nextDate);
           setDateDisabled(true);
 
-          // Заполняем предыдущие значения
+          // Заполняем предыдущие значения и цены
           const prevHoses = Array.isArray(lastData.hoses) ? lastData.hoses : [];
           const initialRows = hoseNames.map((name) => {
             const prevHose = prevHoses.find((h) => h.hose === name);
@@ -93,14 +105,18 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
               hose: name,
               prev: prevHose ? Number(prevHose.current) : 0,
               current: "",
+              price: prevHose ? Number(prevHose.price) || 0 : 0, // Берем цену из предыдущего отчета или 0
               diff: 0,
+              sum: 0,
               prevDisabled: true,
             };
             return calculateRowDiff(baseRow);
           });
 
           setRows(initialRows);
-          setTotal(calculateTotal(initialRows));
+          const totals = calculateTotals(initialRows);
+          setTotal(totals.totalGas);
+          setTotalSum(totals.totalSum);
         } else {
           // Нет предыдущих отчетов
           setLastReport(null);
@@ -112,14 +128,18 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
               hose: name,
               prev: 0,
               current: "",
+              price: 0, // По умолчанию 0
               diff: 0,
+              sum: 0,
               prevDisabled: false,
             };
             return calculateRowDiff(baseRow);
           });
 
           setRows(initialRows);
-          setTotal(calculateTotal(initialRows));
+          const totals = calculateTotals(initialRows);
+          setTotal(totals.totalGas);
+          setTotalSum(totals.totalSum);
         }
       } catch (error) {
         console.error("Ошибка при загрузке предыдущего отчета:", error);
@@ -130,19 +150,23 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
             hose: name,
             prev: 0,
             current: "",
+            price: 0,
             diff: 0,
+            sum: 0,
             prevDisabled: false,
           };
           return calculateRowDiff(baseRow);
         });
 
         setRows(initialRows);
-        setTotal(calculateTotal(initialRows));
+        const totals = calculateTotals(initialRows);
+        setTotal(totals.totalGas);
+        setTotalSum(totals.totalSum);
       }
     };
 
     fetchLastReport();
-  }, [station?.id, hoseNames, addDays, calculateRowDiff, calculateTotal]);
+  }, [station?.id, hoseNames, addDays, calculateRowDiff, calculateTotals]);
 
   // Обработчик изменения текущего показания
   const handleCurrentChange = useCallback(
@@ -156,18 +180,19 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
           current: cleanedValue,
         };
 
-        // Сразу рассчитываем разницу для этой строки
+        // Сразу рассчитываем разницу и сумму для этой строки
         const rowWithDiff = calculateRowDiff(updatedRow);
         newRows[index] = rowWithDiff;
 
-        // Пересчитываем общий тотал
-        const newTotal = calculateTotal(newRows);
-        setTotal(newTotal);
+        // Пересчитываем общие тоталы
+        const newTotals = calculateTotals(newRows);
+        setTotal(newTotals.totalGas);
+        setTotalSum(newTotals.totalSum);
 
         return newRows;
       });
     },
-    [calculateRowDiff, calculateTotal]
+    [calculateRowDiff, calculateTotals]
   );
 
   // Обработчик изменения предыдущего показания
@@ -182,18 +207,47 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
           prev: cleanedValue === "" ? 0 : Number(cleanedValue),
         };
 
-        // Сразу рассчитываем разницу для этой строки
+        // Сразу рассчитываем разницу и сумму для этой строки
         const rowWithDiff = calculateRowDiff(updatedRow);
         newRows[index] = rowWithDiff;
 
-        // Пересчитываем общий тотал
-        const newTotal = calculateTotal(newRows);
-        setTotal(newTotal);
+        // Пересчитываем общие тоталы
+        const newTotals = calculateTotals(newRows);
+        setTotal(newTotals.totalGas);
+        setTotalSum(newTotals.totalSum);
 
         return newRows;
       });
     },
-    [calculateRowDiff, calculateTotal]
+    [calculateRowDiff, calculateTotals]
+  );
+
+  // Обработчик изменения цены
+  const handlePriceChange = useCallback(
+    (index, value) => {
+      const cleanedValue =
+        value === "" ? "" : value.replace(/[^0-9.,]/g, "").replace(",", ".");
+
+      setRows((prev) => {
+        const newRows = [...prev];
+        const updatedRow = {
+          ...newRows[index],
+          price: cleanedValue === "" ? 0 : parseFloat(cleanedValue) || 0,
+        };
+
+        // Сразу рассчитываем сумму для этой строки
+        const rowWithDiff = calculateRowDiff(updatedRow);
+        newRows[index] = rowWithDiff;
+
+        // Пересчитываем общие тоталы
+        const newTotals = calculateTotals(newRows);
+        setTotal(newTotals.totalGas);
+        setTotalSum(newTotals.totalSum);
+
+        return newRows;
+      });
+    },
+    [calculateRowDiff, calculateTotals]
   );
 
   // Валидация формы
@@ -246,7 +300,9 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
         hose: row.hose,
         prev: Number(row.prev) || 0,
         current: Number(row.current) || 0,
+        price: Number(row.price) || 0, // Сохраняем цену
         diff: Number(row.diff) || 0,
+        sum: Number(row.sum) || 0, // Сохраняем сумму
       }));
 
       const reportData = {
@@ -255,6 +311,7 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
         date,
         hoses,
         totalgas: total,
+        totalsum: totalSum, // Сохраняем общую сумму
         createdAt: serverTimestamp(),
         createdBy: userId,
         createdIp: ip,
@@ -276,7 +333,7 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden">
         {/* Заголовок */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
           <div className="flex justify-between items-center">
@@ -362,6 +419,9 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
                       Шланг
                     </th>
                     <th className="px-6 py-4 text-left font-semibold text-gray-700 border-b">
+                      Цена (₽)
+                    </th>
+                    <th className="px-6 py-4 text-left font-semibold text-gray-700 border-b">
                       Предыдущее показание
                     </th>
                     <th className="px-6 py-4 text-left font-semibold text-gray-700 border-b">
@@ -369,6 +429,9 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
                     </th>
                     <th className="px-6 py-4 text-left font-semibold text-gray-700 border-b">
                       Разница
+                    </th>
+                    <th className="px-6 py-4 text-left font-semibold text-gray-700 border-b">
+                      Сумма (₽)
                     </th>
                     <th className="px-6 py-4 text-left font-semibold text-gray-700 border-b">
                       Статус
@@ -390,6 +453,20 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
                           <span className="font-semibold text-gray-900">
                             {row.hose}
                           </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            value={row.price}
+                            onChange={(e) =>
+                              handlePriceChange(index, e.target.value)
+                            }
+                            className="w-full max-w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+                            disabled={loading}
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                          />
                         </td>
                         <td className="px-6 py-4">
                           <input
@@ -436,6 +513,17 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
                           </span>
                         </td>
                         <td className="px-6 py-4">
+                          <span
+                            className={`font-semibold ${
+                              row.sum > 0 ? "text-blue-600" : "text-gray-500"
+                            }`}>
+                            {row.sum.toLocaleString("ru-RU", {
+                              minimumFractionDigits: 2,
+                            })}{" "}
+                            ₽
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
                           {isInvalid ? (
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                               <svg
@@ -479,21 +567,44 @@ const AddHoseReportModal = ({ station, onClose, onSaved }) => {
           </div>
 
           {/* Итоговая информация */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h4 className="text-lg font-semibold text-blue-900">
-                  Итог за день
-                </h4>
-                <p className="text-blue-700 text-sm">
-                  Суммарный расход по всем шлангам
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="text-3xl font-bold text-blue-900">
-                  {total.toLocaleString()}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h4 className="text-lg font-semibold text-blue-900">
+                    Итог за день (м³)
+                  </h4>
+                  <p className="text-blue-700 text-sm">
+                    Суммарный расход по всем шлангам
+                  </p>
                 </div>
-                <div className="text-blue-700 font-medium">м³</div>
+                <div className="text-right">
+                  <div className="text-3xl font-bold text-blue-900">
+                    {total.toLocaleString()}
+                  </div>
+                  <div className="text-blue-700 font-medium">м³</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h4 className="text-lg font-semibold text-green-900">
+                    Итог за день (₽)
+                  </h4>
+                  <p className="text-green-700 text-sm">
+                    Суммарная стоимость по всем шлангам
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl font-bold text-green-900">
+                    {totalSum.toLocaleString("ru-RU", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </div>
+                  <div className="text-green-700 font-medium">руб.</div>
+                </div>
               </div>
             </div>
           </div>

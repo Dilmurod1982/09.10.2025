@@ -147,18 +147,27 @@ const AddPartnerReportModal = ({
 
       const clientIP = await getClientIP();
 
+      // Рассчитываем общее количество и сумму газа по всем партнерам
+      const totalGasPartner = partnerData.reduce((total, partner) => {
+        return total + (partner.soldM3 || 0);
+      }, 0);
+
+      const totalSumGasPartner = partnerData.reduce((total, partner) => {
+        return total + (partner.totalAmount || 0);
+      }, 0);
+
       const reportData = {
         reportDate,
         stationId: stationId,
         stationName: stationName || "Неизвестная станция",
         partnerData,
+        totalgaspartner: totalGasPartner, // Новое поле: общее количество газа
+        totalsumgaspartner: totalSumGasPartner, // Новое поле: общая сумма газа
         createdBy: userName,
         createdAt: new Date(),
         clientIP,
         status: "saving",
       };
-
-      console.log("Сохранение отчета:", reportData);
 
       // Сохраняем отчет
       const docRef = await addDoc(

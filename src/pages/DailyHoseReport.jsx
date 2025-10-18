@@ -263,12 +263,21 @@ const DailyHoseReport = () => {
                             {hose.hose} (показание)
                           </th>
                           <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                            {hose.hose} (цена)
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                             {hose.hose} (расход)
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                            {hose.hose} (сумма)
                           </th>
                         </React.Fragment>
                       ))}
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Итого за день
+                        Итого м³
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                        Итого ₽
                       </th>
                     </tr>
                   </thead>
@@ -285,43 +294,34 @@ const DailyHoseReport = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               {hose.current.toLocaleString()}
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                              {hose.price?.toLocaleString("ru-RU", {
+                                minimumFractionDigits: 2,
+                              })}{" "}
+                              ₽
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">
                               +{hose.diff.toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">
+                              {hose.sum?.toLocaleString("ru-RU", {
+                                minimumFractionDigits: 2,
+                              })}{" "}
+                              ₽
                             </td>
                           </React.Fragment>
                         ))}
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
                           {report.totalgas.toLocaleString()} м³
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                          {report.totalsum?.toLocaleString("ru-RU", {
+                            minimumFractionDigits: 2,
+                          })}{" "}
+                          ₽
+                        </td>
                       </tr>
                     ))}
-
-                    {/* Итоговая строка */}
-                    {totals && (
-                      <tr className="bg-blue-50 border-t-2 border-blue-200">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                          ИТОГО ЗА МЕСЯЦ:
-                        </td>
-                        {reports[0]?.hoses?.map((hose) => (
-                          <React.Fragment key={hose.hose}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                              {totals.hoseTotals[
-                                hose.hose
-                              ]?.current.toLocaleString() || "0"}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-700">
-                              +
-                              {totals.hoseTotals[
-                                hose.hose
-                              ]?.diff.toLocaleString() || "0"}
-                            </td>
-                          </React.Fragment>
-                        ))}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-700">
-                          {totals.totalGas.toLocaleString()} м³
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
