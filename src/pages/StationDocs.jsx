@@ -6,10 +6,12 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { getStatusColor } from "../utils/dateUtils";
 import AddDocumentModalByStation from "../components/AddDocumentModalByStation";
+import { useAppStore } from "../lib/zustand"; // Добавляем импорт Zustand
 
 const StationDocs = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const userData = useAppStore((state) => state.userData); // Получаем данные пользователя
 
   const [docs, setDocs] = useState([]);
   const [filteredDocs, setFilteredDocs] = useState([]);
@@ -23,6 +25,13 @@ const StationDocs = () => {
   const [selectedType, setSelectedType] = useState("Все");
   const [expiryFilter, setExpiryFilter] = useState("Все");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Проверяем, может ли пользователь добавлять документы
+  const canAddDocuments =
+    userData &&
+    (userData.role === "admin" ||
+      userData.role === "nazorat" ||
+      userData.role === "rahbar");
 
   useEffect(() => {
     fetchDocs();
@@ -205,11 +214,14 @@ const StationDocs = () => {
           Документы станции: {stationName}
         </h1>
         <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
-            + Добавить документ
-          </button>
+          {/* Кнопка "Добавить документ" показывается только для определенных ролей */}
+          {canAddDocuments && (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+              + Добавить документ
+            </button>
+          )}
           <button
             onClick={exportToExcel}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
@@ -307,13 +319,15 @@ const StationDocs = () => {
       )}
 
       {/* Модальное окно добавления документа */}
-      <AddDocumentModalByStation
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        stationId={id}
-        stationName={stationName}
-        onDocumentAdded={fetchDocs}
-      />
+      {canAddDocuments && (
+        <AddDocumentModalByStation
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          stationId={id}
+          stationName={stationName}
+          onDocumentAdded={fetchDocs}
+        />
+      )}
     </div>
   );
 };

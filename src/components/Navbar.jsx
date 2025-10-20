@@ -44,17 +44,19 @@ import {
   Handshake as HandshakeIcon,
   List as ListIcon,
   Assignment as AssignmentIcon,
-  Summarize as SummarizeIcon, // Иконка для отчетов
+  Summarize as SummarizeIcon,
+  Person as PersonIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import Collapse from "@mui/material/Collapse";
+import UserModal from "./UserModal";
 
 export default function Navbar() {
   const MotionPaper = motion.create(Paper);
   const setUser = useAppStore((state) => state.setUser);
   const user = useAppStore((state) => state.user);
   const userData = useAppStore((state) => state.userData);
-  const role = userData?.role; // ✅ Роль пользователя
+  const role = userData?.role;
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [equipmentOpen, setEquipmentOpen] = React.useState(false);
   const [equipmentDetailsOpen, setEquipmentDetailsOpen] = React.useState(false);
@@ -64,10 +66,25 @@ export default function Navbar() {
   const [docsTimedOpen, setDocsTimedOpen] = React.useState(false);
   const [docsPerpOpen, setDocsPerpOpen] = React.useState(false);
   const [partnersOpen, setPartnersOpen] = React.useState(false);
-  const [dailyReportsOpen, setDailyReportsOpen] = React.useState(false); // Новое состояние для ежедневных отчетов
+  const [dailyReportsOpen, setDailyReportsOpen] = React.useState(false);
+  const [userModalOpen, setUserModalOpen] = React.useState(false);
 
   const navigate = useNavigate();
   const theme = useTheme();
+
+  // Формируем ФИО пользователя
+  const getUserFullName = () => {
+    if (!userData) return "";
+
+    const { lastName, firstName, middleName } = userData;
+    let fullName = "";
+
+    if (lastName) fullName += lastName;
+    if (firstName) fullName += ` ${firstName}`;
+    if (middleName) fullName += ` ${middleName}`;
+
+    return fullName.trim();
+  };
 
   const signOutProfile = async () => {
     await signOut(auth);
@@ -91,13 +108,25 @@ export default function Navbar() {
       setDocsTimedOpen(false);
       setDocsPerpOpen(false);
       setPartnersOpen(false);
-      setDailyReportsOpen(false); // Сбрасываем состояние ежедневных отчетов
+      setDailyReportsOpen(false);
     }
   };
 
   const handleMenuClick = (path) => {
     setDrawerOpen(false);
     navigate(path);
+  };
+
+  const handleUserButtonClick = () => {
+    setUserModalOpen(true);
+  };
+
+  const handleUserModalClose = () => {
+    setUserModalOpen(false);
+  };
+
+  const handleUserUpdated = () => {
+    toast.success("Данные пользователя обновлены");
   };
 
   const handleEquipmentClick = () => setEquipmentOpen(!equipmentOpen);
@@ -110,7 +139,7 @@ export default function Navbar() {
   const handleDocsTimedClick = () => setDocsTimedOpen(!docsTimedOpen);
   const handleDocsPerpClick = () => setDocsPerpOpen(!docsPerpOpen);
   const handlePartnersClick = () => setPartnersOpen(!partnersOpen);
-  const handleDailyReportsClick = () => setDailyReportsOpen(!dailyReportsOpen); // Обработчик для ежедневных отчетов
+  const handleDailyReportsClick = () => setDailyReportsOpen(!dailyReportsOpen);
 
   // 🔹 Меню
   const menuItems = [
@@ -216,6 +245,9 @@ export default function Navbar() {
       ? menuItems.filter((item) => item.text === "Партнёры")
       : [];
 
+  // Проверяем, является ли пользователь rahbar или booker
+  const isRahbarOrBooker = role === "rahbar" || role === "buxgalter";
+
   return (
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
@@ -244,22 +276,144 @@ export default function Navbar() {
             component="div"
             onClick={() => navigate("/")}
             sx={{
-              flexGrow: 1,
               cursor: "pointer",
               fontWeight: "600",
               transition: "color 0.2s",
               "&:hover": { color: "#b3e5fc" },
+              mr: isRahbarOrBooker ? 3 : 0, // Добавляем отступ если есть кнопки
             }}>
             Метан
           </Typography>
 
-          <Button onClick={signOutProfile} color="inherit">
-            Выход
+          {/* Кнопки для rahbar и booker */}
+          {isRahbarOrBooker && (
+            <Box sx={{ display: "flex", gap: 1, flexGrow: 1 }}>
+              <Button
+                color="inherit"
+                onClick={() => navigate("/employeesdocdeadline")}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: "20px",
+                  padding: "6px 16px",
+                  transition: "all 0.2s",
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                    transform: "translateY(-1px)",
+                  },
+                }}>
+                Документы со сроком
+              </Button>
+              <Button
+                color="inherit"
+                onClick={() => navigate("/employeesdocdeadlineinf")}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: "20px",
+                  padding: "6px 16px",
+                  transition: "all 0.2s",
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                    transform: "translateY(-1px)",
+                  },
+                }}>
+                Документы без срока
+              </Button>
+              <Button
+                color="inherit"
+                onClick={() => navigate("/generaldailyreport")}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: "20px",
+                  padding: "6px 16px",
+                  transition: "all 0.2s",
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                    transform: "translateY(-1px)",
+                  },
+                }}>
+                Ежедневные отчеты
+              </Button>
+            </Box>
+          )}
+
+          {/* Кнопка пользователя */}
+          {userData && (
+            <Button
+              onClick={handleUserButtonClick}
+              color="inherit"
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                mr: 2,
+                textTransform: "none",
+                borderRadius: "20px",
+                padding: "6px 12px",
+                transition: "all 0.2s",
+                "&:hover": {
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  transform: "translateY(-1px)",
+                },
+              }}>
+              <PersonIcon sx={{ fontSize: 20 }} />
+              <Typography
+                variant="body1"
+                sx={{
+                  fontWeight: "500",
+                  fontSize: "0.9rem",
+                  maxWidth: "150px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}>
+                {getUserFullName()}
+              </Typography>
+            </Button>
+          )}
+
+          <Button
+            onClick={signOutProfile}
+            color="inherit"
+            sx={{
+              borderRadius: "20px",
+              padding: "6px 16px",
+              transition: "all 0.2s",
+              "&:hover": {
+                backgroundColor: "rgba(255, 255, 255, 0.1)",
+                transform: "translateY(-1px)",
+              },
+            }}>
+            ЧИҚИШ
           </Button>
         </Toolbar>
       </AppBar>
 
-      {/* Drawer отображается для admin, buxgalter и operator */}
+      {/* Модальное окно пользователя */}
+      {userModalOpen && userData && (
+        <UserModal
+          user={{
+            id: userData.uid || user?.uid,
+            email: userData.email,
+            displayName: userData.displayName,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            middleName: userData.middleName,
+            birthday: userData.birthday,
+            pinfl: userData.pinfl,
+            passportSeries: userData.passportSeries,
+            passportNumber: userData.passportNumber,
+            address: userData.address,
+            role: userData.role,
+            accessEndDate: userData.accessEndDate,
+            stations: userData.stations || [],
+          }}
+          onClose={handleUserModalClose}
+          onUserUpdated={handleUserUpdated}
+          readOnly={true}
+        />
+      )}
+
+      {/* Остальная часть кода Drawer остается без изменений */}
       {(role === "admin" || role === "buxgalter" || role === "operator") && (
         <Drawer
           anchor="left"

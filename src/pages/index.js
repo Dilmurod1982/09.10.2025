@@ -33,6 +33,8 @@ export { default as HomeOperator } from "./HomeOperator";
 export { default as GeneralDailyReport } from "./GeneralDailyReport";
 export { default as DailyHoseReport } from "./DailyHoseReport";
 export { default as DailyReportPartners } from "./DailyReportPartners";
+export { default as EmployeesDocDeadlineInf } from "./EmployeesDocDeadlineInf";
+export { default as EmployeesDocDeadline } from "./EmployeesDocDeadline";
 
 // export { default as License } from "./documents/License";
 // export { default as GasCertificate } from "./documents/GasCertificate";

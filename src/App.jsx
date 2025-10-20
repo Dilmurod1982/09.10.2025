@@ -35,6 +35,8 @@ import {
   GeneralDailyReport,
   DailyHoseReport,
   DailyReportPartners,
+  EmployeesDocDeadline,
+  EmployeesDocDeadlineInf,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -308,7 +310,7 @@ function App() {
           path: "/stationdocs/:id",
           element: (
             <ProtectedLayout
-              allowedRoles={["admin"]}
+              allowedRoles={["admin", "rahbar", "buxgalter"]}
               element={<StationDocs />}
             />
           ),
@@ -317,7 +319,7 @@ function App() {
           path: "/stationdocsinf/:id",
           element: (
             <ProtectedLayout
-              allowedRoles={["admin"]}
+              allowedRoles={["admin", "rahbar", "buxgalter"]}
               element={<StationDocsInf />}
             />
           ),
@@ -380,6 +382,14 @@ function App() {
         {
           path: "/dailyreportpartners",
           element: <DailyReportPartners />,
+        },
+        {
+          path: "/employeesdocdeadline",
+          element: <EmployeesDocDeadline />,
+        },
+        {
+          path: "/employeesdocdeadlineinf",
+          element: <EmployeesDocDeadlineInf />,
         },
       ],
     },

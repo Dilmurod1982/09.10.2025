@@ -33,6 +33,9 @@ import {
   Trash2,
   AlertCircle,
   CheckCircle,
+  Calendar,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 
 const Stations = () => {
@@ -63,6 +66,10 @@ const Stations = () => {
   });
   const [currentEmployeeIndex, setCurrentEmployeeIndex] = useState(null);
   const [pinflError, setPinflError] = useState("");
+  const [currentUser, setCurrentUser] = useState({
+    id: "user123",
+    name: "Администратор",
+  });
 
   // Фильтрация станций по поиску
   const filteredStations = stations.filter(
@@ -183,6 +190,83 @@ const Stations = () => {
     loadData();
   }, []);
 
+  // Вспомогательная функция для получения вложенных значений
+  const getNestedValue = (obj, path) => {
+    return path.split(".").reduce((acc, part) => acc && acc[part], obj);
+  };
+  // Функция для получения доступного оборудования (не прикрепленного к другим станциям)
+  const getAvailableEquipment = (
+    equipmentList,
+    equipmentType,
+    currentStationEquipment = []
+  ) => {
+    return equipmentList.filter((equipment) => {
+      // Если оборудование уже выбрано в текущей станции, показываем его
+      const isCurrentlySelected = currentStationEquipment.some(
+        (currentEq) => currentEq.equipmentId === equipment.id
+      );
+
+      if (isCurrentlySelected) {
+        return true;
+      }
+
+      // Если нет истории движения, оборудование доступно
+      if (
+        !equipment.movementHistory ||
+        equipment.movementHistory.length === 0
+      ) {
+        return true;
+      }
+
+      // Получаем последнюю запись в истории движения
+      const sortedHistory = equipment.movementHistory
+        .filter((move) => move.toStationId) // Фильтруем только записи о прикреплении
+        .sort(
+          (a, b) => new Date(b.attachmentDate) - new Date(a.attachmentDate)
+        );
+
+      if (sortedHistory.length === 0) {
+        return true;
+      }
+
+      const lastMovement = sortedHistory[0];
+
+      // Если есть дата открепления, оборудование доступно
+      return !!lastMovement.detachmentDate;
+    });
+  };
+
+  // Получаем доступное оборудование для каждого типа с учетом уже выбранного
+  const getCurrentEquipment = (type) => {
+    return (
+      getNestedValue(isCreating ? newStation : selectedStation, type) || []
+    );
+  };
+
+  const availableCompressors = getAvailableEquipment(
+    compressors,
+    "compressors",
+    getCurrentEquipment("compressors")
+  );
+
+  const availableDispensers = getAvailableEquipment(
+    dispensers,
+    "dispensers",
+    getCurrentEquipment("dispensers")
+  );
+
+  const availableGasDryers = getAvailableEquipment(
+    gasDryers,
+    "gasDryers",
+    getCurrentEquipment("dryers")
+  );
+
+  const availableGasChillers = getAvailableEquipment(
+    gasChillers,
+    "gasChillers",
+    getCurrentEquipment("chillers")
+  );
+
   // Находим должность руководителя
   const directorPosition = positions.find(
     (p) =>
@@ -244,12 +328,18 @@ const Stations = () => {
       currentData.staff[0].employeeId &&
       currentData.staff[0].employeeId.trim() !== "";
 
-    return basicFieldsValid && staffValid;
-  };
+    // Проверяем, что для всего оборудования заполнены даты прикрепления
+    const equipmentValid = [
+      ...(currentData.compressors || []),
+      ...(currentData.dispensers || []),
+      ...(currentData.dryers || []),
+      ...(currentData.chillers || []),
+    ].every(
+      (equipment) =>
+        equipment.attachmentDate && equipment.attachmentDate.trim() !== ""
+    );
 
-  // Вспомогательная функция для получения вложенных значений
-  const getNestedValue = (obj, path) => {
-    return path.split(".").reduce((acc, part) => acc && acc[part], obj);
+    return basicFieldsValid && staffValid && equipmentValid;
   };
 
   // Обработчики изменения полей
@@ -429,10 +519,13 @@ const Stations = () => {
   // Обработчики для оборудования
   const addEquipment = (type) => {
     const emptyItem = {
+      equipmentId: "",
       modelId: "",
       modelName: "",
       brand: "",
       serialNumber: "",
+      attachmentDate: "",
+      detachmentDate: "",
     };
     const currentData = isCreating ? newStation : selectedStation;
     const updatedList = [...(currentData[type] || []), emptyItem];
@@ -472,9 +565,12 @@ const Stations = () => {
             i === index
               ? {
                   ...item,
-                  modelId: selectedId,
+                  equipmentId: selectedId,
+                  modelId: selected.id,
                   modelName: selected.model,
                   brand: selected.brand,
+                  serialNumber: selected.serialNumber || "",
+                  attachmentDate: new Date().toISOString().split("T")[0], // Автозаполнение текущей датой
                 }
               : item
           );
@@ -486,15 +582,162 @@ const Stations = () => {
             i === index
               ? {
                   ...item,
-                  modelId: selectedId,
+                  equipmentId: selectedId,
+                  modelId: selected.id,
                   modelName: selected.model,
                   brand: selected.brand,
+                  serialNumber: selected.serialNumber || "",
+                  attachmentDate: new Date().toISOString().split("T")[0], // Автозаполнение текущей датой
                 }
               : item
           );
           return { ...prev, [type]: updatedList };
         });
       }
+    } else {
+      // Если выбрана пустая опция, очищаем поля
+      if (isCreating) {
+        setNewStation((prev) => {
+          const updatedList = prev[type].map((item, i) =>
+            i === index
+              ? {
+                  equipmentId: "",
+                  modelId: "",
+                  modelName: "",
+                  brand: "",
+                  serialNumber: "",
+                  attachmentDate: "",
+                  detachmentDate: "",
+                }
+              : item
+          );
+          return { ...prev, [type]: updatedList };
+        });
+      } else {
+        setSelectedStation((prev) => {
+          const updatedList = prev[type].map((item, i) =>
+            i === index
+              ? {
+                  equipmentId: "",
+                  modelId: "",
+                  modelName: "",
+                  brand: "",
+                  serialNumber: "",
+                  attachmentDate: "",
+                  detachmentDate: "",
+                }
+              : item
+          );
+          return { ...prev, [type]: updatedList };
+        });
+      }
+    }
+  };
+
+  // Функция для сброса оборудования
+  const handleEquipmentReset = (type, index) => {
+    if (isCreating) {
+      setNewStation((prev) => {
+        const updatedList = prev[type].map((item, i) =>
+          i === index
+            ? {
+                equipmentId: "",
+                modelId: "",
+                modelName: "",
+                brand: "",
+                serialNumber: "",
+                attachmentDate: "",
+                detachmentDate: "",
+              }
+            : item
+        );
+        return { ...prev, [type]: updatedList };
+      });
+    } else {
+      setSelectedStation((prev) => {
+        const updatedList = prev[type].map((item, i) =>
+          i === index
+            ? {
+                equipmentId: "",
+                modelId: "",
+                modelName: "",
+                brand: "",
+                serialNumber: "",
+                attachmentDate: "",
+                detachmentDate: "",
+              }
+            : item
+        );
+        return { ...prev, [type]: updatedList };
+      });
+    }
+  };
+
+  // Функция для обновления истории движения оборудования
+  const updateEquipmentMovementHistory = async (
+    equipmentId,
+    equipmentType,
+    stationData,
+    attachmentDate,
+    detachmentDate = null
+  ) => {
+    try {
+      const equipmentDoc = doc(db, equipmentType, equipmentId);
+      const equipmentSnapshot = await getDoc(equipmentDoc);
+
+      if (equipmentSnapshot.exists()) {
+        const equipmentData = equipmentSnapshot.data();
+        const movementHistory = equipmentData.movementHistory || [];
+
+        const movementRecord = {
+          stationId: stationData.id,
+          stationName: stationData.stationName,
+          attachmentDate: attachmentDate,
+          attachedBy: currentUser.name,
+          attachedById: currentUser.id,
+          detachmentDate: detachmentDate,
+          detachedBy: detachmentDate ? currentUser.name : null,
+          detachedById: detachmentDate ? currentUser.id : null,
+        };
+
+        // Если это открепление, обновляем последнюю запись
+        if (detachmentDate) {
+          const lastAttachmentIndex = movementHistory
+            .map((move, index) =>
+              move.stationId === stationData.id && !move.detachmentDate
+                ? index
+                : -1
+            )
+            .find((index) => index !== -1);
+
+          if (lastAttachmentIndex !== -1) {
+            movementHistory[lastAttachmentIndex] = {
+              ...movementHistory[lastAttachmentIndex],
+              detachmentDate: detachmentDate,
+              detachedBy: currentUser.name,
+              detachedById: currentUser.id,
+            };
+          }
+        } else {
+          // Если это прикрепление, добавляем новую запись
+          movementHistory.push(movementRecord);
+        }
+
+        await updateDoc(equipmentDoc, {
+          movementHistory: movementHistory,
+          updatedAt: new Date(),
+        });
+
+        console.log(
+          `Movement history updated for ${equipmentType}:`,
+          equipmentId
+        );
+      }
+    } catch (error) {
+      console.error(
+        `Error updating movement history for ${equipmentType}:`,
+        error
+      );
     }
   };
 
@@ -585,11 +828,10 @@ const Stations = () => {
         });
         stationId = docRef.id;
 
-        // Теперь обновляем workHistory для руководителя
+        // Обновляем workHistory для руководителя
         if (dataToSave.staff && dataToSave.staff.length > 0) {
           const director = dataToSave.staff[0];
           if (director.employeeId) {
-            // Получаем текущего сотрудника
             const employeeDoc = await getDoc(
               doc(db, "employees", director.employeeId)
             );
@@ -597,7 +839,6 @@ const Stations = () => {
             if (employeeDoc.exists()) {
               const employeeData = employeeDoc.data();
 
-              // Создаем запись в истории работы
               const workHistoryEntry = {
                 stationId: stationId,
                 stationName: dataToSave.stationName,
@@ -615,25 +856,114 @@ const Stations = () => {
                 workHistoryEntry,
               ];
 
-              // Обновляем сотрудника в Firestore
               await updateDoc(doc(db, "employees", director.employeeId), {
                 workHistory: updatedWorkHistory,
                 updatedAt: new Date(),
               });
-
-              console.log(
-                "Work history updated for director:",
-                director.employeeId
-              );
             }
           }
         }
+
+        // Обновляем историю движения для оборудования
+        const equipmentUpdates = [];
+
+        // Компрессоры
+        if (dataToSave.compressors) {
+          dataToSave.compressors.forEach((compressor) => {
+            if (compressor.equipmentId && compressor.attachmentDate) {
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  compressor.equipmentId,
+                  "compressors",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  compressor.attachmentDate
+                )
+              );
+            }
+          });
+        }
+
+        // Колонки
+        if (dataToSave.dispensers) {
+          dataToSave.dispensers.forEach((dispenser) => {
+            if (dispenser.equipmentId && dispenser.attachmentDate) {
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  dispenser.equipmentId,
+                  "dispensers",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  dispenser.attachmentDate
+                )
+              );
+            }
+          });
+        }
+
+        // Осушки
+        if (dataToSave.dryers) {
+          dataToSave.dryers.forEach((dryer) => {
+            if (dryer.equipmentId && dryer.attachmentDate) {
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  dryer.equipmentId,
+                  "gasDryers",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  dryer.attachmentDate
+                )
+              );
+            }
+          });
+        }
+
+        // Чиллеры
+        if (dataToSave.chillers) {
+          dataToSave.chillers.forEach((chiller) => {
+            if (chiller.equipmentId && chiller.attachmentDate) {
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  chiller.equipmentId,
+                  "gasChillers",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  chiller.attachmentDate
+                )
+              );
+            }
+          });
+        }
+
+        // Ждем завершения всех обновлений оборудования
+        await Promise.all(equipmentUpdates);
       } else {
         stationId = selectedStation.id;
+
+        // Для редактирования обновляем историю движения при изменении дат
+        const equipmentUpdates = [];
+
+        // Компрессоры
+        if (dataToSave.compressors) {
+          dataToSave.compressors.forEach((compressor) => {
+            if (compressor.equipmentId && compressor.detachmentDate) {
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  compressor.equipmentId,
+                  "compressors",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  compressor.attachmentDate,
+                  compressor.detachmentDate
+                )
+              );
+            }
+          });
+        }
+
+        // Аналогично для других типов оборудования...
+
         await updateDoc(doc(db, "stations", stationId), {
           ...dataToSave,
           updatedAt: new Date(),
         });
+
+        await Promise.all(equipmentUpdates);
       }
 
       // Перезагрузка данных
@@ -1213,6 +1543,8 @@ const Stations = () => {
                       </table>
                     </div>
                   </div>
+
+                  {/* Оборудование станции */}
                   <div className="border-t pt-6">
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <Settings size={18} />
@@ -1245,27 +1577,32 @@ const Stations = () => {
                       ).map((compressor, index) => (
                         <div
                           key={index}
-                          className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
+                          className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель компрессора
+                              Модель компрессора *
                             </label>
                             <select
-                              value={compressor.modelId || ""}
-                              onChange={(e) =>
-                                handleEquipmentSelect(
-                                  "compressors",
-                                  index,
-                                  e.target.value,
-                                  compressors
-                                )
-                              }
+                              value={compressor.equipmentId || ""}
+                              onChange={(e) => {
+                                if (e.target.value === "") {
+                                  handleEquipmentReset("compressors", index);
+                                } else {
+                                  handleEquipmentSelect(
+                                    "compressors",
+                                    index,
+                                    e.target.value,
+                                    availableCompressors
+                                  );
+                                }
+                              }}
                               disabled={!isCreating && !isEditMode}
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
                               <option value="">Выберите компрессор</option>
-                              {compressors.map((comp) => (
+                              {availableCompressors.map((comp) => (
                                 <option key={comp.id} value={comp.id}>
-                                  {comp.brand} {comp.model}
+                                  {comp.brand} {comp.model} -{" "}
+                                  {comp.serialNumber || "Без номера"}
                                 </option>
                               ))}
                             </select>
@@ -1273,27 +1610,74 @@ const Stations = () => {
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Заводской номер
+                              Марка
                             </label>
                             <input
                               type="text"
-                              value={compressor.serialNumber || ""}
+                              value={compressor.brand || ""}
+                              readOnly
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
+                              placeholder="Автоматически заполнится"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Модель
+                            </label>
+                            <input
+                              type="text"
+                              value={compressor.modelName || ""}
+                              readOnly
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
+                              placeholder="Автоматически заполнится"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              <UserCheck className="inline w-4 h-4 mr-1 text-green-600" />
+                              Дата прикрепления *
+                            </label>
+                            <input
+                              type="date"
+                              value={compressor.attachmentDate || ""}
                               onChange={(e) =>
                                 updateEquipment(
                                   "compressors",
                                   index,
-                                  "serialNumber",
+                                  "attachmentDate",
                                   e.target.value
                                 )
                               }
                               disabled={!isCreating && !isEditMode}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                              placeholder="Введите заводской номер"
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              <UserX className="inline w-4 h-4 mr-1 text-red-600" />
+                              Дата открепления
+                            </label>
+                            <input
+                              type="date"
+                              value={compressor.detachmentDate || ""}
+                              onChange={(e) =>
+                                updateEquipment(
+                                  "compressors",
+                                  index,
+                                  "detachmentDate",
+                                  e.target.value
+                                )
+                              }
+                              disabled={!isCreating && !isEditMode}
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
                             />
                           </div>
 
                           {(isCreating || isEditMode) && (
-                            <div className="flex items-end">
+                            <div className="flex items-end lg:col-span-5">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -1334,27 +1718,32 @@ const Stations = () => {
                       ).map((dispenser, index) => (
                         <div
                           key={index}
-                          className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
+                          className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель колонки
+                              Модель колонки *
                             </label>
                             <select
-                              value={dispenser.modelId || ""}
-                              onChange={(e) =>
-                                handleEquipmentSelect(
-                                  "dispensers",
-                                  index,
-                                  e.target.value,
-                                  dispensers
-                                )
-                              }
+                              value={dispenser.equipmentId || ""}
+                              onChange={(e) => {
+                                if (e.target.value === "") {
+                                  handleEquipmentReset("dispensers", index);
+                                } else {
+                                  handleEquipmentSelect(
+                                    "dispensers",
+                                    index,
+                                    e.target.value,
+                                    availableDispensers
+                                  );
+                                }
+                              }}
                               disabled={!isCreating && !isEditMode}
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
                               <option value="">Выберите колонку</option>
-                              {dispensers.map((disp) => (
+                              {availableDispensers.map((disp) => (
                                 <option key={disp.id} value={disp.id}>
-                                  {disp.brand} {disp.model}
+                                  {disp.brand} {disp.model} -{" "}
+                                  {disp.serialNumber || "Без номера"}
                                 </option>
                               ))}
                             </select>
@@ -1362,27 +1751,74 @@ const Stations = () => {
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Заводской номер
+                              Марка
                             </label>
                             <input
                               type="text"
-                              value={dispenser.serialNumber || ""}
+                              value={dispenser.brand || ""}
+                              readOnly
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
+                              placeholder="Автоматически заполнится"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Модель
+                            </label>
+                            <input
+                              type="text"
+                              value={dispenser.modelName || ""}
+                              readOnly
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
+                              placeholder="Автоматически заполнится"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              <UserCheck className="inline w-4 h-4 mr-1 text-green-600" />
+                              Дата прикрепления *
+                            </label>
+                            <input
+                              type="date"
+                              value={dispenser.attachmentDate || ""}
                               onChange={(e) =>
                                 updateEquipment(
                                   "dispensers",
                                   index,
-                                  "serialNumber",
+                                  "attachmentDate",
                                   e.target.value
                                 )
                               }
                               disabled={!isCreating && !isEditMode}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                              placeholder="Введите заводской номер"
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              <UserX className="inline w-4 h-4 mr-1 text-red-600" />
+                              Дата открепления
+                            </label>
+                            <input
+                              type="date"
+                              value={dispenser.detachmentDate || ""}
+                              onChange={(e) =>
+                                updateEquipment(
+                                  "dispensers",
+                                  index,
+                                  "detachmentDate",
+                                  e.target.value
+                                )
+                              }
+                              disabled={!isCreating && !isEditMode}
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
                             />
                           </div>
 
                           {(isCreating || isEditMode) && (
-                            <div className="flex items-end">
+                            <div className="flex items-end lg:col-span-5">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -1423,27 +1859,32 @@ const Stations = () => {
                       ).map((dryer, index) => (
                         <div
                           key={index}
-                          className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
+                          className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель осушки
+                              Модель осушки *
                             </label>
                             <select
-                              value={dryer.modelId || ""}
-                              onChange={(e) =>
-                                handleEquipmentSelect(
-                                  "dryers",
-                                  index,
-                                  e.target.value,
-                                  gasDryers
-                                )
-                              }
+                              value={dryer.equipmentId || ""}
+                              onChange={(e) => {
+                                if (e.target.value === "") {
+                                  handleEquipmentReset("dryers", index);
+                                } else {
+                                  handleEquipmentSelect(
+                                    "dryers",
+                                    index,
+                                    e.target.value,
+                                    availableGasDryers
+                                  );
+                                }
+                              }}
                               disabled={!isCreating && !isEditMode}
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
                               <option value="">Выберите осушку</option>
-                              {gasDryers.map((dry) => (
+                              {availableGasDryers.map((dry) => (
                                 <option key={dry.id} value={dry.id}>
-                                  {dry.brand} {dry.model}
+                                  {dry.brand} {dry.model} -{" "}
+                                  {dry.serialNumber || "Без номера"}
                                 </option>
                               ))}
                             </select>
@@ -1451,27 +1892,74 @@ const Stations = () => {
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Заводской номер
+                              Марка
                             </label>
                             <input
                               type="text"
-                              value={dryer.serialNumber || ""}
+                              value={dryer.brand || ""}
+                              readOnly
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
+                              placeholder="Автоматически заполнится"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Модель
+                            </label>
+                            <input
+                              type="text"
+                              value={dryer.modelName || ""}
+                              readOnly
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
+                              placeholder="Автоматически заполнится"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              <UserCheck className="inline w-4 h-4 mr-1 text-green-600" />
+                              Дата прикрепления *
+                            </label>
+                            <input
+                              type="date"
+                              value={dryer.attachmentDate || ""}
                               onChange={(e) =>
                                 updateEquipment(
                                   "dryers",
                                   index,
-                                  "serialNumber",
+                                  "attachmentDate",
                                   e.target.value
                                 )
                               }
                               disabled={!isCreating && !isEditMode}
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                              placeholder="Введите заводской номер"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              <UserX className="inline w-4 h-4 mr-1 text-red-600" />
+                              Дата открепления
+                            </label>
+                            <input
+                              type="date"
+                              value={dryer.detachmentDate || ""}
+                              onChange={(e) =>
+                                updateEquipment(
+                                  "dryers",
+                                  index,
+                                  "detachmentDate",
+                                  e.target.value
+                                )
+                              }
+                              disabled={!isCreating && !isEditMode}
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
                             />
                           </div>
 
                           {(isCreating || isEditMode) && (
-                            <div className="flex items-end">
+                            <div className="flex items-end lg:col-span-5">
                               <button
                                 type="button"
                                 onClick={() => removeEquipment("dryers", index)}
@@ -1510,27 +1998,32 @@ const Stations = () => {
                       ).map((chiller, index) => (
                         <div
                           key={index}
-                          className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
+                          className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель чиллера
+                              Модель чиллера *
                             </label>
                             <select
-                              value={chiller.modelId || ""}
-                              onChange={(e) =>
-                                handleEquipmentSelect(
-                                  "chillers",
-                                  index,
-                                  e.target.value,
-                                  gasChillers
-                                )
-                              }
+                              value={chiller.equipmentId || ""}
+                              onChange={(e) => {
+                                if (e.target.value === "") {
+                                  handleEquipmentReset("chillers", index);
+                                } else {
+                                  handleEquipmentSelect(
+                                    "chillers",
+                                    index,
+                                    e.target.value,
+                                    availableGasChillers
+                                  );
+                                }
+                              }}
                               disabled={!isCreating && !isEditMode}
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
                               <option value="">Выберите чиллер</option>
-                              {gasChillers.map((chill) => (
+                              {availableGasChillers.map((chill) => (
                                 <option key={chill.id} value={chill.id}>
-                                  {chill.brand} {chill.model}
+                                  {chill.brand} {chill.model} -{" "}
+                                  {chill.serialNumber || "Без номера"}
                                 </option>
                               ))}
                             </select>
@@ -1538,27 +2031,74 @@ const Stations = () => {
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Заводской номер
+                              Марка
                             </label>
                             <input
                               type="text"
-                              value={chiller.serialNumber || ""}
+                              value={chiller.brand || ""}
+                              readOnly
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
+                              placeholder="Автоматически заполнится"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Модель
+                            </label>
+                            <input
+                              type="text"
+                              value={chiller.modelName || ""}
+                              readOnly
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
+                              placeholder="Автоматически заполнится"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              <UserCheck className="inline w-4 h-4 mr-1 text-green-600" />
+                              Дата прикрепления *
+                            </label>
+                            <input
+                              type="date"
+                              value={chiller.attachmentDate || ""}
                               onChange={(e) =>
                                 updateEquipment(
                                   "chillers",
                                   index,
-                                  "serialNumber",
+                                  "attachmentDate",
                                   e.target.value
                                 )
                               }
                               disabled={!isCreating && !isEditMode}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                              placeholder="Введите заводской номер"
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              <UserX className="inline w-4 h-4 mr-1 text-red-600" />
+                              Дата открепления
+                            </label>
+                            <input
+                              type="date"
+                              value={chiller.detachmentDate || ""}
+                              onChange={(e) =>
+                                updateEquipment(
+                                  "chillers",
+                                  index,
+                                  "detachmentDate",
+                                  e.target.value
+                                )
+                              }
+                              disabled={!isCreating && !isEditMode}
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
                             />
                           </div>
 
                           {(isCreating || isEditMode) && (
-                            <div className="flex items-end">
+                            <div className="flex items-end lg:col-span-5">
                               <button
                                 type="button"
                                 onClick={() =>

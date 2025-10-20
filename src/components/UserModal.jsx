@@ -4,7 +4,7 @@ import { updatePassword } from "firebase/auth";
 import { db, auth } from "../firebase/config";
 import StationsSelection from "./StationsSelection";
 
-const UserModal = ({ user, onClose, onUserUpdated }) => {
+const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     email: user.email || "",
@@ -29,6 +29,13 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
     message: "",
   });
 
+  // Если readOnly=true, то запрещаем редактирование
+  useEffect(() => {
+    if (readOnly) {
+      setIsEditing(false);
+    }
+  }, [readOnly]);
+
   // Загружаем станции пользователя при открытии модального окна
   useEffect(() => {
     if (user.stations) {
@@ -49,6 +56,11 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
   };
 
   const handleInputChange = (e) => {
+    // Если readOnly режим и поле не пароль, игнорируем изменения
+    if (readOnly && e.target.name !== "password") {
+      return;
+    }
+
     const { name, value } = e.target;
 
     let processedValue = value;
@@ -198,13 +210,24 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
 
   const accessStatus = getAccessStatus();
 
+  // Определяем, можно ли редактировать поле
+  const isFieldEditable = (fieldName) => {
+    if (readOnly) {
+      // В readOnly режиме только пароль можно редактировать
+      return fieldName === "password";
+    }
+    return isEditing;
+  };
+
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
           <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gray-50">
             <h2 className="text-xl font-semibold text-gray-900">
-              Информация о пользователе
+              {readOnly
+                ? "Информация о пользователе"
+                : "Редактирование пользователя"}
             </h2>
             <button
               onClick={onClose}
@@ -242,7 +265,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={!isFieldEditable("email")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
               </div>
@@ -258,10 +281,10 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   value={formData.password}
                   onChange={handleInputChange}
                   placeholder="Новый пароль"
-                  disabled={!isEditing}
+                  disabled={!isFieldEditable("password")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
-                {isEditing && formData.password && (
+                {isFieldEditable("password") && formData.password && (
                   <div className="space-y-1">
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
@@ -294,7 +317,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   name="displayName"
                   value={formData.displayName}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={!isFieldEditable("displayName")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
               </div>
@@ -309,7 +332,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={!isFieldEditable("firstName")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
               </div>
@@ -324,7 +347,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={!isFieldEditable("lastName")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
               </div>
@@ -339,7 +362,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   name="middleName"
                   value={formData.middleName}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={!isFieldEditable("middleName")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
               </div>
@@ -354,7 +377,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   name="birthday"
                   value={formData.birthday}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={!isFieldEditable("birthday")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
               </div>
@@ -369,7 +392,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   name="accessEndDate"
                   value={formData.accessEndDate}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={!isFieldEditable("accessEndDate")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
               </div>
@@ -379,7 +402,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                 <label className="block text-sm font-medium text-gray-700">
                   ПИНФЛ
                 </label>
-                {isEditing ? (
+                {isFieldEditable("pinfl") ? (
                   <input
                     type="text"
                     name="pinfl"
@@ -406,7 +429,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   name="passportSeries"
                   value={formData.passportSeries}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={!isFieldEditable("passportSeries")}
                   maxLength={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500 uppercase"
                 />
@@ -417,7 +440,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                 <label className="block text-sm font-medium text-gray-700">
                   Номер паспорта
                 </label>
-                {isEditing ? (
+                {isFieldEditable("passportNumber") ? (
                   <input
                     type="text"
                     name="passportNumber"
@@ -444,7 +467,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   name="address"
                   value={formData.address}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={!isFieldEditable("address")}
                   placeholder="Город, улица, дом"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
@@ -459,7 +482,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   name="role"
                   value={formData.role}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={!isFieldEditable("role")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500">
                   <option value="admin">Admin</option>
                   <option value="nazorat">Nazorat</option>
@@ -477,13 +500,14 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
               <div className="md:col-span-2 space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
                   Прикрепленные станции
-                  {!isEditing && selectedStations.length > 0 && (
-                    <span className="text-green-500 ml-1">
-                      ({selectedStations.length})
-                    </span>
-                  )}
+                  {!isFieldEditable("stations") &&
+                    selectedStations.length > 0 && (
+                      <span className="text-green-500 ml-1">
+                        ({selectedStations.length})
+                      </span>
+                    )}
                 </label>
-                {isEditing ? (
+                {isFieldEditable("stations") ? (
                   <button
                     type="button"
                     onClick={() => setShowStations(true)}
@@ -497,7 +521,7 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                       : "Станции не прикреплены"}
                   </div>
                 )}
-                {isEditing && (
+                {isFieldEditable("stations") && (
                   <div className="text-xs text-gray-500">
                     Нажмите для управления списком прикрепленных станций
                   </div>
@@ -514,11 +538,14 @@ const UserModal = ({ user, onClose, onUserUpdated }) => {
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
                   Закрыть
                 </button>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  Редактировать
-                </button>
+                {/* Кнопка Редактировать показывается только если не readOnly режим */}
+                {!readOnly && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    Редактировать
+                  </button>
+                )}
               </>
             ) : (
               <>
