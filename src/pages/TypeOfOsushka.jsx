@@ -54,7 +54,7 @@ const TypeOfOsushka = () => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const dryersSnapshot = await getDocs(collection(db, "gasDryers"));
+        const dryersSnapshot = await getDocs(collection(db, "typeofgasDryers"));
         const dryersData = dryersSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -149,19 +149,19 @@ const TypeOfOsushka = () => {
 
     try {
       if (isCreating) {
-        await addDoc(collection(db, "gasDryers"), {
+        await addDoc(collection(db, "typeofgasDryers"), {
           ...newDryer,
           createdAt: new Date(),
         });
       } else {
-        await updateDoc(doc(db, "gasDryers", selectedDryer.id), {
+        await updateDoc(doc(db, "typeofgasDryers", selectedDryer.id), {
           ...selectedDryer,
           updatedAt: new Date(),
         });
       }
 
       // Перезагрузка данных
-      const dryersSnapshot = await getDocs(collection(db, "gasDryers"));
+      const dryersSnapshot = await getDocs(collection(db, "typeofgasDryers"));
       const dryersData = dryersSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),

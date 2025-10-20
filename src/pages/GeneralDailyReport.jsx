@@ -14,6 +14,7 @@ import AddGeneralReportModal from "../components/AddGeneralReportModal";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import UnifiedReportModal from "../components/UnifiedReportModal";
+import DetailedReportModal from "../components/DetailedReportModal";
 
 const GeneralDailyReport = () => {
   const userData = useAppStore((state) => state.userData);
@@ -24,6 +25,13 @@ const GeneralDailyReport = () => {
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
+  const [showDetailedModal, setShowDetailedModal] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
+
+  // Проверка роли пользователя
+  const isOperator = useMemo(() => {
+    return userData?.role === "operator";
+  }, [userData?.role]);
 
   // Генерация месяцев с 2025 года
   const monthOptions = useMemo(() => {
@@ -69,7 +77,7 @@ const GeneralDailyReport = () => {
     fetchStations();
   }, [userData]);
 
-  // Загрузка отчетов
+  // Загрузка отчетов из unifiedDailyReports
   useEffect(() => {
     if (!selectedStation || !selectedMonth) {
       setReports([]);
@@ -84,11 +92,11 @@ const GeneralDailyReport = () => {
         const endDate = `${year}-${month}-31`;
 
         const q = query(
-          collection(db, "generalDailyReports"),
+          collection(db, "unifiedDailyReports"),
           where("stationId", "==", selectedStation.id),
-          where("date", ">=", startDate),
-          where("date", "<=", endDate),
-          orderBy("date", "asc")
+          where("reportDate", ">=", startDate),
+          where("reportDate", "<=", endDate),
+          orderBy("reportDate", "asc")
         );
 
         const snapshot = await getDocs(q);
@@ -112,10 +120,24 @@ const GeneralDailyReport = () => {
   // Расчет разницы между показаниями счетчика
   const calculateCounterDiff = (currentReport, previousReport) => {
     if (!previousReport) return 0;
-    return (
-      (currentReport.autopilotReading || 0) -
-      (previousReport.autopilotReading || 0)
-    );
+    const currentReading = currentReport.generalData?.autopilotReading || 0;
+    const previousReading = previousReport.generalData?.autopilotReading || 0;
+    return currentReading - previousReading;
+  };
+
+  // Форматирование даты в ДД-ММ-ГГГГ
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
+  // Обработчик клика по строке отчета
+  const handleReportClick = (report) => {
+    setSelectedReport(report);
+    setShowDetailedModal(true);
   };
 
   // Экспорт в Excel
@@ -124,9 +146,8 @@ const GeneralDailyReport = () => {
 
     const worksheetData = [
       // Заголовок
-      ["Ежедневный общий отчет", "", "", "", "", "", "", "", "", "", ""],
       [
-        `Станция: ${selectedStation?.stationName || "Неизвестная станция"}`,
+        "Кунлик ҳисобот",
         "",
         "",
         "",
@@ -136,10 +157,25 @@ const GeneralDailyReport = () => {
         "",
         "",
         "",
+        isOperator ? "" : "",
         "",
       ],
       [
-        `Период: ${new Date(selectedMonth + "-01").toLocaleDateString("ru-RU", {
+        `Станция: ${selectedStation?.stationName || "Ноъмалум заправка"}`,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        isOperator ? "" : "",
+        "",
+      ],
+      [
+        `Давр: ${new Date(selectedMonth + "-01").toLocaleDateString("ru-RU", {
           month: "long",
           year: "numeric",
         })}`,
@@ -152,6 +188,7 @@ const GeneralDailyReport = () => {
         "",
         "",
         "",
+        isOperator ? "" : "",
         "",
       ],
       [], // Пустая строка
@@ -159,16 +196,17 @@ const GeneralDailyReport = () => {
       // Заголовки таблицы
       [
         "№",
-        "Дата",
-        "Показание счетчика",
-        "Разница счетчика",
-        "Цена за м³",
-        "Продано через шланги (м³)",
-        "Продано партнерам (м³)",
-        "Терминал Хумо (₽)",
-        "Терминал Узкард (₽)",
-        "Наличные (₽)",
-        "Создан",
+        "Сана",
+        "Ҳисоблагич кўрсаткичи",
+        "Фарқи",
+        "Жами шланглар (м³)",
+        "Жами хамкорлар (м³)",
+        "1м³нархи",
+        "Терминал Узкард (сўм)",
+        "Терминал Хумо (сўм)",
+        "Z-ҳисобот (сўм)",
+        ...(isOperator ? [] : ["Назорат суммаси"]),
+        "Яратилди",
       ],
 
       // Данные
@@ -176,43 +214,61 @@ const GeneralDailyReport = () => {
         const previousReport = index > 0 ? reports[index - 1] : null;
         const counterDiff = calculateCounterDiff(report, previousReport);
 
-        return [
+        const row = [
           index + 1,
-          new Date(report.date).toLocaleDateString("ru-RU"),
-          report.autopilotReading || 0,
+          formatDate(report.reportDate),
+          report.generalData?.autopilotReading || 0,
           counterDiff,
-          report.gasPrice || 0,
           report.hoseTotalGas || 0,
-          report.partnerTotalGas || 0,
-          report.humoTerminal || 0,
-          report.uzcardTerminal || 0,
-          report.cashAmount || 0,
-          report.createdBy || "Неизвестно",
+          report.partnerTotalM3 || 0,
+          report.generalData?.gasPrice || 0,
+          report.generalData?.uzcardTerminal || 0,
+          report.generalData?.humoTerminal || 0,
+          report.generalData?.cashAmount || 0,
         ];
+
+        // Добавляем контрольную сумму только если пользователь не оператор
+        if (!isOperator) {
+          row.push(report.controlSum || 0);
+        }
+
+        row.push(report.createdBy || "Номаълум");
+
+        return row;
       }),
 
       // Итоги
       [
-        "ИТОГИ:",
+        "ЖАМИ:",
         "",
         "",
         reports.reduce((sum, report, index) => {
           const previousReport = index > 0 ? reports[index - 1] : null;
           return sum + calculateCounterDiff(report, previousReport);
         }, 0),
-        "",
         reports.reduce((sum, report) => sum + (report.hoseTotalGas || 0), 0),
-        reports.reduce((sum, report) => sum + (report.partnerTotalGas || 0), 0),
-        reports.reduce((sum, report) => sum + (report.humoTerminal || 0), 0),
-        reports.reduce((sum, report) => sum + (report.uzcardTerminal || 0), 0),
-        reports.reduce((sum, report) => sum + (report.cashAmount || 0), 0),
+        reports.reduce((sum, report) => sum + (report.partnerTotalM3 || 0), 0),
+        "",
+        reports.reduce(
+          (sum, report) => sum + (report.generalData?.uzcardTerminal || 0),
+          0
+        ),
+        reports.reduce(
+          (sum, report) => sum + (report.generalData?.humoTerminal || 0),
+          0
+        ),
+        reports.reduce(
+          (sum, report) => sum + (report.generalData?.cashAmount || 0),
+          0
+        ),
+        ...(isOperator ? [] : [""]),
         "",
       ],
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Общий отчет");
+    XLSX.utils.book_append_sheet(wb, ws, "Умумий ҳисобот");
 
     // Авто-ширина колонок
     const colWidths = [
@@ -220,19 +276,26 @@ const GeneralDailyReport = () => {
       { wch: 12 }, // Дата
       { wch: 18 }, // Показание счетчика
       { wch: 15 }, // Разница счетчика
+      { wch: 15 }, // Свод шланги
+      { wch: 15 }, // Свод партнеры
       { wch: 12 }, // Цена за м³
-      { wch: 20 }, // Продано через шланги
-      { wch: 20 }, // Продано партнерам
-      { wch: 15 }, // Терминал Хумо
       { wch: 15 }, // Терминал Узкард
+      { wch: 15 }, // Терминал Хумо
       { wch: 15 }, // Наличные
-      { wch: 20 }, // Создан
     ];
+
+    // Добавляем ширину для контрольной суммы если нужно
+    if (!isOperator) {
+      colWidths.push({ wch: 15 }); // Контрольная сумма
+    }
+
+    colWidths.push({ wch: 20 }); // Создан
+
     ws["!cols"] = colWidths;
 
     XLSX.writeFile(
       wb,
-      `общий_отчет_${selectedStation?.stationName}_${selectedMonth}.xlsx`
+      `Умумий_хисобот_${selectedStation?.stationName}_${selectedMonth}.xlsx`
     );
   };
 
@@ -242,10 +305,10 @@ const GeneralDailyReport = () => {
         {/* Заголовок */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Ежедневный общий отчет
+            Кунлик ҳисобот
           </h1>
           <p className="text-gray-600">
-            Сводная информация по продажам и показаниям счетчиков
+            Кўрсаткичлар ва сотувлар бўйича йиғма ҳисобот
           </p>
         </div>
 
@@ -255,7 +318,7 @@ const GeneralDailyReport = () => {
             {/* Выбор станции */}
             <div className="flex-1 min-w-0">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Выберите станцию
+                Заправкани танланг
               </label>
               <select
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none"
@@ -265,7 +328,7 @@ const GeneralDailyReport = () => {
                   setSelectedStation(station || null);
                   setSelectedMonth("");
                 }}>
-                <option value="">Выберите станцию...</option>
+                <option value="">танланг...</option>
                 {stations.map((station) => (
                   <option key={station.id} value={station.id}>
                     {station.stationName}
@@ -278,13 +341,13 @@ const GeneralDailyReport = () => {
             {selectedStation && (
               <div className="flex-1 min-w-0">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Выберите месяц
+                  Ойни танланг
                 </label>
                 <select
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}>
-                  <option value="">Выберите месяц...</option>
+                  <option value="">танланг...</option>
                   {monthOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -296,25 +359,6 @@ const GeneralDailyReport = () => {
 
             {/* Кнопки действий */}
             <div className="flex gap-3 lg:ml-auto">
-              <button
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                onClick={() => setShowAddModal(true)}
-                disabled={!selectedStation}>
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Новый отчет
-              </button>
-
               <button
                 className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 onClick={() => setShowUnifiedModal(true)}
@@ -331,7 +375,7 @@ const GeneralDailyReport = () => {
                     d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                   />
                 </svg>
-                Единый отчет
+                Ягона ҳисобот
               </button>
 
               <button
@@ -350,7 +394,7 @@ const GeneralDailyReport = () => {
                     d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                   />
                 </svg>
-                Экспорт в Excel
+                Excel га экспорт
               </button>
             </div>
           </div>
@@ -375,34 +419,39 @@ const GeneralDailyReport = () => {
                         №
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Дата
+                        Сана
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Показание счетчика
+                        Автопилот кўрсаткичи
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Разница
+                        Фарқи
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Цена за м³
+                        Шланглар (м³)
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Шланги (м³)
+                        Хамкорлар (м³)
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Партнеры (м³)
+                        1м³ нархи
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Хумо (₽)
+                        Узкард (сўм)
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Узкард (₽)
+                        Хумо (сўм)
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Наличные (₽)
+                        Z-ҳисобот (сўм)
                       </th>
+                      {!isOperator && (
+                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                          Назорат суммаси
+                        </th>
+                      )}
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Создан
+                        Яратилди
                       </th>
                     </tr>
                   </thead>
@@ -418,51 +467,73 @@ const GeneralDailyReport = () => {
                       return (
                         <tr
                           key={report.id}
-                          className="hover:bg-gray-50 transition-colors">
+                          className="hover:bg-gray-50 transition-colors cursor-pointer"
+                          onClick={() => handleReportClick(report)}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {index + 1}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {new Date(report.date).toLocaleDateString("ru-RU")}
+                            {formatDate(report.reportDate)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {report.autopilotReading?.toLocaleString() || "0"}
+                            {report.generalData?.autopilotReading?.toLocaleString() ||
+                              "0"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">
                             {counterDiff.toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {report.gasPrice?.toLocaleString("ru-RU", {
-                              minimumFractionDigits: 2,
-                            }) || "0.00"}{" "}
-                            ₽
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
                             {report.hoseTotalGas?.toLocaleString() || "0"} м³
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
-                            {report.partnerTotalGas?.toLocaleString() || "0"} м³
+                            {report.partnerTotalM3?.toLocaleString() || "0"} м³
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {report.generalData?.gasPrice?.toLocaleString(
+                              "ru-RU",
+                              {
+                                minimumFractionDigits: 2,
+                              }
+                            ) || "0.00"}{" "}
+                            сўм
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
-                            {report.humoTerminal?.toLocaleString("ru-RU", {
-                              minimumFractionDigits: 2,
-                            }) || "0.00"}{" "}
-                            ₽
+                            {report.generalData?.uzcardTerminal?.toLocaleString(
+                              "ru-RU",
+                              {
+                                minimumFractionDigits: 2,
+                              }
+                            ) || "0.00"}{" "}
+                            сўм
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
-                            {report.uzcardTerminal?.toLocaleString("ru-RU", {
-                              minimumFractionDigits: 2,
-                            }) || "0.00"}{" "}
-                            ₽
+                            {report.generalData?.humoTerminal?.toLocaleString(
+                              "ru-RU",
+                              {
+                                minimumFractionDigits: 2,
+                              }
+                            ) || "0.00"}{" "}
+                            сўм
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 font-semibold">
-                            {report.cashAmount?.toLocaleString("ru-RU", {
-                              minimumFractionDigits: 2,
-                            }) || "0.00"}{" "}
-                            ₽
+                            {report.generalData?.cashAmount?.toLocaleString(
+                              "ru-RU",
+                              {
+                                minimumFractionDigits: 2,
+                              }
+                            ) || "0.00"}{" "}
+                            сўм
                           </td>
+                          {!isOperator && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-semibold">
+                              {report.controlSum?.toLocaleString("ru-RU", {
+                                minimumFractionDigits: 2,
+                              }) || "0.00"}{" "}
+                              сўм
+                            </td>
+                          )}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {report.createdBy || "Неизвестно"}
+                            {report.createdBy || "Ноъмалум"}
                           </td>
                         </tr>
                       );
@@ -485,11 +556,11 @@ const GeneralDailyReport = () => {
                   />
                 </svg>
                 <h3 className="mt-2 text-sm font-medium text-gray-900">
-                  Отчетов не найдено
+                  Ҳисоботлар топилмади
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  За выбранный месяц отчетов по станции "
-                  {selectedStation.stationName}" нет.
+                  {selectedStation.stationName} заправка бўйича танланган даврга
+                  ҳисобот мавжуд эмас
                 </p>
               </div>
             )}
@@ -513,10 +584,10 @@ const GeneralDailyReport = () => {
                 />
               </svg>
               <h3 className="mt-4 text-lg font-medium text-gray-900">
-                Выберите станцию
+                Заправкани танланг
               </h3>
               <p className="mt-2 text-sm text-gray-500">
-                Для просмотра отчетов выберите станцию из списка выше.
+                Ҳисоботни кўриш учун юқорида заправкани танланг.
               </p>
             </div>
           </div>
@@ -538,34 +609,47 @@ const GeneralDailyReport = () => {
                 />
               </svg>
               <h3 className="mt-4 text-lg font-medium text-gray-900">
-                Выберите месяц
+                Ойни танланг
               </h3>
               <p className="mt-2 text-sm text-gray-500">
-                Выберите месяц для просмотра отчетов по станции "
-                {selectedStation.stationName}".
+                {selectedStation.stationName} заправка ҳисоботини кўриш учун
+                ойни танланг
               </p>
             </div>
           </div>
         )}
       </div>
+
       {/* Модальное окно добавления отчета */}
       {showAddModal && selectedStation && (
         <AddGeneralReportModal
           station={selectedStation}
           onClose={() => setShowAddModal(false)}
           onSaved={() => {
-            // Обновляем данные
             setSelectedMonth(selectedMonth);
             setShowAddModal(false);
           }}
         />
       )}
-      {/* И модальное окно*/}
+
+      {/* Модальное окно единого отчета */}
       {showUnifiedModal && selectedStation && (
         <UnifiedReportModal
           isOpen={showUnifiedModal}
           onClose={() => setShowUnifiedModal(false)}
           station={selectedStation}
+        />
+      )}
+
+      {/* Модальное окно подробного отчета */}
+      {showDetailedModal && selectedReport && (
+        <DetailedReportModal
+          isOpen={showDetailedModal}
+          onClose={() => {
+            setShowDetailedModal(false);
+            setSelectedReport(null);
+          }}
+          report={selectedReport}
         />
       )}
     </div>

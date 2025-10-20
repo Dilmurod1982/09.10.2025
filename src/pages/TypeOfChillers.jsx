@@ -56,7 +56,9 @@ const TypeOfChillers = () => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const chillersSnapshot = await getDocs(collection(db, "gasChillers"));
+        const chillersSnapshot = await getDocs(
+          collection(db, "typeofgasChillers")
+        );
         const chillersData = chillersSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -153,19 +155,21 @@ const TypeOfChillers = () => {
 
     try {
       if (isCreating) {
-        await addDoc(collection(db, "gasChillers"), {
+        await addDoc(collection(db, "typeofgasChillers"), {
           ...newChiller,
           createdAt: new Date(),
         });
       } else {
-        await updateDoc(doc(db, "gasChillers", selectedChiller.id), {
+        await updateDoc(doc(db, "typeofgasChillers", selectedChiller.id), {
           ...selectedChiller,
           updatedAt: new Date(),
         });
       }
 
       // Перезагрузка данных
-      const chillersSnapshot = await getDocs(collection(db, "gasChillers"));
+      const chillersSnapshot = await getDocs(
+        collection(db, "typeofgasChillers")
+      );
       const chillersData = chillersSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),

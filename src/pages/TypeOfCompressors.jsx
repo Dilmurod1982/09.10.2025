@@ -50,7 +50,7 @@ const TypeOfCompressors = () => {
       setLoading(true);
       try {
         const compressorsSnapshot = await getDocs(
-          collection(db, "compressors")
+          collection(db, "typeofcompressors")
         );
         const compressorsData = compressorsSnapshot.docs.map((doc) => ({
           id: doc.id,
@@ -176,7 +176,7 @@ const TypeOfCompressors = () => {
 
     try {
       if (isCreating) {
-        await addDoc(collection(db, "compressors"), {
+        await addDoc(collection(db, "typecompressors"), {
           ...newCompressor,
           maxPower: parseFloat(newCompressor.maxPower),
           minPressure: parseFloat(newCompressor.minPressure),
@@ -184,7 +184,7 @@ const TypeOfCompressors = () => {
           createdAt: new Date(),
         });
       } else {
-        await updateDoc(doc(db, "compressors", selectedCompressor.id), {
+        await updateDoc(doc(db, "typecompressors", selectedCompressor.id), {
           ...selectedCompressor,
           maxPower: parseFloat(selectedCompressor.maxPower),
           minPressure: parseFloat(selectedCompressor.minPressure),
@@ -194,7 +194,9 @@ const TypeOfCompressors = () => {
       }
 
       // Перезагрузка данных
-      const compressorsSnapshot = await getDocs(collection(db, "compressors"));
+      const compressorsSnapshot = await getDocs(
+        collection(db, "typecompressors")
+      );
       const compressorsData = compressorsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),

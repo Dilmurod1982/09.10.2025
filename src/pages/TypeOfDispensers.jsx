@@ -51,7 +51,9 @@ const TypeOfDispensers = () => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const dispensersSnapshot = await getDocs(collection(db, "dispensers"));
+        const dispensersSnapshot = await getDocs(
+          collection(db, "typeofdispensers")
+        );
         const dispensersData = dispensersSnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -143,13 +145,13 @@ const TypeOfDispensers = () => {
 
     try {
       if (isCreating) {
-        await addDoc(collection(db, "dispensers"), {
+        await addDoc(collection(db, "typeofdispensers"), {
           ...newDispenser,
           fuelType: "Природный газ", // Автоматически добавляем тип топлива
           createdAt: new Date(),
         });
       } else {
-        await updateDoc(doc(db, "dispensers", selectedDispenser.id), {
+        await updateDoc(doc(db, "typeofdispensers", selectedDispenser.id), {
           ...selectedDispenser,
           fuelType: "Природный газ", // Автоматически добавляем тип топлива
           updatedAt: new Date(),
@@ -157,7 +159,9 @@ const TypeOfDispensers = () => {
       }
 
       // Перезагрузка данных
-      const dispensersSnapshot = await getDocs(collection(db, "dispensers"));
+      const dispensersSnapshot = await getDocs(
+        collection(db, "typeofdispensers")
+      );
       const dispensersData = dispensersSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),

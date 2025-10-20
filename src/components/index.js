@@ -14,3 +14,4 @@ export { default as AddPartnerModal } from "./AddPartnerModal";
 export { default as AddPartnerReportModal } from "./AddPartnerReportModal";
 export { default as VerifyReportsButton } from "./VerifyReportsButton";
 export { default as PartnerDetailModal } from "./PartnerDetailModal";
+export { default as DetailedReportModal } from "./DetailedReportModal";

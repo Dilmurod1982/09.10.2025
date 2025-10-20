@@ -141,16 +141,6 @@ export default function Navbar() {
       icon: <SummarizeIcon />,
       path: "/generaldailyreport",
     },
-    {
-      text: "Ежедневный отчет по шлангам",
-      icon: <SummarizeIcon />,
-      path: "/dailyhosereport",
-    },
-    {
-      text: "Ежедневный отчет по партнерам",
-      icon: <SummarizeIcon />,
-      path: "/dailyreportpartners",
-    },
   ];
 
   const equipmentDetailsItems = [
