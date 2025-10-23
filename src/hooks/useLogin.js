@@ -78,6 +78,7 @@ export function useLogin() {
       setIsPending(false);
       return { success: true, user: userDataFromFirestore };
     } catch (error) {
+      toast.error(error.message);
       console.error("❌ Login error:", error);
       console.error("Error code:", error.code);
       console.error("Error message:", error.message);

@@ -37,6 +37,9 @@ import {
   DailyReportPartners,
   EmployeesDocDeadline,
   EmployeesDocDeadlineInf,
+  ControlPayments,
+  Payments,
+  ReportOnDebtsPartners,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -368,6 +371,33 @@ function App() {
             <ProtectedLayout
               allowedRoles={["operator"]}
               element={<HomeOperator />}
+            />
+          ),
+        },
+        {
+          path: "/controlpayments",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["buxgalter"]}
+              element={<ControlPayments />}
+            />
+          ),
+        },
+        {
+          path: "/payments",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["buxgalter"]}
+              element={<Payments />}
+            />
+          ),
+        },
+        {
+          path: "/reportondebtspartners",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["buxgalter"]}
+              element={<ReportOnDebtsPartners />}
             />
           ),
         },

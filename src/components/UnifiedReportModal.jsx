@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { useAppStore } from "../lib/zustand";
 
-const UnifiedReportModal = ({ isOpen, onClose, station }) => {
+const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   const [loading, setLoading] = useState(false);
   const [reportDate, setReportDate] = useState("");
   const [dateDisabled, setDateDisabled] = useState(false);
@@ -475,19 +475,24 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
     }
   };
 
-  // Сохранение объединенного отчета
-  const saveUnifiedReport = async () => {
+  // Функция для открытия модального окна подтверждения
+  const handleSaveClick = () => {
     if (!isReportValid()) {
       toast.error("Заполните все обязательные поля правильно");
       return;
     }
+    setIsConfirmModalOpen(true);
+  };
 
+  // Сохранение объединенного отчета (теперь вызывается только после подтверждения)
+  const saveUnifiedReport = async () => {
     try {
       setLoading(true);
 
       // Проверяем существующие отчеты перед сохранением
       const hasExistingReport = await checkExistingReport();
       if (hasExistingReport) {
+        setIsConfirmModalOpen(false);
         setLoading(false);
         return;
       }
@@ -543,6 +548,10 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
           humoTerminal: parseFormattedNumber(generalData.humoTerminal),
           uzcardTerminal: parseFormattedNumber(generalData.uzcardTerminal),
           cashAmount: cashAmount,
+          // Контрольные суммы - устанавливаем в 0
+          controlTotalSum: 0,
+          controlHumoSum: 0,
+          controlUzcardSum: 0,
         },
 
         // Метаданные
@@ -558,20 +567,15 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
       );
       setSavedReportId(docRef.id);
 
-      // Показываем модальное окно подтверждения
-      setIsConfirmModalOpen(true);
+      // Закрываем модальное окно подтверждения и открываем окно успеха
+      setIsConfirmModalOpen(false);
+      setIsSuccessModalOpen(true);
     } catch (error) {
       console.error("Ошибка сохранения объединенного отчета:", error);
       toast.error("Ошибка при сохранении отчета");
     } finally {
       setLoading(false);
     }
-  };
-
-  // Подтверждение сохранения отчета
-  const handleConfirmSave = () => {
-    setIsConfirmModalOpen(false);
-    setIsSuccessModalOpen(true);
   };
 
   // Завершение работы с отчетом
@@ -587,6 +591,12 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
       uzcardTerminal: "",
     });
     setSavedReportId(null);
+
+    // Вызываем callback для обновления списка отчетов
+    if (onSaved) {
+      onSaved();
+    }
+
     onClose();
   };
 
@@ -610,6 +620,8 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
       uzcardTerminal: "",
     });
     setSavedReportId(null);
+    setIsConfirmModalOpen(false);
+    setIsSuccessModalOpen(false);
     onClose();
   };
 
@@ -679,9 +691,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
                                 <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider md:px-3 md:w-1/6">
                                   Шланг
                                 </th>
-                                {/* <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider md:px-3 md:w-1/6">
-                                  Нарх (сўм)
-                                </th> */}
                                 <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider md:px-3 md:w-1/6">
                                   Олдинги кўрсаткич
                                 </th>
@@ -691,9 +700,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
                                 <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider md:px-3 md:w-1/6">
                                   Фарқи
                                 </th>
-                                {/* <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider md:px-3 md:w-1/6">
-                                  Сумма (сўм)
-                                </th> */}
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -714,22 +720,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
                                         {row.hose}
                                       </span>
                                     </td>
-                                    {/* <td className="px-2 py-3 md:px-3 md:w-1/6">
-                                      <input
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={formatNumberInput(row.price)}
-                                        onChange={(e) =>
-                                          handleHosePriceChange(
-                                            index,
-                                            e.target.value
-                                          )
-                                        }
-                                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 no-spinner text-xs md:text-sm"
-                                        disabled={loading}
-                                        placeholder="0"
-                                      />
-                                    </td> */}
                                     <td className="px-2 py-3 md:px-3 md:w-1/6">
                                       <input
                                         type="text"
@@ -779,16 +769,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
                                         {formatNumberInput(row.diff)}
                                       </span>
                                     </td>
-                                    {/* <td className="px-2 py-3 md:px-3 md:w-1/6">
-                                      <span
-                                        className={`font-semibold text-xs md:text-sm ${
-                                          row.sum > 0
-                                            ? "text-blue-600"
-                                            : "text-gray-500"
-                                        }`}>
-                                        {formatNumberInput(row.sum)} сўм{" "}
-                                      </span>
-                                    </td> */}
                                   </tr>
                                 );
                               })}
@@ -815,24 +795,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
                               </div>
                             </div>
                           </div>
-
-                          {/* <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <h4 className="font-semibold text-green-900 text-sm">
-                                  Итог за день (₽)
-                                </h4>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-xl font-bold text-green-900">
-                                  {formatNumberInput(hoseTotalSum)}
-                                </div>
-                                <div className="text-green-700 font-medium text-sm">
-                                  руб.
-                                </div>
-                              </div>
-                            </div>
-                          </div> */}
                         </div>
                       </div>
                     </div>
@@ -1111,7 +1073,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
                     Бекор
                   </button>
                   <button
-                    onClick={saveUnifiedReport}
+                    onClick={handleSaveClick}
                     disabled={loading || !isReportValid()}
                     className={`px-5 py-2 rounded-xl text-white font-semibold ${
                       isReportValid() && !loading
@@ -1209,21 +1171,28 @@ const UnifiedReportModal = ({ isOpen, onClose, station }) => {
                     Бекор
                   </button>
                   <button
-                    onClick={handleConfirmSave}
-                    className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium flex-1 flex items-center justify-center">
-                    <svg
-                      className="w-5 h-5 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                    Сақлашни тасдиқлаш
+                    onClick={saveUnifiedReport}
+                    disabled={loading}
+                    className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium flex-1 flex items-center justify-center disabled:bg-orange-300">
+                    {loading ? (
+                      "Сақланмоқда..."
+                    ) : (
+                      <>
+                        <svg
+                          className="w-5 h-5 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        Сақлашни тасдиқлаш
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

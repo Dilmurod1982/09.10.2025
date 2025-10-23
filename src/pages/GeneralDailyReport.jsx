@@ -140,6 +140,13 @@ const GeneralDailyReport = () => {
     setShowDetailedModal(true);
   };
 
+  const refreshReports = () => {
+    if (selectedStation && selectedMonth) {
+      // Триггерим повторную загрузку отчетов
+      setSelectedMonth(selectedMonth); // Это вызовет useEffect
+    }
+  };
+
   // Экспорт в Excel
   const exportToExcel = () => {
     if (!reports.length) return;
@@ -638,6 +645,7 @@ const GeneralDailyReport = () => {
           isOpen={showUnifiedModal}
           onClose={() => setShowUnifiedModal(false)}
           station={selectedStation}
+          onSaved={refreshReports} // Добавляем callback
         />
       )}
 

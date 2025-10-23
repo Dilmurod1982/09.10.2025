@@ -333,6 +333,51 @@ export default function Navbar() {
                 }}>
                 Ежедневные отчеты
               </Button>
+              <Button
+                color="inherit"
+                onClick={() => navigate("/controlpayments")}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: "20px",
+                  padding: "6px 16px",
+                  transition: "all 0.2s",
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                    transform: "translateY(-1px)",
+                  },
+                }}>
+                Контрольные суммы
+              </Button>
+              <Button
+                color="inherit"
+                onClick={() => navigate("/payments")}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: "20px",
+                  padding: "6px 16px",
+                  transition: "all 0.2s",
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                    transform: "translateY(-1px)",
+                  },
+                }}>
+                Оплаты
+              </Button>
+              <Button
+                color="inherit"
+                onClick={() => navigate("/reportondebtspartners")}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: "20px",
+                  padding: "6px 16px",
+                  transition: "all 0.2s",
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                    transform: "translateY(-1px)",
+                  },
+                }}>
+                Задолженности партнеров
+              </Button>
             </Box>
           )}
 

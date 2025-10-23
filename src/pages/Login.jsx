@@ -12,35 +12,52 @@ function Login() {
   const userData = useAppStore((state) => state.userData);
   const { isPending, signIn } = useLogin();
 
-  const [isFocused, setIsFocused] = useState({ email: false, password: false });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [isHovered, setIsHovered] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const formRef = useRef(null);
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
 
-  // Убрать этот useEffect если он не нужен
-  // useEffect(() => {
-  //   if (userData && user?.email && user?.password) {
-  //     signIn(user.email, user.password);
-  //   }
-  // }, [userData, user, signIn]);
-
-  const handleFocus = (field) => () => {
-    setIsFocused((prev) => ({ ...prev, [field]: true }));
-  };
-
-  const handleBlur = (field) => () => {
-    setIsFocused((prev) => ({ ...prev, [field]: false }));
+  const handleInputChange = (field) => (e) => {
+    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
   const handleMouseMove = (e) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
   };
 
+  // Проверяем автозаполнение после загрузки
+  useEffect(() => {
+    const checkAutofill = () => {
+      setTimeout(() => {
+        if (emailRef.current) {
+          const emailValue = emailRef.current.value;
+          if (emailValue) {
+            setFormData((prev) => ({ ...prev, email: emailValue }));
+          }
+        }
+        if (passwordRef.current) {
+          const passwordValue = passwordRef.current.value;
+          if (passwordValue) {
+            setFormData((prev) => ({ ...prev, password: passwordValue }));
+          }
+        }
+      }, 100);
+    };
+
+    checkAutofill();
+    window.addEventListener("load", checkAutofill);
+
+    return () => {
+      window.removeEventListener("load", checkAutofill);
+    };
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
-    const email = formData.get("username");
-    const password = formData.get("password");
+    const email = formData.email;
+    const password = formData.password;
 
     // Анимация нажатия
     if (formRef.current) {
@@ -128,61 +145,47 @@ function Login() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Поле Email */}
                   <div className="relative">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="email"
+                      className="block text-sm font-medium text-gray-700 mb-2">
                       Email
                     </label>
                     <div className="relative">
                       <input
+                        ref={emailRef}
+                        id="email"
                         type="email"
                         name="username"
-                        placeholder=" "
-                        className={`w-full px-4 py-3 bg-white border-2 rounded-xl transition-all duration-300 focus:outline-none focus:ring-4 ${
-                          isFocused.email
-                            ? "border-purple-500 ring-purple-200 shadow-lg"
-                            : "border-gray-300 focus:border-purple-500"
-                        }`}
-                        onFocus={handleFocus("email")}
-                        onBlur={handleBlur("email")}
+                        value={formData.email}
+                        onChange={handleInputChange("email")}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl transition-all duration-300 focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-200 shadow-sm"
+                        placeholder="email@example.com"
+                        autoComplete="username email"
                         required
                       />
-                      <span
-                        className={`absolute left-4 transition-all duration-300 pointer-events-none ${
-                          isFocused.email
-                            ? "top-0 -translate-y-1/2 bg-white px-2 text-xs text-purple-600"
-                            : "top-1/2 -translate-y-1/2 text-gray-400"
-                        }`}>
-                        Emailingizni kiriting
-                      </span>
                     </div>
                   </div>
 
                   {/* Поле Password */}
                   <div className="relative">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="password"
+                      className="block text-sm font-medium text-gray-700 mb-2">
                       Parol
                     </label>
                     <div className="relative">
                       <input
+                        ref={passwordRef}
+                        id="password"
                         type="password"
                         name="password"
-                        placeholder=" "
-                        className={`w-full px-4 py-3 bg-white border-2 rounded-xl transition-all duration-300 focus:outline-none focus:ring-4 ${
-                          isFocused.password
-                            ? "border-purple-500 ring-purple-200 shadow-lg"
-                            : "border-gray-300 focus:border-purple-500"
-                        }`}
-                        onFocus={handleFocus("password")}
-                        onBlur={handleBlur("password")}
+                        value={formData.password}
+                        onChange={handleInputChange("password")}
+                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl transition-all duration-300 focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-200 shadow-sm"
+                        placeholder="••••••••"
+                        autoComplete="current-password"
                         required
                       />
-                      <span
-                        className={`absolute left-4 transition-all duration-300 pointer-events-none ${
-                          isFocused.password
-                            ? "top-0 -translate-y-1/2 bg-white px-2 text-xs text-purple-600"
-                            : "top-1/2 -translate-y-1/2 text-gray-400"
-                        }`}>
-                        Parolingizni kiriting
-                      </span>
                     </div>
                   </div>
 
@@ -243,6 +246,56 @@ function Login() {
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes float {
+          0%,
+          100% {
+            transform: translateY(0px) rotate(0deg);
+          }
+          50% {
+            transform: translateY(-20px) rotate(180deg);
+          }
+        }
+        @keyframes shine {
+          0% {
+            transform: translateX(-100%) skewX(-12deg);
+          }
+          100% {
+            transform: translateX(200%) skewX(-12deg);
+          }
+        }
+        @keyframes tilt {
+          0%,
+          100% {
+            transform: rotate(0deg);
+          }
+          25% {
+            transform: rotate(0.5deg);
+          }
+          75% {
+            transform: rotate(-0.5deg);
+          }
+        }
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+        .animation-delay-1000 {
+          animation-delay: 1s;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-1500 {
+          animation-delay: 1.5s;
+        }
+        .animate-shine {
+          animation: shine 1.5s ease-in-out;
+        }
+        .animate-tilt {
+          animation: tilt 10s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }
