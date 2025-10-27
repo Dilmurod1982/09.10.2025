@@ -32,11 +32,13 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   const [hoseRows, setHoseRows] = useState([]);
   const [hoseTotal, setHoseTotal] = useState(0);
   const [hoseTotalSum, setHoseTotalSum] = useState(0);
+  // 1. Обновите состояние generalData
   const [generalData, setGeneralData] = useState({
     autopilotReading: "",
     gasPrice: "",
     humoTerminal: "",
     uzcardTerminal: "",
+    electronicPaymentSystem: "", // ДОБАВЛЕНО НОВОЕ ПОЛЕ
   });
 
   const userData = useAppStore((state) => state.userData);
@@ -204,6 +206,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         setHoseRows(initializedHoseRows);
 
         // Инициализируем общие данные из последнего отчета
+        // 8. Обновите инициализацию из последнего отчета
         if (!lastReportSnapshot.empty) {
           const lastReport = lastReportSnapshot.docs[0].data();
           setGeneralData((prev) => ({
@@ -211,6 +214,10 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
             gasPrice: lastReport.generalData?.gasPrice
               ? lastReport.generalData.gasPrice.toString()
               : "",
+            electronicPaymentSystem: lastReport.generalData
+              ?.electronicPaymentSystem
+              ? lastReport.generalData.electronicPaymentSystem.toString()
+              : "", // ДОБАВЛЕНО
           }));
         }
       } catch (error) {
@@ -417,25 +424,33 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   };
 
   // Расчет наличных
+  // 2. Обновите функцию calculateCashAmount для учета нового поля
   const calculateCashAmount = () => {
     const gasPrice = parseFormattedNumber(generalData.gasPrice);
     const humoTerminal = parseFormattedNumber(generalData.humoTerminal);
     const uzcardTerminal = parseFormattedNumber(generalData.uzcardTerminal);
+    const electronicPaymentSystem = parseFormattedNumber(
+      generalData.electronicPaymentSystem
+    );
 
     const cashAmount =
       (hoseTotal - partnerTotals.totalM3) * gasPrice -
       humoTerminal -
-      uzcardTerminal;
+      uzcardTerminal -
+      electronicPaymentSystem; // ВЫЧИТАЕМ ЭЛЕКТРОННЫЕ ПЛАТЕЖИ
+
     return cashAmount > 0 ? cashAmount : 0;
   };
 
   // Валидация общего отчета
+  // 3. Обновите валидацию общего отчета
   const isGeneralReportValid = () => {
     return (
       generalData.autopilotReading &&
       generalData.gasPrice &&
       generalData.humoTerminal !== "" &&
-      generalData.uzcardTerminal !== ""
+      generalData.uzcardTerminal !== "" &&
+      generalData.electronicPaymentSystem !== "" // ДОБАВЛЕНО В ВАЛИДАЦИЮ
     );
   };
 
@@ -525,6 +540,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         }));
 
       // Создаем объединенный отчет
+      // 5. Обновите функцию сохранения отчета (добавьте новое поле в generalData)
       const reportData = {
         reportDate,
         stationId: station.id,
@@ -547,6 +563,9 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           gasPrice: parseFormattedNumber(generalData.gasPrice),
           humoTerminal: parseFormattedNumber(generalData.humoTerminal),
           uzcardTerminal: parseFormattedNumber(generalData.uzcardTerminal),
+          electronicPaymentSystem: parseFormattedNumber(
+            generalData.electronicPaymentSystem
+          ), // ДОБАВЛЕНО
           cashAmount: cashAmount,
           // Контрольные суммы - устанавливаем в 0
           controlTotalSum: 0,
@@ -618,6 +637,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       gasPrice: "",
       humoTerminal: "",
       uzcardTerminal: "",
+      electronicPaymentSystem: "", // ДОБАВЛЕНО
     });
     setSavedReportId(null);
     setIsConfirmModalOpen(false);
@@ -798,7 +818,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                         </div>
                       </div>
                     </div>
-
                     {/* Отчет по партнерам */}
                     <div className="bg-white border border-gray-200 rounded-xl">
                       <div className="p-4 border-b bg-gray-50">
@@ -918,8 +937,8 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                         )}
                       </div>
                     </div>
-
                     {/* Общий отчет */}
+
                     <div className="bg-white border border-gray-200 rounded-xl">
                       <div className="p-4 border-b bg-gray-50">
                         <h4 className="text-lg font-semibold">
@@ -1013,6 +1032,31 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                               required
                             />
                           </div>
+                        </div>
+
+                        {/* ДОБАВЛЕНО НОВОЕ ПОЛЕ - Электронная платежная система */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Электрон тўлов тизими (сўм) *
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={generalData.electronicPaymentSystem}
+                              onChange={(e) =>
+                                handleGeneralInputChange(
+                                  "electronicPaymentSystem",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 no-spinner"
+                              disabled={loading}
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                          <div>{/* Пустой div для выравнивания */}</div>
                         </div>
                       </div>
                     </div>
@@ -1147,6 +1191,22 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                     <span>{formatNumberInput(generalData.gasPrice)} ₽</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="font-medium">Хумо терминал:</span>
+                    <span>{formatNumberInput(generalData.humoTerminal)} ₽</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Узкард терминал:</span>
+                    <span>
+                      {formatNumberInput(generalData.uzcardTerminal)} ₽
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Электрон тўлов тизими:</span>
+                    <span>
+                      {formatNumberInput(generalData.electronicPaymentSystem)} ₽
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="font-medium">
                       Шланглар орқали сотилди:
                     </span>
@@ -1157,7 +1217,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                     <span>{formatNumberInput(partnerTotals.totalM3)} м³</span>
                   </div>
                   <div className="flex justify-between border-t border-gray-200 pt-2">
-                    <span className="font-bold">Наличные:</span>
+                    <span className="font-bold">Z-ҳисобот:</span>
                     <span className="font-bold text-orange-600">
                       {formatNumberInput(calculateCashAmount())} ₽
                     </span>

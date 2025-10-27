@@ -29,6 +29,7 @@ const ControlSumModal = ({
     total: "Окно для добавления общей контрольной суммы",
     humo: "Окно для добавления контрольной суммы Хумо",
     uzcard: "Окно для добавления контрольной суммы Узкард",
+    electronic: "Окно для добавления контрольной суммы электронных платежей", // ДОБАВЛЕНО
   };
 
   // Названия полей в базе данных
@@ -36,6 +37,7 @@ const ControlSumModal = ({
     total: "controlTotalSum",
     humo: "controlHumoSum",
     uzcard: "controlUzcardSum",
+    electronic: "controlElectronicSum", // ДОБАВЛЕНО
   };
 
   // Сброс формы при открытии/закрытии
@@ -194,7 +196,16 @@ const ControlSumModal = ({
             exit={{ scale: 0.9 }}
             onClick={(e) => e.stopPropagation()}>
             {/* Заголовок */}
-            <div className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+            <div
+              className={`p-6 border-b bg-gradient-to-r text-white ${
+                modalType === "total"
+                  ? "from-green-600 to-green-700"
+                  : modalType === "humo"
+                  ? "from-blue-600 to-blue-700"
+                  : modalType === "uzcard"
+                  ? "from-purple-600 to-purple-700"
+                  : "from-teal-600 to-teal-700" // ДОБАВЛЕНО для electronic
+              }`}>
               <h3 className="text-xl font-semibold text-center">
                 {modalTitles[modalType]}
               </h3>
@@ -295,7 +306,13 @@ const ControlSumModal = ({
                 className={`px-4 py-2 rounded-lg transition-colors font-medium ${
                   hasExistingControlSum
                     ? "bg-gray-400 text-gray-700 cursor-not-allowed"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
+                    : modalType === "total"
+                    ? "bg-green-600 text-white hover:bg-green-700"
+                    : modalType === "humo"
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : modalType === "uzcard"
+                    ? "bg-purple-600 text-white hover:bg-purple-700"
+                    : "bg-teal-600 text-white hover:bg-teal-700" // ДОБАВЛЕНО для electronic
                 } disabled:opacity-50 disabled:cursor-not-allowed`}>
                 {loading
                   ? "Сохранение..."

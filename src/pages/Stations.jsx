@@ -194,6 +194,7 @@ const Stations = () => {
   const getNestedValue = (obj, path) => {
     return path.split(".").reduce((acc, part) => acc && acc[part], obj);
   };
+
   // Функция для получения доступного оборудования (не прикрепленного к другим станциям)
   const getAvailableEquipment = (
     equipmentList,
@@ -220,10 +221,12 @@ const Stations = () => {
 
       // Получаем последнюю запись в истории движения
       const sortedHistory = equipment.movementHistory
-        .filter((move) => move.toStationId) // Фильтруем только записи о прикреплении
-        .sort(
-          (a, b) => new Date(b.attachmentDate) - new Date(a.attachmentDate)
-        );
+        .filter((move) => move.toStationId || move.stationId) // Фильтруем записи о прикреплении
+        .sort((a, b) => {
+          const dateA = new Date(a.attachmentDate || a.date);
+          const dateB = new Date(b.attachmentDate || b.date);
+          return dateB - dateA;
+        });
 
       if (sortedHistory.length === 0) {
         return true;
@@ -231,8 +234,17 @@ const Stations = () => {
 
       const lastMovement = sortedHistory[0];
 
-      // Если есть дата открепления, оборудование доступно
-      return !!lastMovement.detachmentDate;
+      // Оборудование доступно если:
+      // 1. Есть дата открепления И эта дата уже прошла
+      // 2. Или нет активного прикрепления (последняя запись имеет detachmentDate)
+      if (lastMovement.detachmentDate) {
+        const detachmentDate = new Date(lastMovement.detachmentDate);
+        const today = new Date();
+        return detachmentDate <= today; // Доступно если дата открепления прошла
+      }
+
+      // Если нет даты открепления - оборудование прикреплено к другой станции
+      return false;
     });
   };
 
@@ -689,30 +701,18 @@ const Stations = () => {
         const equipmentData = equipmentSnapshot.data();
         const movementHistory = equipmentData.movementHistory || [];
 
-        const movementRecord = {
-          stationId: stationData.id,
-          stationName: stationData.stationName,
-          attachmentDate: attachmentDate,
-          attachedBy: currentUser.name,
-          attachedById: currentUser.id,
-          detachmentDate: detachmentDate,
-          detachedBy: detachmentDate ? currentUser.name : null,
-          detachedById: detachmentDate ? currentUser.id : null,
-        };
-
-        // Если это открепление, обновляем последнюю запись
         if (detachmentDate) {
-          const lastAttachmentIndex = movementHistory
-            .map((move, index) =>
-              move.stationId === stationData.id && !move.detachmentDate
-                ? index
-                : -1
-            )
-            .find((index) => index !== -1);
+          // Если это открепление, находим активную запись и обновляем ее
+          const activeMovementIndex = movementHistory.findIndex(
+            (move) =>
+              (move.stationId === stationData.id ||
+                move.toStationId === stationData.id) &&
+              !move.detachmentDate
+          );
 
-          if (lastAttachmentIndex !== -1) {
-            movementHistory[lastAttachmentIndex] = {
-              ...movementHistory[lastAttachmentIndex],
+          if (activeMovementIndex !== -1) {
+            movementHistory[activeMovementIndex] = {
+              ...movementHistory[activeMovementIndex],
               detachmentDate: detachmentDate,
               detachedBy: currentUser.name,
               detachedById: currentUser.id,
@@ -720,6 +720,16 @@ const Stations = () => {
           }
         } else {
           // Если это прикрепление, добавляем новую запись
+          const movementRecord = {
+            stationId: stationData.id,
+            stationName: stationData.stationName,
+            attachmentDate: attachmentDate,
+            attachedBy: currentUser.name,
+            attachedById: currentUser.id,
+            detachmentDate: null,
+            detachedBy: null,
+            detachedById: null,
+          };
           movementHistory.push(movementRecord);
         }
 
@@ -727,11 +737,6 @@ const Stations = () => {
           movementHistory: movementHistory,
           updatedAt: new Date(),
         });
-
-        console.log(
-          `Movement history updated for ${equipmentType}:`,
-          equipmentId
-        );
       }
     } catch (error) {
       console.error(
@@ -952,11 +957,97 @@ const Stations = () => {
                   compressor.detachmentDate
                 )
               );
+            } else if (compressor.equipmentId && compressor.attachmentDate) {
+              // Обновляем дату прикрепления если нужно
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  compressor.equipmentId,
+                  "compressors",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  compressor.attachmentDate
+                )
+              );
             }
           });
         }
 
-        // Аналогично для других типов оборудования...
+        // Колонки
+        if (dataToSave.dispensers) {
+          dataToSave.dispensers.forEach((dispenser) => {
+            if (dispenser.equipmentId && dispenser.detachmentDate) {
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  dispenser.equipmentId,
+                  "dispensers",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  dispenser.attachmentDate,
+                  dispenser.detachmentDate
+                )
+              );
+            } else if (dispenser.equipmentId && dispenser.attachmentDate) {
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  dispenser.equipmentId,
+                  "dispensers",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  dispenser.attachmentDate
+                )
+              );
+            }
+          });
+        }
+
+        // Осушки
+        if (dataToSave.dryers) {
+          dataToSave.dryers.forEach((dryer) => {
+            if (dryer.equipmentId && dryer.detachmentDate) {
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  dryer.equipmentId,
+                  "gasDryers",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  dryer.attachmentDate,
+                  dryer.detachmentDate
+                )
+              );
+            } else if (dryer.equipmentId && dryer.attachmentDate) {
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  dryer.equipmentId,
+                  "gasDryers",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  dryer.attachmentDate
+                )
+              );
+            }
+          });
+        }
+
+        // Чиллеры
+        if (dataToSave.chillers) {
+          dataToSave.chillers.forEach((chiller) => {
+            if (chiller.equipmentId && chiller.detachmentDate) {
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  chiller.equipmentId,
+                  "gasChillers",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  chiller.attachmentDate,
+                  chiller.detachmentDate
+                )
+              );
+            } else if (chiller.equipmentId && chiller.attachmentDate) {
+              equipmentUpdates.push(
+                updateEquipmentMovementHistory(
+                  chiller.equipmentId,
+                  "gasChillers",
+                  { id: stationId, stationName: dataToSave.stationName },
+                  chiller.attachmentDate
+                )
+              );
+            }
+          });
+        }
 
         await updateDoc(doc(db, "stations", stationId), {
           ...dataToSave,

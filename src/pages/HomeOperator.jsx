@@ -34,6 +34,7 @@ import {
   AccountBalance,
   TrendingUp,
   People,
+  AvTimer,
 } from "@mui/icons-material";
 
 function HomeOperator() {
@@ -162,6 +163,25 @@ function HomeOperator() {
       {/* Основная статистика */}
       <Grid container spacing={3} mb={4}>
         {/* Общая сумма наличными */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card elevation={3}>
+            <CardContent>
+              <Box display="flex" alignItems="center" mb={2}>
+                <AvTimer color="primary" sx={{ fontSize: 40, mr: 2 }} />
+                <Box>
+                  <Typography color="textSecondary" variant="body2">
+                    Автопилот
+                  </Typography>
+                  <Typography variant="h5" fontWeight="bold">
+                    {formatCurrency(
+                      latestReport.generalData?.autopilotReading || 0
+                    )}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <Card elevation={3}>
             <CardContent>

@@ -153,6 +153,7 @@ const GeneralDailyReport = () => {
 
     const worksheetData = [
       // Заголовок
+      // Заголовок
       [
         "Кунлик ҳисобот",
         "",
@@ -163,8 +164,7 @@ const GeneralDailyReport = () => {
         "",
         "",
         "",
-        "",
-        isOperator ? "" : "",
+        isOperator ? "" : "", // Убрали одну пустую ячейку
         "",
       ],
       [
@@ -177,8 +177,7 @@ const GeneralDailyReport = () => {
         "",
         "",
         "",
-        "",
-        isOperator ? "" : "",
+        isOperator ? "" : "", // Убрали одну пустую ячейку
         "",
       ],
       [
@@ -194,12 +193,12 @@ const GeneralDailyReport = () => {
         "",
         "",
         "",
-        "",
-        isOperator ? "" : "",
+        isOperator ? "" : "", // Убрали одну пустую ячейку
         "",
       ],
       [], // Пустая строка
 
+      // Заголовки таблицы
       // Заголовки таблицы
       [
         "№",
@@ -212,7 +211,7 @@ const GeneralDailyReport = () => {
         "Терминал Узкард (сўм)",
         "Терминал Хумо (сўм)",
         "Z-ҳисобот (сўм)",
-        ...(isOperator ? [] : ["Назорат суммаси"]),
+        ...(isOperator ? [] : ["Назорат суммаси"]), // Убрали лишнюю пустую строку
         "Яратилди",
       ],
 
@@ -366,24 +365,27 @@ const GeneralDailyReport = () => {
 
             {/* Кнопки действий */}
             <div className="flex gap-3 lg:ml-auto">
-              <button
-                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                onClick={() => setShowUnifiedModal(true)}
-                disabled={!selectedStation}>
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                Ягона ҳисобот
-              </button>
+              {/* Показываем кнопку "Ягона ҳисобот" только для операторов */}
+              {isOperator && (
+                <button
+                  className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  onClick={() => setShowUnifiedModal(true)}
+                  disabled={!selectedStation}>
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  Ягона ҳисобот
+                </button>
+              )}
 
               <button
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"

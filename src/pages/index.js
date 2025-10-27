@@ -38,6 +38,7 @@ export { default as EmployeesDocDeadline } from "./EmployeesDocDeadline";
 export { default as ControlPayments } from "./ControlPayments";
 export { default as Payments } from "./Payments";
 export { default as ReportOnDebtsPartners } from "./ReportOnDebtsPartners";
+export { default as HomeChief } from "./HomeChief";
 
 // export { default as License } from "./documents/License";
 // export { default as GasCertificate } from "./documents/GasCertificate";

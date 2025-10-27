@@ -215,6 +215,9 @@ const ControlPayments = () => {
         "Сумма Uzcard",
         "Контрольная сумма Uzcard",
         "Процент Uzcard",
+        "Электронные платежи",
+        "Контрольная сумма электронных платежей",
+        "Процент электронных платежей",
       ],
       ...reports.map((report) => {
         const generalData = report.generalData || {};
@@ -234,6 +237,11 @@ const ControlPayments = () => {
           generalData.uzcardTerminal || 0
         );
 
+        const electronicPercentage = calculatePercentage(
+          generalData.controlElectronicSum || 0,
+          generalData.electronicPaymentSystem || 0
+        );
+
         return [
           report.stationName,
           formatDate(report.reportDate),
@@ -246,6 +254,9 @@ const ControlPayments = () => {
           generalData.uzcardTerminal || 0,
           generalData.controlUzcardSum || 0,
           uzcardPercentage,
+          generalData.electronicPaymentSystem || 0,
+          generalData.controlElectronicSum || 0,
+          electronicPercentage,
         ];
       }),
     ];
@@ -255,17 +266,20 @@ const ControlPayments = () => {
     XLSX.utils.book_append_sheet(wb, ws, "Контроль платежей");
 
     const colWidths = [
-      { wch: 20 }, // Станция
-      { wch: 12 }, // Дата
-      { wch: 15 }, // Z-отчет
-      { wch: 20 }, // Общая контрольная сумма
-      { wch: 12 }, // Процент
-      { wch: 15 }, // Сумма Humo
-      { wch: 20 }, // Контрольная сумма Humo
-      { wch: 12 }, // Процент Humo
-      { wch: 15 }, // Сумма Uzcard
-      { wch: 20 }, // Контрольная сумма Uzcard
-      { wch: 12 }, // Процент Uzcard
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 20 },
+      { wch: 25 },
+      { wch: 20 },
     ];
 
     ws["!cols"] = colWidths;
@@ -278,272 +292,364 @@ const ControlPayments = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Заголовок */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Контроль платежей
-          </h1>
-          <p className="text-gray-600">
-            Контроль и сверка наличных и безналичных платежей
-          </p>
-          {/* {isBuxgalter && (
-            <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              Режим бухгалтера
-            </div>
-          )} */}
+        <div className="mb-6 sm:mb-8 text-center sm:text-left">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-white/20">
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+              Контроль платежей
+            </h1>
+            <p className="text-gray-600 text-sm sm:text-base">
+              Контроль и сверка наличных и безналичных платежей
+            </p>
+            {isBuxgalter && (
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 mt-2">
+                👑 Режим бухгалтера
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Панель управления */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-            {/* Выбор станции */}
-            <div className="flex-1 min-w-0">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Заправка
-              </label>
-              <select
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none"
-                value={selectedStation?.id || ""}
-                onChange={(e) => {
-                  const station = stations.find((s) => s.id === e.target.value);
-                  setSelectedStation(station || null);
-                }}>
-                <option value="">Все заправки</option>
-                {stations.map((station) => (
-                  <option key={station.id} value={station.id}>
-                    {station.stationName}
-                  </option>
-                ))}
-              </select>
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 p-4 sm:p-6 mb-6">
+          <div className="space-y-4">
+            {/* Первая строка - выбор станции и месяца */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Выбор станции */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  🏪 Заправка
+                </label>
+                <select
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50 backdrop-blur-sm transition-all duration-200 hover:border-gray-300"
+                  value={selectedStation?.id || ""}
+                  onChange={(e) => {
+                    const station = stations.find(
+                      (s) => s.id === e.target.value
+                    );
+                    setSelectedStation(station || null);
+                  }}>
+                  <option value="">Все заправки</option>
+                  {stations.map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {station.stationName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Выбор месяца */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  📅 Месяц *
+                </label>
+                <select
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50 backdrop-blur-sm transition-all duration-200 hover:border-gray-300"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}>
+                  <option value="">Выберите месяц...</option>
+                  {monthOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Выбор месяца */}
-            <div className="flex-1 min-w-0">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Месяц *
+            {/* Вторая строка - кнопки действий */}
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-gray-700">
+                🛠️ Действия
               </label>
-              <select
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}>
-                <option value="">Выберите месяц...</option>
-                {monthOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
 
-            {/* Кнопки действий */}
-            <div className="flex flex-wrap gap-3 lg:ml-auto">
               {/* Кнопки добавления контрольных сумм - только для бухгалтера */}
               {isBuxgalter && (
-                <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <button
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
                     onClick={() => handleOpenModal("total")}
                     disabled={!selectedStation}>
-                    Общая контрольная сумма
+                    <span className="text-lg">💰</span>
+                    <span className="text-sm font-medium">Общая сумма</span>
                   </button>
+
                   <button
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
                     onClick={() => handleOpenModal("humo")}
                     disabled={!selectedStation}>
-                    Контрольная сумма Humo
+                    <span className="text-lg">💳</span>
+                    <span className="text-sm font-medium">Humo</span>
                   </button>
+
                   <button
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
                     onClick={() => handleOpenModal("uzcard")}
                     disabled={!selectedStation}>
-                    Контрольная сумма Uzcard
+                    <span className="text-lg">💳</span>
+                    <span className="text-sm font-medium">Uzcard</span>
                   </button>
-                </>
+
+                  <button
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl hover:from-teal-600 hover:to-teal-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
+                    onClick={() => handleOpenModal("electronic")}
+                    disabled={!selectedStation}>
+                    <span className="text-lg">⚡</span>
+                    <span className="text-sm font-medium">Электронные</span>
+                  </button>
+                </div>
               )}
 
               {/* Кнопка экспорта - для всех пользователей */}
-              <button
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                onClick={exportToExcel}
-                disabled={!reports.length || !selectedMonth}>
-                Экспорт в Excel
-              </button>
+              <div
+                className={`${
+                  isBuxgalter ? "pt-3 border-t border-gray-200" : ""
+                }`}>
+                <button
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale font-medium"
+                  onClick={exportToExcel}
+                  disabled={!reports.length || !selectedMonth}>
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  Экспорт в Excel
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
+        {/* Статус загрузки */}
+        {loading && (
+          <div className="flex justify-center items-center py-12">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <p className="text-gray-600">Загрузка отчетов...</p>
+            </div>
+          </div>
+        )}
+
         {/* Таблица */}
         {!loading && selectedMonth && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 overflow-hidden">
             {reports.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Станция
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Дата
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Z-ҳисобот
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Общая контрольная сумма
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Процент
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Сумма Humo
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Контрольная сумма Humo
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Процент
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Сумма Uzcard
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Контрольная сумма Uzcard
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Процент
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {reports.map((report) => {
-                      const generalData = report.generalData || {};
+                <div className="min-w-full">
+                  <table className="w-full">
+                    <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
+                      <tr>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          Станция
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          Дата
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          Z-отчет
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          Контр. сумма
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          %
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          Humo
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          Контр. Humo
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          %
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          Uzcard
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          Контр. Uzcard
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          %
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          Электронные
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          Контр. электро
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                          %
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {reports.map((report) => {
+                        const generalData = report.generalData || {};
 
-                      const totalPercentage = calculatePercentage(
-                        generalData.controlTotalSum || 0,
-                        generalData.cashAmount || 0
-                      );
+                        const totalPercentage = calculatePercentage(
+                          generalData.controlTotalSum || 0,
+                          generalData.cashAmount || 0
+                        );
 
-                      const humoPercentage = calculatePercentage(
-                        generalData.controlHumoSum || 0,
-                        generalData.humoTerminal || 0
-                      );
+                        const humoPercentage = calculatePercentage(
+                          generalData.controlHumoSum || 0,
+                          generalData.humoTerminal || 0
+                        );
 
-                      const uzcardPercentage = calculatePercentage(
-                        generalData.controlUzcardSum || 0,
-                        generalData.uzcardTerminal || 0
-                      );
+                        const uzcardPercentage = calculatePercentage(
+                          generalData.controlUzcardSum || 0,
+                          generalData.uzcardTerminal || 0
+                        );
 
-                      return (
-                        <tr
-                          key={report.id}
-                          className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {report.stationName}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            {formatDate(report.reportDate)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600 font-semibold">
-                            {generalData.cashAmount?.toLocaleString("ru-RU", {
-                              minimumFractionDigits: 2,
-                            }) || "0.00"}{" "}
-                            сўм
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-semibold">
-                            {generalData.controlTotalSum?.toLocaleString(
-                              "ru-RU",
-                              {
+                        const electronicPercentage = calculatePercentage(
+                          generalData.controlElectronicSum || 0,
+                          generalData.electronicPaymentSystem || 0
+                        );
+
+                        return (
+                          <tr
+                            key={report.id}
+                            className="hover:bg-blue-50/50 transition-colors duration-150">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {report.stationName}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {formatDate(report.reportDate)}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                              {generalData.cashAmount?.toLocaleString("ru-RU", {
                                 minimumFractionDigits: 2,
-                              }
-                            ) || "0.00"}{" "}
-                            сўм
-                          </td>
-                          <td
-                            className={`px-4 py-3 whitespace-nowrap text-sm font-semibold ${
-                              totalPercentage >= 100
-                                ? "text-green-600"
-                                : "text-orange-600"
-                            }`}>
-                            {totalPercentage.toFixed(2)}%
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-purple-600">
-                            {generalData.humoTerminal?.toLocaleString("ru-RU", {
-                              minimumFractionDigits: 2,
-                            }) || "0.00"}{" "}
-                            сўм
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-semibold">
-                            {generalData.controlHumoSum?.toLocaleString(
-                              "ru-RU",
-                              {
-                                minimumFractionDigits: 2,
-                              }
-                            ) || "0.00"}{" "}
-                            сўм
-                          </td>
-                          <td
-                            className={`px-4 py-3 whitespace-nowrap text-sm font-semibold ${
-                              humoPercentage >= 100
-                                ? "text-green-600"
-                                : "text-orange-600"
-                            }`}>
-                            {humoPercentage.toFixed(2)}%
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-purple-600">
-                            {generalData.uzcardTerminal?.toLocaleString(
-                              "ru-RU",
-                              {
-                                minimumFractionDigits: 2,
-                              }
-                            ) || "0.00"}{" "}
-                            сўм
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-semibold">
-                            {generalData.controlUzcardSum?.toLocaleString(
-                              "ru-RU",
-                              {
-                                minimumFractionDigits: 2,
-                              }
-                            ) || "0.00"}{" "}
-                            сўм
-                          </td>
-                          <td
-                            className={`px-4 py-3 whitespace-nowrap text-sm font-semibold ${
-                              uzcardPercentage >= 100
-                                ? "text-green-600"
-                                : "text-orange-600"
-                            }`}>
-                            {uzcardPercentage.toFixed(2)}%
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                              }) || "0.00"}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
+                              {generalData.controlTotalSum?.toLocaleString(
+                                "ru-RU",
+                                {
+                                  minimumFractionDigits: 2,
+                                }
+                              ) || "0.00"}
+                            </td>
+                            <td
+                              className={`px-4 py-4 whitespace-nowrap text-sm font-bold ${
+                                totalPercentage >= 100
+                                  ? "text-green-600"
+                                  : "text-orange-600"
+                              }`}>
+                              {totalPercentage.toFixed(2)}%
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600">
+                              {generalData.humoTerminal?.toLocaleString(
+                                "ru-RU",
+                                {
+                                  minimumFractionDigits: 2,
+                                }
+                              ) || "0.00"}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
+                              {generalData.controlHumoSum?.toLocaleString(
+                                "ru-RU",
+                                {
+                                  minimumFractionDigits: 2,
+                                }
+                              ) || "0.00"}
+                            </td>
+                            <td
+                              className={`px-4 py-4 whitespace-nowrap text-sm font-bold ${
+                                humoPercentage >= 100
+                                  ? "text-green-600"
+                                  : "text-orange-600"
+                              }`}>
+                              {humoPercentage.toFixed(2)}%
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600">
+                              {generalData.uzcardTerminal?.toLocaleString(
+                                "ru-RU",
+                                {
+                                  minimumFractionDigits: 2,
+                                }
+                              ) || "0.00"}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
+                              {generalData.controlUzcardSum?.toLocaleString(
+                                "ru-RU",
+                                {
+                                  minimumFractionDigits: 2,
+                                }
+                              ) || "0.00"}
+                            </td>
+                            <td
+                              className={`px-4 py-4 whitespace-nowrap text-sm font-bold ${
+                                uzcardPercentage >= 100
+                                  ? "text-green-600"
+                                  : "text-orange-600"
+                              }`}>
+                              {uzcardPercentage.toFixed(2)}%
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-teal-600">
+                              {generalData.electronicPaymentSystem?.toLocaleString(
+                                "ru-RU",
+                                {
+                                  minimumFractionDigits: 2,
+                                }
+                              ) || "0.00"}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
+                              {generalData.controlElectronicSum?.toLocaleString(
+                                "ru-RU",
+                                {
+                                  minimumFractionDigits: 2,
+                                }
+                              ) || "0.00"}
+                            </td>
+                            <td
+                              className={`px-4 py-4 whitespace-nowrap text-sm font-bold ${
+                                electronicPercentage >= 100
+                                  ? "text-green-600"
+                                  : "text-orange-600"
+                              }`}>
+                              {electronicPercentage.toFixed(2)}%
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : (
-              <div className="text-center py-12">
-                <svg
-                  className="mx-auto h-12 w-12 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <h3 className="mt-2 text-sm font-medium text-gray-900">
-                  Отчеты не найдены
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Для выбранных параметров отчеты отсутствуют
-                </p>
+              <div className="text-center py-16">
+                <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-2xl p-8 max-w-md mx-auto border border-white/20">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg
+                      className="w-8 h-8 text-blue-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Отчеты не найдены
+                  </h3>
+                  <p className="text-gray-600 text-sm">
+                    Для выбранных параметров отчеты отсутствуют
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -552,23 +658,25 @@ const ControlPayments = () => {
         {/* Сообщение о выборе месяца */}
         {!selectedMonth && (
           <div className="text-center py-12">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md mx-auto">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              <h3 className="mt-4 text-lg font-medium text-gray-900">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 max-w-md mx-auto border border-white/20">
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg
+                  className="w-8 h-8 text-orange-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Выберите месяц
               </h3>
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="text-gray-600 text-sm">
                 Выберите месяц для просмотра отчетов
               </p>
             </div>

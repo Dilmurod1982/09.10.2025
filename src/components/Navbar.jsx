@@ -11,7 +11,7 @@ import { auth } from "../firebase/config";
 import { toast } from "react-toastify";
 import { useAppStore } from "../lib/zustand";
 import { motion } from "framer-motion";
-import { Paper } from "@mui/material";
+import { Paper, useMediaQuery } from "@mui/material";
 import Drawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -46,6 +46,11 @@ import {
   Assignment as AssignmentIcon,
   Summarize as SummarizeIcon,
   Person as PersonIcon,
+  Payment as PaymentIcon,
+  MoneyOff as MoneyOffIcon,
+  AccountBalanceWallet as AccountBalanceWalletIcon,
+  Logout as LogoutIcon,
+  Dashboard as DashboardIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import Collapse from "@mui/material/Collapse";
@@ -71,6 +76,8 @@ export default function Navbar() {
 
   const navigate = useNavigate();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isTablet = useMediaQuery(theme.breakpoints.down("lg"));
 
   // Формируем ФИО пользователя
   const getUserFullName = () => {
@@ -86,10 +93,21 @@ export default function Navbar() {
     return fullName.trim();
   };
 
+  // Сокращаем ФИО для мобильных устройств
+  const getShortName = () => {
+    if (!userData) return "";
+
+    const { lastName, firstName } = userData;
+    if (lastName && firstName) {
+      return `${lastName} ${firstName.charAt(0)}.`;
+    }
+    return getUserFullName();
+  };
+
   const signOutProfile = async () => {
     await signOut(auth);
     setUser(null);
-    toast.success("See you later");
+    toast.success("До свидания!");
   };
 
   const toggleDrawer = (open) => (event) => {
@@ -161,6 +179,16 @@ export default function Navbar() {
       icon: <AssignmentIcon />,
       path: "/partnerslist",
     },
+    {
+      text: "Оплаты",
+      icon: <PaymentIcon />,
+      path: "/payments",
+    },
+    {
+      text: "Задолженности партнеров",
+      icon: <MoneyOffIcon />,
+      path: "/reportondebtspartners",
+    },
   ];
 
   // 🔹 Ежедневные отчеты
@@ -169,6 +197,11 @@ export default function Navbar() {
       text: "Общий ежедневный отчет",
       icon: <SummarizeIcon />,
       path: "/generaldailyreport",
+    },
+    {
+      text: "Контрольные суммы",
+      icon: <AccountBalanceWalletIcon />,
+      path: "/controlpayments",
     },
   ];
 
@@ -248,12 +281,51 @@ export default function Navbar() {
   // Проверяем, является ли пользователь rahbar или booker
   const isRahbarOrBooker = role === "rahbar" || role === "buxgalter";
 
+  // Бейдж роли с цветами
+  const getRoleBadge = () => {
+    const roleConfig = {
+      admin: { color: "#ef4444", text: "Админ" },
+      buxgalter: { color: "#10b981", text: "Бухгалтер" },
+      operator: { color: "#3b82f6", text: "Оператор" },
+      rahbar: { color: "#8b5cf6", text: "Рахбар" },
+    };
+
+    const config = roleConfig[role] || { color: "#6b7280", text: role };
+
+    return (
+      <Box
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          px: 1.5,
+          py: 0.5,
+          borderRadius: "12px",
+          backgroundColor: `${config.color}15`,
+          border: `1px solid ${config.color}30`,
+          color: config.color,
+          fontSize: "0.75rem",
+          fontWeight: "600",
+          ml: 1,
+        }}>
+        {config.text}
+      </Box>
+    );
+  };
+
   return (
     <Box sx={{ flexGrow: 1 }}>
-      <AppBar position="static">
-        <Toolbar>
+      <AppBar
+        position="static"
+        sx={{
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+        }}>
+        <Toolbar sx={{ minHeight: { xs: "64px", md: "70px" } }}>
           {/* Показываем кнопку меню для admin, buxgalter и operator */}
-          {role === "admin" || role === "buxgalter" || role === "operator" ? (
+          {role === "admin" ||
+          role === "buxgalter" ||
+          role === "operator" ||
+          role === "rahbar" ? (
             <IconButton
               size="large"
               edge="start"
@@ -261,122 +333,93 @@ export default function Navbar() {
               aria-label="menu"
               sx={{
                 mr: 2,
-                transition: theme.transitions.create(["transform", "color"], {
-                  duration: theme.transitions.duration.short,
-                }),
-                "&:hover": { transform: "rotate(90deg)" },
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                "&:hover": {
+                  transform: "rotate(90deg)",
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                },
               }}
               onClick={toggleDrawer(true)}>
               <MenuIcon />
             </IconButton>
           ) : null}
 
-          <Typography
-            variant="h6"
-            component="div"
-            onClick={() => navigate("/")}
-            sx={{
-              cursor: "pointer",
-              fontWeight: "600",
-              transition: "color 0.2s",
-              "&:hover": { color: "#b3e5fc" },
-              mr: isRahbarOrBooker ? 3 : 0, // Добавляем отступ если есть кнопки
-            }}>
-            Метан
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
+            <Typography
+              variant="h6"
+              component="div"
+              onClick={() => navigate("/")}
+              sx={{
+                cursor: "pointer",
+                fontWeight: "700",
+                background: "linear-gradient(45deg, #ffffff, #e0e7ff)",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                transition: "all 0.3s ease",
+                "&:hover": {
+                  transform: "translateY(-1px)",
+                  filter: "brightness(1.1)",
+                },
+                fontSize: { xs: "1.1rem", md: "1.25rem" },
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+              }}>
+              <DashboardIcon
+                sx={{ fontSize: { xs: "1.2rem", md: "1.5rem" } }}
+              />
+              Метан Система
+            </Typography>
+
+            {/* Бейдж роли на десктопе */}
+            {!isMobile && getRoleBadge()}
+          </Box>
 
           {/* Кнопки для rahbar и booker */}
-          {isRahbarOrBooker && (
-            <Box sx={{ display: "flex", gap: 1, flexGrow: 1 }}>
+          {isRahbarOrBooker && !isMobile && (
+            <Box sx={{ display: "flex", gap: 1, mr: 3 }}>
               <Button
                 color="inherit"
                 onClick={() => navigate("/employeesdocdeadline")}
                 sx={{
                   textTransform: "none",
-                  borderRadius: "20px",
-                  padding: "6px 16px",
-                  transition: "all 0.2s",
+                  borderRadius: "25px",
+                  padding: "8px 20px",
+                  transition: "all 0.3s ease",
+                  background: "rgba(255,255,255,0.1)",
+                  backdropFilter: "blur(10px)",
+                  border: "1px solid rgba(255,255,255,0.2)",
                   "&:hover": {
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    transform: "translateY(-1px)",
+                    backgroundColor: "rgba(255, 255, 255, 0.2)",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                   },
+                  fontSize: "0.9rem",
+                  fontWeight: "500",
                 }}>
-                Документы со сроком
+                📄 Документы со сроком
               </Button>
               <Button
                 color="inherit"
                 onClick={() => navigate("/employeesdocdeadlineinf")}
                 sx={{
                   textTransform: "none",
-                  borderRadius: "20px",
-                  padding: "6px 16px",
-                  transition: "all 0.2s",
+                  borderRadius: "25px",
+                  padding: "8px 20px",
+                  transition: "all 0.3s ease",
+                  background: "rgba(255,255,255,0.1)",
+                  backdropFilter: "blur(10px)",
+                  border: "1px solid rgba(255,255,255,0.2)",
                   "&:hover": {
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    transform: "translateY(-1px)",
+                    backgroundColor: "rgba(255, 255, 255, 0.2)",
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                   },
+                  fontSize: "0.9rem",
+                  fontWeight: "500",
                 }}>
-                Документы без срока
-              </Button>
-              <Button
-                color="inherit"
-                onClick={() => navigate("/generaldailyreport")}
-                sx={{
-                  textTransform: "none",
-                  borderRadius: "20px",
-                  padding: "6px 16px",
-                  transition: "all 0.2s",
-                  "&:hover": {
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    transform: "translateY(-1px)",
-                  },
-                }}>
-                Ежедневные отчеты
-              </Button>
-              <Button
-                color="inherit"
-                onClick={() => navigate("/controlpayments")}
-                sx={{
-                  textTransform: "none",
-                  borderRadius: "20px",
-                  padding: "6px 16px",
-                  transition: "all 0.2s",
-                  "&:hover": {
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    transform: "translateY(-1px)",
-                  },
-                }}>
-                Контрольные суммы
-              </Button>
-              <Button
-                color="inherit"
-                onClick={() => navigate("/payments")}
-                sx={{
-                  textTransform: "none",
-                  borderRadius: "20px",
-                  padding: "6px 16px",
-                  transition: "all 0.2s",
-                  "&:hover": {
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    transform: "translateY(-1px)",
-                  },
-                }}>
-                Оплаты
-              </Button>
-              <Button
-                color="inherit"
-                onClick={() => navigate("/reportondebtspartners")}
-                sx={{
-                  textTransform: "none",
-                  borderRadius: "20px",
-                  padding: "6px 16px",
-                  transition: "all 0.2s",
-                  "&:hover": {
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                    transform: "translateY(-1px)",
-                  },
-                }}>
-                Задолженности партнеров
+                ∞ Бессрочные документы
               </Button>
             </Box>
           )}
@@ -392,43 +435,62 @@ export default function Navbar() {
                 gap: 1,
                 mr: 2,
                 textTransform: "none",
-                borderRadius: "20px",
-                padding: "6px 12px",
-                transition: "all 0.2s",
+                borderRadius: "25px",
+                padding: { xs: "6px 12px", md: "8px 16px" },
+                transition: "all 0.3s ease",
+                background: "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(10px)",
+                border: "1px solid rgba(255,255,255,0.2)",
                 "&:hover": {
-                  backgroundColor: "rgba(255, 255, 255, 0.1)",
-                  transform: "translateY(-1px)",
+                  backgroundColor: "rgba(255, 255, 255, 0.2)",
+                  transform: "translateY(-2px)",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                 },
+                minWidth: "auto",
               }}>
-              <PersonIcon sx={{ fontSize: 20 }} />
+              <PersonIcon sx={{ fontSize: { xs: 18, md: 20 } }} />
               <Typography
                 variant="body1"
                 sx={{
                   fontWeight: "500",
-                  fontSize: "0.9rem",
-                  maxWidth: "150px",
+                  fontSize: { xs: "0.8rem", md: "0.9rem" },
+                  maxWidth: { xs: "80px", sm: "120px", md: "150px" },
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
+                  display: { xs: "none", sm: "block" },
                 }}>
-                {getUserFullName()}
+                {isMobile ? getShortName() : getUserFullName()}
               </Typography>
+              {/* Бейдж роли на мобильных */}
+              {isMobile && getRoleBadge()}
             </Button>
           )}
 
+          {/* Кнопка выхода */}
           <Button
             onClick={signOutProfile}
             color="inherit"
             sx={{
-              borderRadius: "20px",
-              padding: "6px 16px",
-              transition: "all 0.2s",
+              borderRadius: "25px",
+              padding: { xs: "6px 12px", md: "8px 20px" },
+              transition: "all 0.3s ease",
+              background: "rgba(255,255,255,0.1)",
+              backdropFilter: "blur(10px)",
+              border: "1px solid rgba(255,255,255,0.2)",
               "&:hover": {
-                backgroundColor: "rgba(255, 255, 255, 0.1)",
-                transform: "translateY(-1px)",
+                backgroundColor: "rgba(255, 59, 59, 0.3)",
+                transform: "translateY(-2px)",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
               },
+              fontWeight: "600",
+              fontSize: { xs: "0.8rem", md: "0.9rem" },
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
             }}>
-            ЧИҚИШ
+            {!isMobile && <LogoutIcon sx={{ fontSize: 18 }} />}
+            {isMobile ? "Выход" : "ЧИҚИШ"}
           </Button>
         </Toolbar>
       </AppBar>
@@ -458,17 +520,22 @@ export default function Navbar() {
         />
       )}
 
-      {/* Остальная часть кода Drawer остается без изменений */}
-      {(role === "admin" || role === "buxgalter" || role === "operator") && (
+      {/* Боковое меню */}
+      {(role === "admin" ||
+        role === "buxgalter" ||
+        role === "operator" ||
+        role === "rahbar") && (
         <Drawer
           anchor="left"
           open={drawerOpen}
           onClose={toggleDrawer(false)}
           sx={{
             "& .MuiDrawer-paper": {
-              width: 320,
+              width: { xs: "280px", sm: "320px" },
               boxSizing: "border-box",
               overflow: "hidden",
+              background: "linear-gradient(180deg, #2d3748 0%, #4a5568 100%)",
+              color: "white",
             },
           }}>
           <Paper
@@ -477,28 +544,48 @@ export default function Navbar() {
               height: "100%",
               display: "flex",
               flexDirection: "column",
+              background: "transparent",
             }}>
+            {/* Заголовок меню */}
             <Box
               sx={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "16px",
-                backgroundColor: theme.palette.primary.main,
+                padding: "20px 16px",
+                background:
+                  "linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%)",
                 color: "white",
+                backdropFilter: "blur(10px)",
               }}>
-              <Typography variant="h6">Меню</Typography>
-              <IconButton onClick={toggleDrawer(false)} sx={{ color: "white" }}>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: "700", fontSize: "1.1rem" }}>
+                🗂️ Меню навигации
+              </Typography>
+              <IconButton
+                onClick={toggleDrawer(false)}
+                sx={{
+                  color: "white",
+                  transition: "all 0.3s ease",
+                  "&:hover": {
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    transform: "rotate(90deg)",
+                  },
+                }}>
                 <CloseIcon />
               </IconButton>
             </Box>
 
-            <Divider />
+            <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
 
-            <Box sx={{ flex: 1, overflow: "auto" }}>
+            {/* Содержимое меню */}
+            <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
               <List sx={{ padding: "8px" }}>
                 {/* 🔹 Основные пункты (только для admin и buxgalter) */}
-                {(role === "admin" || role === "buxgalter") && (
+                {(role === "admin" ||
+                  role === "buxgalter" ||
+                  role === "rahbar") && (
                   <>
                     {filteredMenuItems.map((item, index) => (
                       <motion.div
@@ -510,12 +597,16 @@ export default function Navbar() {
                           <ListItemButton
                             onClick={() => handleMenuClick(item.path)}
                             sx={{
-                              borderRadius: "8px",
+                              borderRadius: "12px",
+                              py: 1.5,
+                              transition: "all 0.3s ease",
                               "&:hover": {
-                                backgroundColor: theme.palette.action.hover,
+                                backgroundColor: "rgba(255,255,255,0.1)",
+                                transform: "translateX(5px)",
                               },
                             }}>
-                            <ListItemIcon sx={{ minWidth: "40px" }}>
+                            <ListItemIcon
+                              sx={{ minWidth: "45px", color: "white" }}>
                               {item.icon}
                             </ListItemIcon>
                             <ListItemText
@@ -523,6 +614,7 @@ export default function Navbar() {
                               primaryTypographyProps={{
                                 fontSize: "15px",
                                 fontWeight: "500",
+                                color: "white",
                               }}
                             />
                           </ListItemButton>
@@ -533,14 +625,28 @@ export default function Navbar() {
                 )}
 
                 {/* 🔹 Партнеры (только для admin и buxgalter) */}
-                {(role === "admin" || role === "buxgalter") && (
+                {(role === "admin" ||
+                  role === "buxgalter" ||
+                  role === "rahbar") && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
-                      <ListItemButton onClick={handlePartnersClick}>
-                        <ListItemIcon>
+                      <ListItemButton
+                        onClick={handlePartnersClick}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                          },
+                        }}>
+                        <ListItemIcon sx={{ color: "white" }}>
                           <HandshakeIcon />
                         </ListItemIcon>
-                        <ListItemText primary="Партнёры" />
+                        <ListItemText
+                          primary="🤝 Партнёры"
+                          primaryTypographyProps={{ fontWeight: "500" }}
+                        />
                         {partnersOpen ? <ExpandLess /> : <ExpandMore />}
                       </ListItemButton>
                     </ListItem>
@@ -555,17 +661,25 @@ export default function Navbar() {
                               onClick={() => handleMenuClick(item.path)}
                               sx={{
                                 borderRadius: "8px",
+                                py: 1.2,
+                                transition: "all 0.3s ease",
                                 "&:hover": {
-                                  backgroundColor: theme.palette.action.hover,
+                                  backgroundColor: "rgba(255,255,255,0.08)",
+                                  transform: "translateX(5px)",
                                 },
                               }}>
-                              <ListItemIcon sx={{ minWidth: "40px" }}>
+                              <ListItemIcon
+                                sx={{
+                                  minWidth: "40px",
+                                  color: "rgba(255,255,255,0.8)",
+                                }}>
                                 {item.icon}
                               </ListItemIcon>
                               <ListItemText
                                 primary={item.text}
                                 primaryTypographyProps={{
                                   fontSize: "14px",
+                                  color: "rgba(255,255,255,0.9)",
                                 }}
                               />
                             </ListItemButton>
@@ -579,14 +693,27 @@ export default function Navbar() {
                 {/* 🔹 Ежедневные отчеты (для admin, buxgalter и operator) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
-                  role === "operator") && (
+                  role === "operator" ||
+                  role === "rahbar") && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
-                      <ListItemButton onClick={handleDailyReportsClick}>
-                        <ListItemIcon>
+                      <ListItemButton
+                        onClick={handleDailyReportsClick}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                          },
+                        }}>
+                        <ListItemIcon sx={{ color: "white" }}>
                           <SummarizeIcon />
                         </ListItemIcon>
-                        <ListItemText primary="Ежедневные отчеты" />
+                        <ListItemText
+                          primary="📊 Ежедневные отчеты"
+                          primaryTypographyProps={{ fontWeight: "500" }}
+                        />
                         {dailyReportsOpen ? <ExpandLess /> : <ExpandMore />}
                       </ListItemButton>
                     </ListItem>
@@ -604,17 +731,25 @@ export default function Navbar() {
                               onClick={() => handleMenuClick(item.path)}
                               sx={{
                                 borderRadius: "8px",
+                                py: 1.2,
+                                transition: "all 0.3s ease",
                                 "&:hover": {
-                                  backgroundColor: theme.palette.action.hover,
+                                  backgroundColor: "rgba(255,255,255,0.08)",
+                                  transform: "translateX(5px)",
                                 },
                               }}>
-                              <ListItemIcon sx={{ minWidth: "40px" }}>
+                              <ListItemIcon
+                                sx={{
+                                  minWidth: "40px",
+                                  color: "rgba(255,255,255,0.8)",
+                                }}>
                                 {item.icon}
                               </ListItemIcon>
                               <ListItemText
                                 primary={item.text}
                                 primaryTypographyProps={{
                                   fontSize: "14px",
+                                  color: "rgba(255,255,255,0.9)",
                                 }}
                               />
                             </ListItemButton>
@@ -625,16 +760,218 @@ export default function Navbar() {
                   </>
                 )}
 
+                {/* 🔹 Документы (для admin и buxgalter) */}
+                {role === "admin" && (
+                  <>
+                    <ListItem disablePadding sx={{ mb: 1 }}>
+                      <ListItemButton
+                        onClick={handleDocumentsClick}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                          },
+                        }}>
+                        <ListItemIcon sx={{ color: "white" }}>
+                          <DescriptionIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="📑 Документы"
+                          primaryTypographyProps={{ fontWeight: "500" }}
+                        />
+                        {documentsOpen ? <ExpandLess /> : <ExpandMore />}
+                      </ListItemButton>
+                    </ListItem>
+                    <Collapse in={documentsOpen} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        <ListItem disablePadding sx={{ pl: 2 }}>
+                          <ListItemButton
+                            onClick={() => handleMenuClick("/doctypepage")}
+                            sx={{
+                              borderRadius: "8px",
+                              py: 1.2,
+                              transition: "all 0.3s ease",
+                              "&:hover": {
+                                backgroundColor: "rgba(255,255,255,0.08)",
+                                transform: "translateX(5px)",
+                              },
+                            }}>
+                            <ListItemIcon
+                              sx={{ color: "rgba(255,255,255,0.8)" }}>
+                              <CategoryIcon />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary="Типы документов"
+                              primaryTypographyProps={{
+                                fontSize: "14px",
+                                color: "rgba(255,255,255,0.9)",
+                              }}
+                            />
+                          </ListItemButton>
+                        </ListItem>
+
+                        <Divider
+                          sx={{ my: 1, borderColor: "rgba(255,255,255,0.1)" }}
+                        />
+
+                        <ListItem disablePadding sx={{ pl: 2 }}>
+                          <ListItemButton
+                            onClick={handleDocsTimedClick}
+                            sx={{
+                              borderRadius: "8px",
+                              py: 1.2,
+                              transition: "all 0.3s ease",
+                              "&:hover": {
+                                backgroundColor: "rgba(255,255,255,0.08)",
+                              },
+                            }}>
+                            <ListItemIcon
+                              sx={{ color: "rgba(255,255,255,0.8)" }}>
+                              <ScheduleIcon />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary="Документы со сроком"
+                              primaryTypographyProps={{
+                                fontSize: "14px",
+                                color: "rgba(255,255,255,0.9)",
+                              }}
+                            />
+                            {docsTimedOpen ? <ExpandLess /> : <ExpandMore />}
+                          </ListItemButton>
+                        </ListItem>
+                        <Collapse
+                          in={docsTimedOpen}
+                          timeout="auto"
+                          unmountOnExit>
+                          <List component="div" disablePadding>
+                            {docsTimedItems.map((item) => (
+                              <ListItem
+                                key={item.text}
+                                disablePadding
+                                sx={{ pl: 4 }}>
+                                <ListItemButton
+                                  onClick={() => handleMenuClick(item.path)}
+                                  sx={{
+                                    borderRadius: "6px",
+                                    py: 1,
+                                    transition: "all 0.3s ease",
+                                    "&:hover": {
+                                      backgroundColor: "rgba(255,255,255,0.06)",
+                                      transform: "translateX(5px)",
+                                    },
+                                  }}>
+                                  <ListItemIcon
+                                    sx={{ color: "rgba(255,255,255,0.7)" }}>
+                                    {item.icon}
+                                  </ListItemIcon>
+                                  <ListItemText
+                                    primary={item.text}
+                                    primaryTypographyProps={{
+                                      fontSize: "13px",
+                                      color: "rgba(255,255,255,0.8)",
+                                    }}
+                                  />
+                                </ListItemButton>
+                              </ListItem>
+                            ))}
+                          </List>
+                        </Collapse>
+
+                        <Divider
+                          sx={{ my: 1, borderColor: "rgba(255,255,255,0.1)" }}
+                        />
+
+                        <ListItem disablePadding sx={{ pl: 2 }}>
+                          <ListItemButton
+                            onClick={handleDocsPerpClick}
+                            sx={{
+                              borderRadius: "8px",
+                              py: 1.2,
+                              transition: "all 0.3s ease",
+                              "&:hover": {
+                                backgroundColor: "rgba(255,255,255,0.08)",
+                              },
+                            }}>
+                            <ListItemIcon
+                              sx={{ color: "rgba(255,255,255,0.8)" }}>
+                              <AllInclusiveIcon />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary="Бессрочные документы"
+                              primaryTypographyProps={{
+                                fontSize: "14px",
+                                color: "rgba(255,255,255,0.9)",
+                              }}
+                            />
+                            {docsPerpOpen ? <ExpandLess /> : <ExpandMore />}
+                          </ListItemButton>
+                        </ListItem>
+                        <Collapse
+                          in={docsPerpOpen}
+                          timeout="auto"
+                          unmountOnExit>
+                          <List component="div" disablePadding>
+                            {docsPerpItems.map((item) => (
+                              <ListItem
+                                key={item.text}
+                                disablePadding
+                                sx={{ pl: 4 }}>
+                                <ListItemButton
+                                  onClick={() => handleMenuClick(item.path)}
+                                  sx={{
+                                    borderRadius: "6px",
+                                    py: 1,
+                                    transition: "all 0.3s ease",
+                                    "&:hover": {
+                                      backgroundColor: "rgba(255,255,255,0.06)",
+                                      transform: "translateX(5px)",
+                                    },
+                                  }}>
+                                  <ListItemIcon
+                                    sx={{ color: "rgba(255,255,255,0.7)" }}>
+                                    {item.icon}
+                                  </ListItemIcon>
+                                  <ListItemText
+                                    primary={item.text}
+                                    primaryTypographyProps={{
+                                      fontSize: "13px",
+                                      color: "rgba(255,255,255,0.8)",
+                                    }}
+                                  />
+                                </ListItemButton>
+                              </ListItem>
+                            ))}
+                          </List>
+                        </Collapse>
+                      </List>
+                    </Collapse>
+                  </>
+                )}
+
                 {/* 🔹 Остальные меню только для admin */}
                 {role === "admin" && (
                   <>
-                    {/* регионы */}
+                    {/* Регионы */}
                     <ListItem disablePadding sx={{ mb: 1 }}>
-                      <ListItemButton onClick={handleRegionsClick}>
-                        <ListItemIcon>
+                      <ListItemButton
+                        onClick={handleRegionsClick}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                          },
+                        }}>
+                        <ListItemIcon sx={{ color: "white" }}>
                           <MapIcon />
                         </ListItemIcon>
-                        <ListItemText primary="Регионы" />
+                        <ListItemText
+                          primary="🗺️ Регионы"
+                          primaryTypographyProps={{ fontWeight: "500" }}
+                        />
                         {regionsOpen ? <ExpandLess /> : <ExpandMore />}
                       </ListItemButton>
                     </ListItem>
@@ -646,9 +983,27 @@ export default function Navbar() {
                             disablePadding
                             sx={{ pl: 2 }}>
                             <ListItemButton
-                              onClick={() => handleMenuClick(item.path)}>
-                              <ListItemIcon>{item.icon}</ListItemIcon>
-                              <ListItemText primary={item.text} />
+                              onClick={() => handleMenuClick(item.path)}
+                              sx={{
+                                borderRadius: "8px",
+                                py: 1.2,
+                                transition: "all 0.3s ease",
+                                "&:hover": {
+                                  backgroundColor: "rgba(255,255,255,0.08)",
+                                  transform: "translateX(5px)",
+                                },
+                              }}>
+                              <ListItemIcon
+                                sx={{ color: "rgba(255,255,255,0.8)" }}>
+                                {item.icon}
+                              </ListItemIcon>
+                              <ListItemText
+                                primary={item.text}
+                                primaryTypographyProps={{
+                                  fontSize: "14px",
+                                  color: "rgba(255,255,255,0.9)",
+                                }}
+                              />
                             </ListItemButton>
                           </ListItem>
                         ))}
@@ -657,22 +1012,50 @@ export default function Navbar() {
 
                     {/* Оборудование */}
                     <ListItem disablePadding sx={{ mb: 1 }}>
-                      <ListItemButton onClick={handleEquipmentClick}>
-                        <ListItemIcon>
+                      <ListItemButton
+                        onClick={handleEquipmentClick}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                          },
+                        }}>
+                        <ListItemIcon sx={{ color: "white" }}>
                           <BuildIcon />
                         </ListItemIcon>
-                        <ListItemText primary="Оборудования" />
+                        <ListItemText
+                          primary="⚙️ Оборудования"
+                          primaryTypographyProps={{ fontWeight: "500" }}
+                        />
                         {equipmentOpen ? <ExpandLess /> : <ExpandMore />}
                       </ListItemButton>
                     </ListItem>
                     <Collapse in={equipmentOpen} timeout="auto" unmountOnExit>
                       <List component="div" disablePadding>
                         <ListItem disablePadding sx={{ pl: 2 }}>
-                          <ListItemButton onClick={handleEquipmentDetailsClick}>
-                            <ListItemIcon>
+                          <ListItemButton
+                            onClick={handleEquipmentDetailsClick}
+                            sx={{
+                              borderRadius: "8px",
+                              py: 1.2,
+                              transition: "all 0.3s ease",
+                              "&:hover": {
+                                backgroundColor: "rgba(255,255,255,0.08)",
+                              },
+                            }}>
+                            <ListItemIcon
+                              sx={{ color: "rgba(255,255,255,0.8)" }}>
                               <SettingsInputComponentIcon />
                             </ListItemIcon>
-                            <ListItemText primary="Сведения об оборудованиях" />
+                            <ListItemText
+                              primary="Сведения об оборудованиях"
+                              primaryTypographyProps={{
+                                fontSize: "14px",
+                                color: "rgba(255,255,255,0.9)",
+                              }}
+                            />
                             {equipmentDetailsOpen ? (
                               <ExpandLess />
                             ) : (
@@ -691,9 +1074,27 @@ export default function Navbar() {
                                 disablePadding
                                 sx={{ pl: 4 }}>
                                 <ListItemButton
-                                  onClick={() => handleMenuClick(item.path)}>
-                                  <ListItemIcon>{item.icon}</ListItemIcon>
-                                  <ListItemText primary={item.text} />
+                                  onClick={() => handleMenuClick(item.path)}
+                                  sx={{
+                                    borderRadius: "6px",
+                                    py: 1,
+                                    transition: "all 0.3s ease",
+                                    "&:hover": {
+                                      backgroundColor: "rgba(255,255,255,0.06)",
+                                      transform: "translateX(5px)",
+                                    },
+                                  }}>
+                                  <ListItemIcon
+                                    sx={{ color: "rgba(255,255,255,0.7)" }}>
+                                    {item.icon}
+                                  </ListItemIcon>
+                                  <ListItemText
+                                    primary={item.text}
+                                    primaryTypographyProps={{
+                                      fontSize: "13px",
+                                      color: "rgba(255,255,255,0.8)",
+                                    }}
+                                  />
                                 </ListItemButton>
                               </ListItem>
                             ))}
@@ -702,11 +1103,27 @@ export default function Navbar() {
 
                         {/* Типы оборудования */}
                         <ListItem disablePadding sx={{ pl: 2 }}>
-                          <ListItemButton onClick={handleEquipmentTypesClick}>
-                            <ListItemIcon>
+                          <ListItemButton
+                            onClick={handleEquipmentTypesClick}
+                            sx={{
+                              borderRadius: "8px",
+                              py: 1.2,
+                              transition: "all 0.3s ease",
+                              "&:hover": {
+                                backgroundColor: "rgba(255,255,255,0.08)",
+                              },
+                            }}>
+                            <ListItemIcon
+                              sx={{ color: "rgba(255,255,255,0.8)" }}>
                               <CategoryIcon />
                             </ListItemIcon>
-                            <ListItemText primary="Типы оборудования" />
+                            <ListItemText
+                              primary="Типы оборудования"
+                              primaryTypographyProps={{
+                                fontSize: "14px",
+                                color: "rgba(255,255,255,0.9)",
+                              }}
+                            />
                             {equipmentTypesOpen ? (
                               <ExpandLess />
                             ) : (
@@ -725,95 +1142,27 @@ export default function Navbar() {
                                 disablePadding
                                 sx={{ pl: 4 }}>
                                 <ListItemButton
-                                  onClick={() => handleMenuClick(item.path)}>
-                                  <ListItemIcon>{item.icon}</ListItemIcon>
-                                  <ListItemText primary={item.text} />
-                                </ListItemButton>
-                              </ListItem>
-                            ))}
-                          </List>
-                        </Collapse>
-                      </List>
-                    </Collapse>
-
-                    {/* Документы */}
-                    <ListItem disablePadding sx={{ mb: 1 }}>
-                      <ListItemButton onClick={handleDocumentsClick}>
-                        <ListItemIcon>
-                          <DescriptionIcon />
-                        </ListItemIcon>
-                        <ListItemText primary="Документы" />
-                        {documentsOpen ? <ExpandLess /> : <ExpandMore />}
-                      </ListItemButton>
-                    </ListItem>
-                    <Collapse in={documentsOpen} timeout="auto" unmountOnExit>
-                      <List component="div" disablePadding>
-                        <ListItem disablePadding sx={{ pl: 2 }}>
-                          <ListItemButton
-                            onClick={() => handleMenuClick("/doctypepage")}>
-                            <ListItemIcon>
-                              <CategoryIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Типы документов" />
-                          </ListItemButton>
-                        </ListItem>
-
-                        <Divider sx={{ my: 1 }} />
-
-                        <ListItem disablePadding sx={{ pl: 2 }}>
-                          <ListItemButton onClick={handleDocsTimedClick}>
-                            <ListItemIcon>
-                              <ScheduleIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Документы со сроком" />
-                            {docsTimedOpen ? <ExpandLess /> : <ExpandMore />}
-                          </ListItemButton>
-                        </ListItem>
-                        <Collapse
-                          in={docsTimedOpen}
-                          timeout="auto"
-                          unmountOnExit>
-                          <List component="div" disablePadding>
-                            {docsTimedItems.map((item) => (
-                              <ListItem
-                                key={item.text}
-                                disablePadding
-                                sx={{ pl: 4 }}>
-                                <ListItemButton
-                                  onClick={() => handleMenuClick(item.path)}>
-                                  <ListItemIcon>{item.icon}</ListItemIcon>
-                                  <ListItemText primary={item.text} />
-                                </ListItemButton>
-                              </ListItem>
-                            ))}
-                          </List>
-                        </Collapse>
-
-                        <Divider sx={{ my: 1 }} />
-
-                        <ListItem disablePadding sx={{ pl: 2 }}>
-                          <ListItemButton onClick={handleDocsPerpClick}>
-                            <ListItemIcon>
-                              <AllInclusiveIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Бессрочные документы" />
-                            {docsPerpOpen ? <ExpandLess /> : <ExpandMore />}
-                          </ListItemButton>
-                        </ListItem>
-                        <Collapse
-                          in={docsPerpOpen}
-                          timeout="auto"
-                          unmountOnExit>
-                          <List component="div" disablePadding>
-                            {docsPerpItems.map((item) => (
-                              <ListItem
-                                key={item.text}
-                                disablePadding
-                                sx={{ pl: 4 }}>
-                                <ListItemButton
-                                  onClick={() => handleMenuClick(item.path)}>
-                                  <ListItemIcon>{item.icon}</ListItemIcon>
-                                  <ListItemText primary={item.text} />
+                                  onClick={() => handleMenuClick(item.path)}
+                                  sx={{
+                                    borderRadius: "6px",
+                                    py: 1,
+                                    transition: "all 0.3s ease",
+                                    "&:hover": {
+                                      backgroundColor: "rgba(255,255,255,0.06)",
+                                      transform: "translateX(5px)",
+                                    },
+                                  }}>
+                                  <ListItemIcon
+                                    sx={{ color: "rgba(255,255,255,0.7)" }}>
+                                    {item.icon}
+                                  </ListItemIcon>
+                                  <ListItemText
+                                    primary={item.text}
+                                    primaryTypographyProps={{
+                                      fontSize: "13px",
+                                      color: "rgba(255,255,255,0.8)",
+                                    }}
+                                  />
                                 </ListItemButton>
                               </ListItem>
                             ))}

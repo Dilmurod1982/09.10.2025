@@ -40,6 +40,7 @@ import {
   ControlPayments,
   Payments,
   ReportOnDebtsPartners,
+  HomeChief,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -102,6 +103,7 @@ function App() {
 
     if (!hasAccess(role, allowedRoles)) {
       // Перенаправляем в зависимости от роли
+      if (role === "rahbar") return <Navigate to="/homechief" replace />;
       if (role === "buxgalter") return <Navigate to="/homebooker" replace />;
       if (role === "operator") return <Navigate to="/homeoperator" replace />;
       return <Navigate to="/" replace />;
@@ -356,6 +358,15 @@ function App() {
         },
 
         // ==== 🔹 Домашние страницы для BUCHGALTER и OPERATOR ====
+        {
+          path: "/homechief",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["rahbar"]}
+              element={<HomeChief />}
+            />
+          ),
+        },
         {
           path: "/homebooker",
           element: (
