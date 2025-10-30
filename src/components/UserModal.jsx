@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { updatePassword } from "firebase/auth";
 import { db, auth } from "../firebase/config";
+import { getFunctions, httpsCallable } from "firebase/functions"; // ← Добавьте эту строку
 import StationsSelection from "./StationsSelection";
 
 const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
@@ -140,28 +141,79 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
     try {
       const userDoc = doc(db, "users", user.id);
       const updateData = {
-        ...formData,
-        stations: selectedStations, // Сохраняем выбранные станции
+        displayName: formData.displayName,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        middleName: formData.middleName,
+        birthday: formData.birthday,
+        pinfl: formData.pinfl,
+        passportSeries: formData.passportSeries,
+        passportNumber: formData.passportNumber,
+        address: formData.address,
+        role: formData.role,
+        accessEndDate: formData.accessEndDate,
+        stations: selectedStations,
       };
 
-      if (!formData.password) {
-        delete updateData.password;
-      }
+      // Сохраняем пароль отдельно
+      const passwordToUpdate = formData.password;
 
+      // Обновляем данные пользователя в Firestore
       await updateDoc(userDoc, updateData);
 
-      if (formData.password) {
-        const currentUser = auth.currentUser;
-        if (currentUser && currentUser.uid === user.id) {
-          await updatePassword(currentUser, formData.password);
+      // Если указан новый пароль, обновляем его через Cloud Function
+      if (passwordToUpdate) {
+        try {
+          // Инициализируем Functions
+          const functions = getFunctions();
+
+          // Указываем регион если нужно (по умолчанию us-central1)
+          // const functions = getFunctions(app, 'europe-west1');
+
+          const updatePasswordFunction = httpsCallable(
+            functions,
+            "updateUserPassword"
+          );
+
+          const result = await updatePasswordFunction({
+            targetUserId: user.id,
+            newPassword: passwordToUpdate,
+          });
+
+          console.log("Пароль обновлен:", result.data);
+        } catch (passwordError) {
+          console.error("Ошибка обновления пароля:", passwordError);
+
+          // Более детальная обработка ошибок
+          let errorMessage = "Неизвестная ошибка";
+
+          if (passwordError.code === "permission-denied") {
+            errorMessage =
+              "У вас нет прав для изменения паролей. Требуется роль администратора.";
+          } else if (passwordError.code === "not-found") {
+            errorMessage = "Пользователь не найден в системе аутентификации.";
+          } else if (passwordError.message) {
+            errorMessage = passwordError.message;
+          }
+
+          alert(
+            "Данные пользователя обновлены, но произошла ошибка при смене пароля: " +
+              errorMessage
+          );
         }
       }
 
+      // Очищаем поле пароля после успешного сохранения
+      setFormData((prev) => ({ ...prev, password: "" }));
+      setPasswordStrength({ strength: 0, message: "" });
+
       onUserUpdated();
       setIsEditing(false);
+
+      alert("Данные пользователя успешно обновлены");
     } catch (error) {
       console.error("Error updating user:", error);
-      alert("Ошибка при обновлении пользователя");
+      alert("Ошибка при обновлении пользователя: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -258,7 +310,7 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
               {/* Email */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
-                  Email
+                  Логин
                 </label>
                 <input
                   type="email"
@@ -271,7 +323,7 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
               </div>
 
               {/* Пароль */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
                   Пароль
                 </label>
@@ -305,10 +357,10 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
                     </div>
                   </div>
                 )}
-              </div>
+              </div> */}
 
               {/* Display Name */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
                   Display Name
                 </label>
@@ -320,7 +372,7 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
                   disabled={!isFieldEditable("displayName")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
-              </div>
+              </div> */}
 
               {/* Имя */}
               <div className="space-y-2">
@@ -383,7 +435,7 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
               </div>
 
               {/* Дата завершения доступа */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
                   Дата завершения доступа
                 </label>
@@ -395,7 +447,7 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
                   disabled={!isFieldEditable("accessEndDate")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
-              </div>
+              </div> */}
 
               {/* ПИНФЛ */}
               <div className="space-y-2">

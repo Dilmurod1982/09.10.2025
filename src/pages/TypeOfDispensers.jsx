@@ -24,6 +24,7 @@ import {
   Zap,
   Gauge,
   Flame,
+  RotateCcw,
 } from "lucide-react";
 
 const TypeOfDispensers = () => {
@@ -44,6 +45,8 @@ const TypeOfDispensers = () => {
     powerConsumption: "",
     nozzleCount: "",
     hoseLength: "",
+    resetCounterEnabled: false, // Новое поле для галочки
+    resetThreshold: "", // Порог сброса счетчика
   });
 
   // Загрузка данных
@@ -83,6 +86,19 @@ const TypeOfDispensers = () => {
         currentData[field] && currentData[field].toString().trim() !== ""
     );
 
+    // Если включен сброс счетчика, проверяем заполнение порога
+    if (currentData.resetCounterEnabled) {
+      const threshold = currentData.resetThreshold;
+      if (
+        !threshold ||
+        threshold.toString().trim() === "" ||
+        isNaN(threshold) ||
+        Number(threshold) <= 0
+      ) {
+        return false;
+      }
+    }
+
     return allFieldsFilled;
   };
 
@@ -103,9 +119,32 @@ const TypeOfDispensers = () => {
     }
   };
 
+  // Обработчик изменения галочки
+  const handleResetToggle = (checked) => {
+    if (isCreating) {
+      setNewDispenser((prev) => ({
+        ...prev,
+        resetCounterEnabled: checked,
+        // Если галочка снимается, очищаем поле порога
+        resetThreshold: checked ? prev.resetThreshold : "",
+      }));
+    } else {
+      setSelectedDispenser((prev) => ({
+        ...prev,
+        resetCounterEnabled: checked,
+        // Если галочка снимается, очищаем поле порога
+        resetThreshold: checked ? prev.resetThreshold : "",
+      }));
+    }
+  };
+
   // Открытие модального окна для просмотра колонки
   const handleDispenserClick = (dispenser) => {
-    setSelectedDispenser({ ...dispenser });
+    setSelectedDispenser({
+      ...dispenser,
+      resetCounterEnabled: dispenser.resetCounterEnabled || false,
+      resetThreshold: dispenser.resetThreshold || "",
+    });
     setIsModalOpen(true);
     setIsEditMode(false);
   };
@@ -122,6 +161,8 @@ const TypeOfDispensers = () => {
       powerConsumption: "",
       nozzleCount: "",
       hoseLength: "",
+      resetCounterEnabled: false,
+      resetThreshold: "",
     });
   };
 
@@ -147,13 +188,13 @@ const TypeOfDispensers = () => {
       if (isCreating) {
         await addDoc(collection(db, "typeofdispensers"), {
           ...newDispenser,
-          fuelType: "Природный газ", // Автоматически добавляем тип топлива
+          fuelType: "Природный газ",
           createdAt: new Date(),
         });
       } else {
         await updateDoc(doc(db, "typeofdispensers", selectedDispenser.id), {
           ...selectedDispenser,
-          fuelType: "Природный газ", // Автоматически добавляем тип топлива
+          fuelType: "Природный газ",
           updatedAt: new Date(),
         });
       }
@@ -276,6 +317,9 @@ const TypeOfDispensers = () => {
                   Пистолеты
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden xl:table-cell">
+                  Сброс счетчика
+                </th>
+                <th className="px-4 py-4 text-left font-semibold hidden xl:table-cell">
                   Страна
                 </th>
               </tr>
@@ -331,6 +375,28 @@ const TypeOfDispensers = () => {
                     ) : (
                       <span className="text-gray-400">Не указано</span>
                     )}
+                  </td>
+                  <td className="px-4 py-4 text-gray-600 hidden xl:table-cell">
+                    <div className="flex items-center gap-2">
+                      <RotateCcw
+                        className={
+                          dispenser.resetCounterEnabled
+                            ? "text-green-500"
+                            : "text-gray-400"
+                        }
+                        size={16}
+                      />
+                      <span
+                        className={
+                          dispenser.resetCounterEnabled
+                            ? "text-green-600 font-medium"
+                            : "text-gray-500"
+                        }>
+                        {dispenser.resetCounterEnabled
+                          ? `Автосброс: ${dispenser.resetThreshold || "N/A"}`
+                          : "Без автосброса"}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-4 text-gray-600 hidden xl:table-cell">
                     <div className="flex items-center gap-2">
@@ -476,6 +542,85 @@ const TypeOfDispensers = () => {
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
                       placeholder="Введите страну производителя"
                     />
+                  </div>
+
+                  {/* Настройки счетчика */}
+                  <div className="border-t pt-6">
+                    <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
+                      <RotateCcw size={18} />
+                      Настройки счетчика
+                    </h3>
+
+                    <div className="space-y-4">
+                      {/* Галочка для включения сброса счетчика */}
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            id="resetCounterEnabled"
+                            checked={
+                              isCreating
+                                ? newDispenser.resetCounterEnabled
+                                : selectedDispenser?.resetCounterEnabled ||
+                                  false
+                            }
+                            onChange={(e) =>
+                              handleResetToggle(e.target.checked)
+                            }
+                            disabled={!isCreating && !isEditMode}
+                            className="w-5 h-5 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500 disabled:bg-gray-100"
+                          />
+                        </div>
+                        <label
+                          htmlFor="resetCounterEnabled"
+                          className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
+                          Автоматический сброс счетчика при достижении порога
+                        </label>
+                      </div>
+
+                      {/* Поле для порога сброса (показывается только если галочка активна) */}
+                      {(isCreating
+                        ? newDispenser.resetCounterEnabled
+                        : selectedDispenser?.resetCounterEnabled) && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          transition={{ duration: 0.3 }}
+                          className="ml-8">
+                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                            Порог сброса счетчика *
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              value={
+                                isCreating
+                                  ? newDispenser.resetThreshold
+                                  : selectedDispenser?.resetThreshold || ""
+                              }
+                              onChange={(e) =>
+                                handleInputChange(
+                                  "resetThreshold",
+                                  e.target.value
+                                )
+                              }
+                              disabled={!isCreating && !isEditMode}
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
+                              placeholder="Введите значение порога"
+                              min="1"
+                              step="1"
+                            />
+                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                              единиц
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Счетчик будет автоматически обнуляться при
+                            достижении этого значения
+                          </p>
+                        </motion.div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Технические характеристики */}

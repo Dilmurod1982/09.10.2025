@@ -6,7 +6,7 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import MenuIcon from "@mui/icons-material/Menu";
-import { signOut } from "firebase/auth";
+import { signOut, updatePassword } from "firebase/auth";
 import { auth } from "../firebase/config";
 import { toast } from "react-toastify";
 import { useAppStore } from "../lib/zustand";
@@ -51,10 +51,31 @@ import {
   AccountBalanceWallet as AccountBalanceWalletIcon,
   Logout as LogoutIcon,
   Dashboard as DashboardIcon,
+  Visibility,
+  VisibilityOff,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import Collapse from "@mui/material/Collapse";
 import UserModal from "./UserModal";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  InputAdornment,
+  Alert,
+} from "@mui/material";
+import {
+  doc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc, // ← Добавьте это
+} from "firebase/firestore";
+import { db } from "../firebase/config";
 
 export default function Navbar() {
   const MotionPaper = motion.create(Paper);
@@ -73,12 +94,38 @@ export default function Navbar() {
   const [partnersOpen, setPartnersOpen] = React.useState(false);
   const [dailyReportsOpen, setDailyReportsOpen] = React.useState(false);
   const [userModalOpen, setUserModalOpen] = React.useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = React.useState(false);
+  const [passwordData, setPasswordData] = React.useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [showPasswords, setShowPasswords] = React.useState({
+    current: false,
+    new: false,
+    confirm: false,
+  });
+  const [passwordError, setPasswordError] = React.useState("");
+  const [passwordLoading, setPasswordLoading] = React.useState(false);
 
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const isTablet = useMediaQuery(theme.breakpoints.down("lg"));
+  const [userMenuOpen, setUserMenuOpen] = React.useState(false);
 
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuOpen) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("click", handleClickOutside);
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, [userMenuOpen]);
   // Формируем ФИО пользователя
   const getUserFullName = () => {
     if (!userData) return "";
@@ -158,6 +205,178 @@ export default function Navbar() {
   const handleDocsPerpClick = () => setDocsPerpOpen(!docsPerpOpen);
   const handlePartnersClick = () => setPartnersOpen(!partnersOpen);
   const handleDailyReportsClick = () => setDailyReportsOpen(!dailyReportsOpen);
+
+  // Функции для управления паролем
+  const handlePasswordChange = () => {
+    setPasswordModalOpen(true);
+    setPasswordData({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+    setPasswordError("");
+  };
+
+  const handlePasswordClose = () => {
+    setPasswordModalOpen(false);
+    setPasswordData({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+    setPasswordError("");
+    setShowPasswords({
+      current: false,
+      new: false,
+      confirm: false,
+    });
+  };
+
+  const handlePasswordInputChange = (field) => (event) => {
+    setPasswordData((prev) => ({
+      ...prev,
+      [field]: event.target.value,
+    }));
+    // Очищаем ошибку при изменении поля
+    if (passwordError) {
+      setPasswordError("");
+    }
+  };
+
+  const togglePasswordVisibility = (field) => {
+    setShowPasswords((prev) => ({
+      ...prev,
+      [field]: !prev[field],
+    }));
+  };
+
+  // Функция проверки силы пароля
+  const validatePassword = (password) => {
+    const minLength = 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    return (
+      password.length >= minLength &&
+      hasUpperCase &&
+      hasLowerCase &&
+      hasNumbers &&
+      hasSpecialChar
+    );
+  };
+
+  // Функция обновления пароля
+  // Функция обновления пароля
+  // Функция обновления пароля
+  // Функция обновления пароля
+  const handleUpdatePassword = async () => {
+    // Валидация
+    if (
+      !passwordData.currentPassword ||
+      !passwordData.newPassword ||
+      !passwordData.confirmPassword
+    ) {
+      setPasswordError("Все поля обязательны для заполнения");
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError("Новый пароль и подтверждение не совпадают");
+      return;
+    }
+
+    if (!validatePassword(passwordData.newPassword)) {
+      setPasswordError(
+        "Пароль должен содержать минимум 8 символов, включая заглавные и строчные буквы, цифры и специальные символы"
+      );
+      return;
+    }
+
+    setPasswordLoading(true);
+    setPasswordError("");
+
+    try {
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        setPasswordError("Пользователь не аутентифицирован");
+        return;
+      }
+
+      // 1. Обновляем пароль в Firebase Authentication
+      await updatePassword(currentUser, passwordData.newPassword);
+
+      // 2. Обновляем пароль в Firestore коллекции users
+      try {
+        // Ищем пользователя в Firestore по email
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("email", "==", userData.email));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          // Берем первый найденный документ
+          const userDoc = querySnapshot.docs[0];
+          const userDocRef = doc(db, "users", userDoc.id);
+
+          await updateDoc(userDocRef, {
+            password: passwordData.newPassword, // Сохраняем пароль
+            lastPasswordChange: new Date(),
+            passwordChanged: true,
+            updatedAt: new Date(),
+          });
+
+          // console.log("Пароль сохранен в Firestore");
+        } else {
+          // console.warn("Пользователь не найден в Firestore");
+          // Создаем запись если не найдено
+          await addDoc(collection(db, "users"), {
+            uid: currentUser.uid,
+            email: currentUser.email,
+            password: passwordData.newPassword,
+            displayName: userData.displayName || "",
+            firstName: userData.firstName || "",
+            lastName: userData.lastName || "",
+            role: userData.role || "operator",
+            lastPasswordChange: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+          // console.log("Создана новая запись пользователя в Firestore");
+        }
+      } catch (firestoreError) {
+        // console.error("Ошибка при обновлении Firestore:", firestoreError);
+        throw new Error("Не удалось сохранить пароль в базе данных");
+      }
+
+      toast.success("Пароль успешно изменен");
+      handlePasswordClose();
+    } catch (error) {
+      // console.error("Ошибка изменения пароля:", error);
+
+      let errorMessage = "Ошибка при изменении пароля";
+      switch (error.code) {
+        case "auth/requires-recent-login":
+          errorMessage =
+            "Для изменения пароля требуется повторная аутентификация. Пожалуйста, выйдите и войдите снова.";
+          break;
+        case "auth/weak-password":
+          errorMessage =
+            "Пароль слишком слабый. Используйте более сложный пароль.";
+          break;
+        case "auth/network-request-failed":
+          errorMessage = "Ошибка сети. Проверьте подключение к интернету.";
+          break;
+        default:
+          errorMessage = error.message || "Неизвестная ошибка";
+      }
+
+      setPasswordError(errorMessage);
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
 
   // 🔹 Меню
   const menuItems = [
@@ -343,7 +562,6 @@ export default function Navbar() {
               <MenuIcon />
             </IconButton>
           ) : null}
-
           <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
             <Typography
               variant="h6"
@@ -375,7 +593,6 @@ export default function Navbar() {
             {/* Бейдж роли на десктопе */}
             {!isMobile && getRoleBadge()}
           </Box>
-
           {/* Кнопки для rahbar и booker */}
           {isRahbarOrBooker && !isMobile && (
             <Box sx={{ display: "flex", gap: 1, mr: 3 }}>
@@ -423,50 +640,62 @@ export default function Navbar() {
               </Button>
             </Box>
           )}
+          {/* Кнопка пользователя с меню */}
 
-          {/* Кнопка пользователя */}
           {userData && (
-            <Button
-              onClick={handleUserButtonClick}
-              color="inherit"
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                mr: 2,
-                textTransform: "none",
-                borderRadius: "25px",
-                padding: { xs: "6px 12px", md: "8px 16px" },
-                transition: "all 0.3s ease",
-                background: "rgba(255,255,255,0.1)",
-                backdropFilter: "blur(10px)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                "&:hover": {
-                  backgroundColor: "rgba(255, 255, 255, 0.2)",
-                  transform: "translateY(-2px)",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                },
-                minWidth: "auto",
-              }}>
-              <PersonIcon sx={{ fontSize: { xs: 18, md: 20 } }} />
-              <Typography
-                variant="body1"
-                sx={{
-                  fontWeight: "500",
-                  fontSize: { xs: "0.8rem", md: "0.9rem" },
-                  maxWidth: { xs: "80px", sm: "120px", md: "150px" },
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  display: { xs: "none", sm: "block" },
+            <div className="relative inline-block">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setUserMenuOpen(!userMenuOpen);
+                }}
+                className="flex items-center gap-2 mr-4 text-white rounded-full px-3 py-2 md:px-4 md:py-2 transition-all duration-300 hover:bg-white/20 hover:translate-y-[-2px] hover:shadow-lg backdrop-blur-sm border border-white/20 min-w-0"
+                style={{
+                  background: "rgba(255,255,255,0.1)",
                 }}>
-                {isMobile ? getShortName() : getUserFullName()}
-              </Typography>
-              {/* Бейдж роли на мобильных */}
-              {isMobile && getRoleBadge()}
-            </Button>
-          )}
+                <PersonIcon className="w-4 h-4 md:w-5 md:h-5" />
+                <span
+                  className={`font-medium text-sm md:text-base ${
+                    isMobile ? "hidden sm:block" : "block"
+                  } truncate max-w-[80px] sm:max-w-[120px] md:max-w-[150px]`}>
+                  {isMobile ? getShortName() : getUserFullName()}
+                </span>
+                {/* Бейдж роли на мобильных */}
+                {isMobile && getRoleBadge()}
+              </button>
 
+              {/* Выпадающее меню пользователя */}
+              {userMenuOpen && (
+                <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-in fade-in-0 zoom-in-95">
+                  <div className="p-0">
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        handleUserButtonClick();
+                      }}
+                      className="flex items-center w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors duration-200 border-b border-gray-100">
+                      <PersonIcon className="w-5 h-5 text-blue-600 mr-3" />
+                      <span className="text-sm font-medium text-gray-900">
+                        Профиль
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        handlePasswordChange();
+                      }}
+                      className="flex items-center w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors duration-200">
+                      <Visibility className="w-5 h-5 text-blue-600 mr-3" />
+                      <span className="text-sm font-medium text-gray-900">
+                        Сменить пароль
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           {/* Кнопка выхода */}
           <Button
             onClick={signOutProfile}
@@ -518,6 +747,127 @@ export default function Navbar() {
           onUserUpdated={handleUserUpdated}
           readOnly={true}
         />
+      )}
+
+      {/* Модальное окно смены пароля */}
+      {passwordModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
+            {/* Заголовок */}
+            <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
+              <h2 className="text-xl font-semibold">🔐 Изменение пароля</h2>
+            </div>
+
+            {/* Содержимое */}
+            <div className="p-6">
+              {passwordError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+                  {passwordError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {/* Текущий пароль */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Текущий пароль
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPasswords.current ? "text" : "password"}
+                      value={passwordData.currentPassword}
+                      onChange={handlePasswordInputChange("currentPassword")}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      placeholder="Введите текущий пароль"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => togglePasswordVisibility("current")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      {showPasswords.current ? (
+                        <VisibilityOff className="w-5 h-5" />
+                      ) : (
+                        <Visibility className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Новый пароль */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Новый пароль
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPasswords.new ? "text" : "password"}
+                      value={passwordData.newPassword}
+                      onChange={handlePasswordInputChange("newPassword")}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      placeholder="Введите новый пароль"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => togglePasswordVisibility("new")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      {showPasswords.new ? (
+                        <VisibilityOff className="w-5 h-5" />
+                      ) : (
+                        <Visibility className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Минимум 8 символов, заглавные и строчные буквы, цифры,
+                    специальные символы
+                  </p>
+                </div>
+
+                {/* Подтверждение пароля */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Подтверждение нового пароля
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPasswords.confirm ? "text" : "password"}
+                      value={passwordData.confirmPassword}
+                      onChange={handlePasswordInputChange("confirmPassword")}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      placeholder="Повторите новый пароль"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => togglePasswordVisibility("confirm")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      {showPasswords.confirm ? (
+                        <VisibilityOff className="w-5 h-5" />
+                      ) : (
+                        <Visibility className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Кнопки */}
+            <div className="flex gap-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={handlePasswordClose}
+                disabled={passwordLoading}
+                className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium">
+                Отмена
+              </button>
+              <button
+                onClick={handleUpdatePassword}
+                disabled={passwordLoading}
+                className="flex-1 px-4 py-2 text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg hover:shadow-xl">
+                {passwordLoading ? "Изменение..." : "Изменить пароль"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Боковое меню */}
@@ -627,7 +977,8 @@ export default function Navbar() {
                 {/* 🔹 Партнеры (только для admin и buxgalter) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
-                  role === "rahbar") && (
+                  role === "rahbar" ||
+                  role === "operator") && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
                       <ListItemButton
@@ -652,39 +1003,48 @@ export default function Navbar() {
                     </ListItem>
                     <Collapse in={partnersOpen} timeout="auto" unmountOnExit>
                       <List component="div" disablePadding>
-                        {partnersItems.map((item) => (
-                          <ListItem
-                            key={item.text}
-                            disablePadding
-                            sx={{ pl: 2 }}>
-                            <ListItemButton
-                              onClick={() => handleMenuClick(item.path)}
-                              sx={{
-                                borderRadius: "8px",
-                                py: 1.2,
-                                transition: "all 0.3s ease",
-                                "&:hover": {
-                                  backgroundColor: "rgba(255,255,255,0.08)",
-                                  transform: "translateX(5px)",
-                                },
-                              }}>
-                              <ListItemIcon
+                        {partnersItems
+                          .filter((item) => {
+                            // Для оператора показываем только "Задолженности партнеров"
+                            if (role === "operator") {
+                              return item.text === "Задолженности партнеров";
+                            }
+                            // Для остальных ролей показываем все пункты
+                            return true;
+                          })
+                          .map((item) => (
+                            <ListItem
+                              key={item.text}
+                              disablePadding
+                              sx={{ pl: 2 }}>
+                              <ListItemButton
+                                onClick={() => handleMenuClick(item.path)}
                                 sx={{
-                                  minWidth: "40px",
-                                  color: "rgba(255,255,255,0.8)",
+                                  borderRadius: "8px",
+                                  py: 1.2,
+                                  transition: "all 0.3s ease",
+                                  "&:hover": {
+                                    backgroundColor: "rgba(255,255,255,0.08)",
+                                    transform: "translateX(5px)",
+                                  },
                                 }}>
-                                {item.icon}
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={item.text}
-                                primaryTypographyProps={{
-                                  fontSize: "14px",
-                                  color: "rgba(255,255,255,0.9)",
-                                }}
-                              />
-                            </ListItemButton>
-                          </ListItem>
-                        ))}
+                                <ListItemIcon
+                                  sx={{
+                                    minWidth: "40px",
+                                    color: "rgba(255,255,255,0.8)",
+                                  }}>
+                                  {item.icon}
+                                </ListItemIcon>
+                                <ListItemText
+                                  primary={item.text}
+                                  primaryTypographyProps={{
+                                    fontSize: "14px",
+                                    color: "rgba(255,255,255,0.9)",
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          ))}
                       </List>
                     </Collapse>
                   </>
@@ -722,39 +1082,48 @@ export default function Navbar() {
                       timeout="auto"
                       unmountOnExit>
                       <List component="div" disablePadding>
-                        {dailyReportsItems.map((item) => (
-                          <ListItem
-                            key={item.text}
-                            disablePadding
-                            sx={{ pl: 2 }}>
-                            <ListItemButton
-                              onClick={() => handleMenuClick(item.path)}
-                              sx={{
-                                borderRadius: "8px",
-                                py: 1.2,
-                                transition: "all 0.3s ease",
-                                "&:hover": {
-                                  backgroundColor: "rgba(255,255,255,0.08)",
-                                  transform: "translateX(5px)",
-                                },
-                              }}>
-                              <ListItemIcon
+                        {dailyReportsItems
+                          .filter((item) => {
+                            // Для оператора скрываем "Контрольные суммы"
+                            if (role === "operator") {
+                              return item.text !== "Контрольные суммы";
+                            }
+                            // Для остальных ролей показываем все пункты
+                            return true;
+                          })
+                          .map((item) => (
+                            <ListItem
+                              key={item.text}
+                              disablePadding
+                              sx={{ pl: 2 }}>
+                              <ListItemButton
+                                onClick={() => handleMenuClick(item.path)}
                                 sx={{
-                                  minWidth: "40px",
-                                  color: "rgba(255,255,255,0.8)",
+                                  borderRadius: "8px",
+                                  py: 1.2,
+                                  transition: "all 0.3s ease",
+                                  "&:hover": {
+                                    backgroundColor: "rgba(255,255,255,0.08)",
+                                    transform: "translateX(5px)",
+                                  },
                                 }}>
-                                {item.icon}
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={item.text}
-                                primaryTypographyProps={{
-                                  fontSize: "14px",
-                                  color: "rgba(255,255,255,0.9)",
-                                }}
-                              />
-                            </ListItemButton>
-                          </ListItem>
-                        ))}
+                                <ListItemIcon
+                                  sx={{
+                                    minWidth: "40px",
+                                    color: "rgba(255,255,255,0.8)",
+                                  }}>
+                                  {item.icon}
+                                </ListItemIcon>
+                                <ListItemText
+                                  primary={item.text}
+                                  primaryTypographyProps={{
+                                    fontSize: "14px",
+                                    color: "rgba(255,255,255,0.9)",
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          ))}
                       </List>
                     </Collapse>
                   </>

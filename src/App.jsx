@@ -407,7 +407,7 @@ function App() {
           path: "/reportondebtspartners",
           element: (
             <ProtectedLayout
-              allowedRoles={["buxgalter"]}
+              allowedRoles={["buxgalter", "operator"]}
               element={<ReportOnDebtsPartners />}
             />
           ),

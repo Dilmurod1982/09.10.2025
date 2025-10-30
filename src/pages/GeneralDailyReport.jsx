@@ -117,12 +117,11 @@ const GeneralDailyReport = () => {
     fetchReports();
   }, [selectedStation, selectedMonth]);
 
-  // Расчет разницы между показаниями счетчика
-  const calculateCounterDiff = (currentReport, previousReport) => {
-    if (!previousReport) return 0;
-    const currentReading = currentReport.generalData?.autopilotReading || 0;
-    const previousReading = previousReport.generalData?.autopilotReading || 0;
-    return currentReading - previousReading;
+  // Расчет разницы между показаниями шлангов и счетчика
+  const calculateCounterDiff = (report) => {
+    const hoseTotal = report.hoseTotalGas || 0;
+    const autopilotReading = report.generalData?.autopilotReading || 0;
+    return hoseTotal - autopilotReading;
   };
 
   // Форматирование даты в ДД-ММ-ГГГГ
@@ -199,7 +198,6 @@ const GeneralDailyReport = () => {
       [], // Пустая строка
 
       // Заголовки таблицы
-      // Заголовки таблицы
       [
         "№",
         "Сана",
@@ -210,15 +208,15 @@ const GeneralDailyReport = () => {
         "1м³нархи",
         "Терминал Узкард (сўм)",
         "Терминал Хумо (сўм)",
+        "ЭТТ (сўм)", // Новый заголовок
         "Z-ҳисобот (сўм)",
-        ...(isOperator ? [] : ["Назорат суммаси"]), // Убрали лишнюю пустую строку
+        ...(isOperator ? [] : ["Назорат суммаси"]),
         "Яратилди",
       ],
 
       // Данные
       ...reports.map((report, index) => {
-        const previousReport = index > 0 ? reports[index - 1] : null;
-        const counterDiff = calculateCounterDiff(report, previousReport);
+        const counterDiff = calculateCounterDiff(report);
 
         const row = [
           index + 1,
@@ -230,6 +228,7 @@ const GeneralDailyReport = () => {
           report.generalData?.gasPrice || 0,
           report.generalData?.uzcardTerminal || 0,
           report.generalData?.humoTerminal || 0,
+          report.electronicPaymentSystem || 0, // Новое поле
           report.generalData?.cashAmount || 0,
         ];
 
@@ -248,10 +247,7 @@ const GeneralDailyReport = () => {
         "ЖАМИ:",
         "",
         "",
-        reports.reduce((sum, report, index) => {
-          const previousReport = index > 0 ? reports[index - 1] : null;
-          return sum + calculateCounterDiff(report, previousReport);
-        }, 0),
+        reports.reduce((sum, report) => sum + calculateCounterDiff(report), 0),
         reports.reduce((sum, report) => sum + (report.hoseTotalGas || 0), 0),
         reports.reduce((sum, report) => sum + (report.partnerTotalM3 || 0), 0),
         "",
@@ -263,6 +259,10 @@ const GeneralDailyReport = () => {
           (sum, report) => sum + (report.generalData?.humoTerminal || 0),
           0
         ),
+        reports.reduce(
+          (sum, report) => sum + (report.electronicPaymentSystem || 0),
+          0
+        ), // Сумма ЭТТ
         reports.reduce(
           (sum, report) => sum + (report.generalData?.cashAmount || 0),
           0
@@ -287,6 +287,7 @@ const GeneralDailyReport = () => {
       { wch: 12 }, // Цена за м³
       { wch: 15 }, // Терминал Узкард
       { wch: 15 }, // Терминал Хумо
+      { wch: 15 }, // ЭТТ (новый столбец)
       { wch: 15 }, // Наличные
     ];
 
@@ -451,6 +452,10 @@ const GeneralDailyReport = () => {
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                         Хумо (сўм)
                       </th>
+                      {/* Новый столбец */}
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                        ЭТТ (сўм)
+                      </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                         Z-ҳисобот (сўм)
                       </th>
@@ -466,12 +471,7 @@ const GeneralDailyReport = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {reports.map((report, index) => {
-                      const previousReport =
-                        index > 0 ? reports[index - 1] : null;
-                      const counterDiff = calculateCounterDiff(
-                        report,
-                        previousReport
-                      );
+                      const counterDiff = calculateCounterDiff(report);
 
                       return (
                         <tr
@@ -517,6 +517,16 @@ const GeneralDailyReport = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
                             {report.generalData?.humoTerminal?.toLocaleString(
+                              "ru-RU",
+                              {
+                                minimumFractionDigits: 2,
+                              }
+                            ) || "0.00"}{" "}
+                            сўм
+                          </td>
+                          {/* Новый столбец с данными */}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
+                            {report.generalData?.electronicPaymentSystem?.toLocaleString(
                               "ru-RU",
                               {
                                 minimumFractionDigits: 2,

@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Вспомогательная функция для проверки роли
+    function isAdmin() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isUserOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Аудит-лог - только для чтения администраторами
+    match /auditLog/{logId} {
+      allow read: if isAdmin();
+      allow create: if request.auth != null; // Cloud Functions создает записи
+    }
+    
+    // Пользователи
+    match /users/{userId} {
+      allow read: if isAdmin() || isUserOwner(userId);
+      allow write: if isAdmin() || isUserOwner(userId);
+    }
+    
+    // Станции
+    match /stations/{stationId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Оборудование
+    match /compressors/{compressorId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /dispensers/{dispenserId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /gasDryers/{dryerId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /gasChillers/{chillerId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Организации и города
+    match /organizations/{orgId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /cities/{cityId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Сотрудники и должности
+    match /employees/{employeeId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /positions/{positionId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Общее правило для остальных документов
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
