@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  getDocs,
+  limit,
+} from "firebase/firestore";
 import { db } from "../firebase/config";
 import { useAppStore } from "../lib/zustand";
 import * as XLSX from "xlsx";
@@ -135,13 +142,93 @@ const ReportOnDebtsPartners = () => {
         endDate = new Date(year, month, 0);
     }
 
+    // Преобразуем в строки и убедимся, что это правильные даты
+    const startDateStr = startDate.toISOString().split("T")[0];
+    const endDateStr = endDate.toISOString().split("T")[0];
+
+    console.log("Рассчитанный период:", {
+      baseMonth,
+      periodType,
+      startDate: startDateStr,
+      endDate: endDateStr,
+      startDateObj: startDate,
+      endDateObj: endDate,
+    });
+
     return {
-      startDate: startDate.toISOString().split("T")[0],
-      endDate: endDate.toISOString().split("T")[0],
+      startDate: startDateStr,
+      endDate: endDateStr,
     };
   };
 
-  // Загрузка и расчет данных отчета
+  // Загрузка начального сальдо из последнего отчета предыдущего месяца
+  const getStartBalances = async (stationIds, startDate) => {
+    try {
+      const startBalances = {};
+
+      for (const stationId of stationIds) {
+        // Получаем последний отчет предыдущего месяца для определения начального сальдо
+        const previousMonthQuery = query(
+          collection(db, "unifiedDailyReports"),
+          where("stationId", "==", stationId),
+          where("reportDate", "<", startDate),
+          orderBy("reportDate", "desc"),
+          limit(1)
+        );
+
+        const previousSnapshot = await getDocs(previousMonthQuery);
+
+        if (!previousSnapshot.empty) {
+          const lastReport = previousSnapshot.docs[0].data();
+          const reportPartners = lastReport.partnerData || [];
+
+          reportPartners.forEach((partner) => {
+            const partnerId = partner.partnerId;
+            if (!startBalances[partnerId]) {
+              startBalances[partnerId] = {
+                startBalance: parseFloat(partner.endBalance) || 0, // Берем endBalance предыдущего отчета как startBalance текущего
+                partnerName: partner.partnerName,
+                contractNumber: partner.contractNumber,
+              };
+            }
+          });
+        } else {
+          // Если предыдущих отчетов нет, ищем первый отчет текущего месяца
+          const firstReportQuery = query(
+            collection(db, "unifiedDailyReports"),
+            where("stationId", "==", stationId),
+            where("reportDate", ">=", startDate),
+            orderBy("reportDate", "asc"),
+            limit(1)
+          );
+
+          const firstSnapshot = await getDocs(firstReportQuery);
+
+          if (!firstSnapshot.empty) {
+            const firstReport = firstSnapshot.docs[0].data();
+            const reportPartners = firstReport.partnerData || [];
+
+            reportPartners.forEach((partner) => {
+              const partnerId = partner.partnerId;
+              if (!startBalances[partnerId]) {
+                startBalances[partnerId] = {
+                  startBalance: parseFloat(partner.startBalance) || 0,
+                  partnerName: partner.partnerName,
+                  contractNumber: partner.contractNumber,
+                };
+              }
+            });
+          }
+        }
+      }
+
+      return startBalances;
+    } catch (error) {
+      console.error("Error loading start balances:", error);
+      return {};
+    }
+  };
+
   // Загрузка и расчет данных отчета
   useEffect(() => {
     if (!selectedPeriod || !selectedMonth) {
@@ -157,6 +244,13 @@ const ReportOnDebtsPartners = () => {
           selectedMonth
         );
 
+        console.log("Период отчета:", {
+          startDate,
+          endDate,
+          selectedPeriod,
+          selectedMonth,
+        });
+
         // Определяем ID станций для запроса
         let stationIds = [];
         if (selectedStation) {
@@ -170,7 +264,10 @@ const ReportOnDebtsPartners = () => {
           return;
         }
 
-        // Загружаем отчеты за период
+        // Загружаем начальные сальдо из последнего отчета предыдущего месяца
+        const startBalances = await getStartBalances(stationIds, startDate);
+
+        // Загружаем все отчеты за период
         const reportsQuery = query(
           collection(db, "unifiedDailyReports"),
           where("stationId", "in", stationIds),
@@ -185,11 +282,19 @@ const ReportOnDebtsPartners = () => {
           ...doc.data(),
         }));
 
+        console.log("Все отчеты за период:", allReports);
+        console.log("Начальные сальдо:", startBalances);
+
         // Собираем данные по партнерам
         const partnerReportData = {};
 
         // Обрабатываем каждый отчет
         allReports.forEach((report) => {
+          console.log(
+            `Обработка отчета за ${report.reportDate}:`,
+            report.partnerData
+          );
+
           const reportPartners = report.partnerData || [];
 
           reportPartners.forEach((partner) => {
@@ -200,33 +305,44 @@ const ReportOnDebtsPartners = () => {
               return;
             }
 
-            if (!partnerReportData[partnerId]) {
-              // Ищем контракт разными способами
-              const contract = partners.find((p) => {
-                // Пробуем разные возможные поля для сопоставления
-                return (
-                  p.id === partnerId || // по ID контракта
-                  p.partnerId === partnerId || // по partnerId
-                  (selectedStation &&
-                    p.stationId === selectedStation &&
-                    p.partner === partner.partnerName) // по названию партнера и станции
-                );
-              });
-
-              if (!contract) {
-                return;
+            // Отладочная информация для каждого партнера
+            console.log(
+              `Партнер ${partner.partnerName} в отчете ${report.reportDate}:`,
+              {
+                soldM3: partner.soldM3,
+                totalAmount: partner.totalAmount,
+                paymentSum: partner.paymentSum,
+                startBalance: partner.startBalance,
+                endBalance: partner.endBalance,
               }
+            );
 
-              partnerReportData[partnerId] = {
-                partnerId,
-                partnerName: partner.partnerName || contract.partner,
-                contractNumber:
-                  partner.contractNumber || contract.contractNumber,
-                startBalance: contract.startBalance || 0,
-                totalSoldM3: 0,
-                totalSoldAmount: 0,
-                totalPaid: 0,
-              };
+            if (!partnerReportData[partnerId]) {
+              // Используем данные из начальных сальдо или создаем новую запись
+              const startBalanceData = startBalances[partnerId];
+
+              if (!startBalanceData) {
+                // Если нет данных о начальном сальдо, используем данные из первого отчета
+                partnerReportData[partnerId] = {
+                  partnerId,
+                  partnerName: partner.partnerName,
+                  contractNumber: partner.contractNumber,
+                  startBalance: parseFloat(partner.startBalance) || 0,
+                  totalSoldM3: 0,
+                  totalSoldAmount: 0,
+                  totalPaid: 0,
+                };
+              } else {
+                partnerReportData[partnerId] = {
+                  partnerId,
+                  partnerName: startBalanceData.partnerName,
+                  contractNumber: startBalanceData.contractNumber,
+                  startBalance: startBalanceData.startBalance,
+                  totalSoldM3: 0,
+                  totalSoldAmount: 0,
+                  totalPaid: 0,
+                };
+              }
             }
 
             const partnerData = partnerReportData[partnerId];
@@ -235,28 +351,44 @@ const ReportOnDebtsPartners = () => {
             const soldM3 = parseFloat(partner.soldM3) || 0;
             const totalAmount = parseFloat(partner.totalAmount) || 0;
 
-            if (soldM3 > 0) {
-              partnerData.totalSoldM3 += soldM3;
-              partnerData.totalSoldAmount += totalAmount;
-            }
+            partnerData.totalSoldM3 += soldM3;
+            partnerData.totalSoldAmount += totalAmount;
 
             // Добавляем оплаты
             const paymentSum = parseFloat(partner.paymentSum) || 0;
-            if (paymentSum > 0) {
-              partnerData.totalPaid += paymentSum;
-            }
+            partnerData.totalPaid += paymentSum;
+
+            console.log(`После обработки партнера ${partner.partnerName}:`, {
+              totalSoldM3: partnerData.totalSoldM3,
+              totalSoldAmount: partnerData.totalSoldAmount,
+              totalPaid: partnerData.totalPaid,
+            });
           });
         });
 
         // Преобразуем в массив и рассчитываем конечное сальдо
-        const reportArray = Object.values(partnerReportData).map((partner) => ({
-          ...partner,
-          endBalance:
-            partner.startBalance + partner.totalSoldAmount - partner.totalPaid,
-        }));
+        const reportArray = Object.values(partnerReportData).map((partner) => {
+          const endBalance =
+            partner.startBalance + partner.totalSoldAmount - partner.totalPaid;
+
+          console.log(`Итог по партнеру ${partner.partnerName}:`, {
+            startBalance: partner.startBalance,
+            totalSoldAmount: partner.totalSoldAmount,
+            totalPaid: partner.totalPaid,
+            endBalance: endBalance,
+          });
+
+          return {
+            ...partner,
+            endBalance: endBalance,
+          };
+        });
+
+        console.log("Итоговые данные отчета:", reportArray);
 
         setReportData(reportArray);
       } catch (error) {
+        console.error("Error generating report:", error);
         setReportData([]);
       } finally {
         setLoading(false);

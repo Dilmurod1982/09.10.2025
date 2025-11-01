@@ -32,13 +32,12 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   const [hoseRows, setHoseRows] = useState([]);
   const [hoseTotal, setHoseTotal] = useState(0);
   const [hoseTotalSum, setHoseTotalSum] = useState(0);
-  // 1. Обновите состояние generalData
   const [generalData, setGeneralData] = useState({
     autopilotReading: "",
     gasPrice: "",
     humoTerminal: "",
     uzcardTerminal: "",
-    electronicPaymentSystem: "", // ДОБАВЛЕНО НОВОЕ ПОЛЕ
+    electronicPaymentSystem: "",
   });
 
   const userData = useAppStore((state) => state.userData);
@@ -64,23 +63,80 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     return date.toISOString().split("T")[0];
   }, []);
 
-  // Функция форматирования чисел с разделителями тысяч
+  // Простая функция для ввода чисел с минусом
   const formatNumberInput = (value) => {
     if (value === "" || value === null || value === undefined) return "";
-    const cleaned = value.toString().replace(/[^\d,.]/g, "");
-    const number = parseFloat(cleaned.replace(",", "."));
-    if (isNaN(number)) return cleaned;
-    return number.toLocaleString("ru-RU", {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 0,
-    });
+
+    // Преобразуем в строку
+    const stringValue = String(value);
+
+    // Разрешаем только: минус в начале, цифры, одна точка или запятая
+    const validChars = /^-?[\d,.]*$/;
+
+    // Если есть недопустимые символы, удаляем их
+    if (!validChars.test(stringValue)) {
+      // Удаляем последний введенный символ если он невалидный
+      return stringValue.slice(0, -1);
+    }
+
+    // Убедимся, что минус только в начале
+    if (stringValue.includes("-") && stringValue.indexOf("-") > 0) {
+      return stringValue.replace(/-/g, "");
+    }
+
+    return stringValue;
   };
 
-  // Функция для парсинка форматированного числа
+  // Функция для отображения отформатированного числа (для display)
+  const formatNumberForDisplay = (value) => {
+    try {
+      if (value === "" || value === null || value === undefined) return "";
+      if (value === "-") return "-";
+
+      // Преобразуем значение в строку
+      const stringValue = String(value);
+      const hasMinus = stringValue.startsWith("-");
+      const numberString = hasMinus ? stringValue.substring(1) : stringValue;
+
+      // Если после удаления минуса строка пустая
+      if (numberString === "" || numberString === "0")
+        return hasMinus ? "-0" : "0";
+
+      // Заменяем запятую на точку для парсинга
+      const cleanNumberString = numberString.replace(",", ".");
+      const number = parseFloat(cleanNumberString);
+
+      if (isNaN(number)) return stringValue;
+
+      const formatted = number.toLocaleString("ru-RU", {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 0,
+      });
+
+      return hasMinus ? `-${formatted}` : formatted;
+    } catch (error) {
+      console.error("Error formatting number:", error, value);
+      return String(value);
+    }
+  };
+
+  // Функция для парсинга форматированного числа
   const parseFormattedNumber = (value) => {
-    if (!value) return 0;
-    const cleaned = value.toString().replace(/\s/g, "").replace(",", ".");
-    return parseFloat(cleaned) || 0;
+    if (!value || value === "-") return 0;
+
+    try {
+      const stringValue = String(value);
+      const hasMinus = stringValue.startsWith("-");
+      const cleaned = stringValue.replace(/\s/g, "").replace(",", ".");
+
+      const numberString = hasMinus ? cleaned.substring(1) : cleaned;
+      const number = parseFloat(numberString) || 0;
+
+      return hasMinus ? -number : number;
+    } catch (error) {
+      console.error("Error parsing number:", error, value);
+      return 0;
+    }
   };
 
   // Проверка существующего отчета
@@ -125,8 +181,9 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         );
 
         const lastReportSnapshot = await getDocs(lastReportQuery);
+        const hasPreviousReport = !lastReportSnapshot.empty;
 
-        if (!lastReportSnapshot.empty) {
+        if (hasPreviousReport) {
           const lastReport = lastReportSnapshot.docs[0].data();
           const nextDate = addDays(lastReport.reportDate, 1);
           setReportDate(nextDate);
@@ -153,24 +210,35 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         // Инициализируем данные партнеров с ценами из последнего отчета
         const initializedPartnerData = contractsData.map((contract) => {
           let pricePerM3 = 0;
+          let startBalance = "0"; // Теперь как строка
+          let startBalanceDisabled = false;
 
-          if (!lastReportSnapshot.empty) {
+          if (hasPreviousReport) {
             const lastReport = lastReportSnapshot.docs[0].data();
             const lastPartnerData = lastReport.partnerData?.find(
               (p) => p.partnerId === contract.id
             );
             if (lastPartnerData) {
               pricePerM3 = lastPartnerData.pricePerM3 || 0;
+              startBalance = lastPartnerData.endBalance?.toString() || "0"; // Конвертируем в строку
+              startBalanceDisabled = true; // Берем из предыдущего отчета, поэтому поле отключено
             }
+          } else {
+            // Если предыдущего отчета нет, поле активно для ручного ввода
+            startBalanceDisabled = false;
           }
 
           return {
             partnerId: contract.id,
             partnerName: contract.partner,
             contractNumber: contract.contractNumber,
+            startBalance: startBalance, // Теперь строка
+            startBalanceDisabled: startBalanceDisabled,
             pricePerM3: pricePerM3,
-            soldM3: "", // ПУСТАЯ СТРОКА вместо 0
+            soldM3: "",
             totalAmount: 0,
+            paymentSum: 0, // Добавляем поле для суммы платежа
+            endBalance: parseFormattedNumber(startBalance), // Изначально равно startBalance
           };
         });
 
@@ -182,7 +250,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           let price = 0;
           let prevDisabled = false;
 
-          if (!lastReportSnapshot.empty) {
+          if (hasPreviousReport) {
             const lastReport = lastReportSnapshot.docs[0].data();
             const lastHose = lastReport.hoseData?.find((h) => h.hose === name);
             if (lastHose) {
@@ -206,8 +274,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         setHoseRows(initializedHoseRows);
 
         // Инициализируем общие данные из последнего отчета
-        // 8. Обновите инициализацию из последнего отчета
-        if (!lastReportSnapshot.empty) {
+        if (hasPreviousReport) {
           const lastReport = lastReportSnapshot.docs[0].data();
           setGeneralData((prev) => ({
             ...prev,
@@ -217,7 +284,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
             electronicPaymentSystem: lastReport.generalData
               ?.electronicPaymentSystem
               ? lastReport.generalData.electronicPaymentSystem.toString()
-              : "", // ДОБАВЛЕНО
+              : "",
           }));
         }
       } catch (error) {
@@ -233,6 +300,31 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
   // ========== ФУНКЦИИ ДЛЯ ОТЧЕТА ПО ПАРТНЕРАМ ==========
 
+  // Обработчик изменения начального сальдо
+  const handlePartnerStartBalanceChange = (partnerId, value) => {
+    // Используем простую валидацию ввода
+    const formattedValue = formatNumberInput(value);
+
+    setPartnerData((prev) =>
+      prev.map((partner) => {
+        if (partner.partnerId === partnerId) {
+          const numericValue = parseFormattedNumber(formattedValue);
+          const totalAmount = partner.totalAmount || 0;
+          const paymentSum = partner.paymentSum || 0;
+          const endBalance = numericValue + totalAmount - paymentSum;
+
+          return {
+            ...partner,
+            startBalance: formattedValue, // Сохраняем как строку для отображения
+            endBalance: endBalance,
+          };
+        }
+        return partner;
+      })
+    );
+  };
+
+  // Обработчик изменения цены
   const handlePartnerPriceChange = (partnerId, newPrice) => {
     const formattedValue = formatNumberInput(newPrice);
     const numericValue = parseFormattedNumber(formattedValue);
@@ -243,10 +335,16 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           const soldM3Value =
             partner.soldM3 === "" ? 0 : parseFormattedNumber(partner.soldM3);
           const totalAmount = soldM3Value * numericValue;
+          const endBalance =
+            parseFormattedNumber(partner.startBalance) +
+            totalAmount -
+            partner.paymentSum;
+
           return {
             ...partner,
             pricePerM3: numericValue,
             totalAmount: totalAmount,
+            endBalance: endBalance,
           };
         }
         return partner;
@@ -254,19 +352,27 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     );
   };
 
+  // Обработчик изменения проданных м³
   const handlePartnerSoldM3Change = (partnerId, soldM3) => {
-    // Если ввод пустой, сохраняем пустую строку
     if (soldM3 === "") {
       setPartnerData((prev) =>
-        prev.map((partner) =>
-          partner.partnerId === partnerId
-            ? {
-                ...partner,
-                soldM3: "",
-                totalAmount: 0, // Обнуляем сумму при пустом вводе
-              }
-            : partner
-        )
+        prev.map((partner) => {
+          if (partner.partnerId === partnerId) {
+            const totalAmount = 0;
+            const endBalance =
+              parseFormattedNumber(partner.startBalance) +
+              totalAmount -
+              partner.paymentSum;
+
+            return {
+              ...partner,
+              soldM3: "",
+              totalAmount: totalAmount,
+              endBalance: endBalance,
+            };
+          }
+          return partner;
+        })
       );
       return;
     }
@@ -278,10 +384,40 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       prev.map((partner) => {
         if (partner.partnerId === partnerId) {
           const totalAmount = numericValue * partner.pricePerM3;
+          const endBalance =
+            parseFormattedNumber(partner.startBalance) +
+            totalAmount -
+            partner.paymentSum;
+
           return {
             ...partner,
-            soldM3: formattedValue, // Сохраняем форматированное значение
+            soldM3: formattedValue,
             totalAmount: totalAmount,
+            endBalance: endBalance,
+          };
+        }
+        return partner;
+      })
+    );
+  };
+
+  // Обработчик изменения суммы платежа
+  const handlePartnerPaymentSumChange = (partnerId, paymentSum) => {
+    const formattedValue = formatNumberInput(paymentSum);
+    const numericValue = parseFormattedNumber(formattedValue);
+
+    setPartnerData((prev) =>
+      prev.map((partner) => {
+        if (partner.partnerId === partnerId) {
+          const endBalance =
+            parseFormattedNumber(partner.startBalance) +
+            partner.totalAmount -
+            numericValue;
+
+          return {
+            ...partner,
+            paymentSum: numericValue,
+            endBalance: endBalance,
           };
         }
         return partner;
@@ -296,15 +432,15 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         partner.soldM3 === "" ? 0 : parseFormattedNumber(partner.soldM3);
       acc.totalM3 += soldM3Value;
       acc.totalAmount += partner.totalAmount;
+      acc.totalPaymentSum += partner.paymentSum;
       return acc;
     },
-    { totalM3: 0, totalAmount: 0 }
+    { totalM3: 0, totalAmount: 0, totalPaymentSum: 0 }
   );
 
   // Проверка, есть ли данные для сохранения у партнеров
   const hasPartnerData = () => {
     return partnerData.some((partner) => {
-      // Если soldM3 пустая строка, считаем что данных нет
       if (partner.soldM3 === "") return false;
       const numericValue = parseFormattedNumber(partner.soldM3);
       return numericValue > 0;
@@ -342,7 +478,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       const rowWithDiff = calculateHoseRowDiff(updatedRow);
       newRows[index] = rowWithDiff;
 
-      // Пересчитываем общие тоталы
       const totals = newRows.reduce(
         (acc, row) => {
           const diff = Number(row.diff) || 0;
@@ -424,7 +559,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   };
 
   // Расчет наличных
-  // 2. Обновите функцию calculateCashAmount для учета нового поля
   const calculateCashAmount = () => {
     const gasPrice = parseFormattedNumber(generalData.gasPrice);
     const humoTerminal = parseFormattedNumber(generalData.humoTerminal);
@@ -437,20 +571,19 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       (hoseTotal - partnerTotals.totalM3) * gasPrice -
       humoTerminal -
       uzcardTerminal -
-      electronicPaymentSystem; // ВЫЧИТАЕМ ЭЛЕКТРОННЫЕ ПЛАТЕЖИ
+      electronicPaymentSystem;
 
     return cashAmount > 0 ? cashAmount : 0;
   };
 
   // Валидация общего отчета
-  // 3. Обновите валидацию общего отчета
   const isGeneralReportValid = () => {
     return (
       generalData.autopilotReading &&
       generalData.gasPrice &&
       generalData.humoTerminal !== "" &&
       generalData.uzcardTerminal !== "" &&
-      generalData.electronicPaymentSystem !== "" // ДОБАВЛЕНО В ВАЛИДАЦИЮ
+      generalData.electronicPaymentSystem !== ""
     );
   };
 
@@ -461,6 +594,13 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     // Если есть прикрепленные партнеры, проверяем их данные
     if (hasPartners) {
       const arePartnersValid = partnerData.every((partner) => {
+        // Проверяем что startBalance заполнено
+        if (
+          partner.startBalance === "" ||
+          isNaN(parseFormattedNumber(partner.startBalance))
+        )
+          return false;
+
         // Если soldM3 пустая строка - невалидно
         if (partner.soldM3 === "") return false;
 
@@ -499,7 +639,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     setIsConfirmModalOpen(true);
   };
 
-  // Сохранение объединенного отчета (теперь вызывается только после подтверждения)
+  // Сохранение объединенного отчета
   const saveUnifiedReport = async () => {
     try {
       setLoading(true);
@@ -536,11 +676,13 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         })
         .map((partner) => ({
           ...partner,
-          soldM3: parseFormattedNumber(partner.soldM3), // Сохраняем как число
+          soldM3: parseFormattedNumber(partner.soldM3),
+          startBalance: parseFormattedNumber(partner.startBalance) || 0,
+          paymentSum: Number(partner.paymentSum) || 0,
+          endBalance: Number(partner.endBalance) || 0,
         }));
 
       // Создаем объединенный отчет
-      // 5. Обновите функцию сохранения отчета (добавьте новое поле в generalData)
       const reportData = {
         reportDate,
         stationId: station.id,
@@ -550,6 +692,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         partnerData: partnerDataToSave,
         partnerTotalM3: partnerTotals.totalM3,
         partnerTotalAmount: partnerTotals.totalAmount,
+        partnerTotalPaymentSum: partnerTotals.totalPaymentSum,
         hasPartnerData: hasPartnerData(),
 
         // Данные шлангов
@@ -565,9 +708,8 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           uzcardTerminal: parseFormattedNumber(generalData.uzcardTerminal),
           electronicPaymentSystem: parseFormattedNumber(
             generalData.electronicPaymentSystem
-          ), // ДОБАВЛЕНО
+          ),
           cashAmount: cashAmount,
-          // Контрольные суммы - устанавливаем в 0
           controlTotalSum: 0,
           controlHumoSum: 0,
           controlUzcardSum: 0,
@@ -608,6 +750,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       gasPrice: "",
       humoTerminal: "",
       uzcardTerminal: "",
+      electronicPaymentSystem: "",
     });
     setSavedReportId(null);
 
@@ -621,7 +764,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
   // Сброс формы при отмене
   const handleClose = async () => {
-    // Удаляем сохраненный отчет если он был создан
     if (savedReportId) {
       try {
         await deleteDoc(doc(db, "unifiedDailyReports", savedReportId));
@@ -637,7 +779,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       gasPrice: "",
       humoTerminal: "",
       uzcardTerminal: "",
-      electronicPaymentSystem: "", // ДОБАВЛЕНО
+      electronicPaymentSystem: "",
     });
     setSavedReportId(null);
     setIsConfirmModalOpen(false);
@@ -694,9 +836,8 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  {/* Левая колонка: Партнеры и Общий отчет */}
+                  {/* Правая колонка: Отчет по шлангам */}
                   <div className="space-y-6">
-                    {/* Правая колонка: Отчет по шлангам */}
                     <div className="bg-white border border-gray-200 rounded-xl">
                       <div className="p-4 border-b bg-gray-50">
                         <h4 className="text-lg font-semibold">
@@ -786,7 +927,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                             ? "text-green-600"
                                             : "text-gray-500"
                                         }`}>
-                                        {formatNumberInput(row.diff)}
+                                        {formatNumberForDisplay(row.diff)}
                                       </span>
                                     </td>
                                   </tr>
@@ -797,7 +938,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                         </div>
 
                         {/* Итоги по шлангам */}
-                        <div className="grid  grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                           <div className="bg-blue-50 w-full border border-blue-200 rounded-lg p-3">
                             <div className="flex justify-between items-center">
                               <div>
@@ -807,7 +948,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                               </div>
                               <div className="text-right">
                                 <div className="text-xl font-bold text-blue-900">
-                                  {formatNumberInput(hoseTotal)}
+                                  {formatNumberForDisplay(hoseTotal)}
                                 </div>
                                 <div className="text-blue-700 font-medium text-sm">
                                   м³
@@ -818,6 +959,10 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Левая колонка: Партнеры и Общий отчет */}
+                  <div className="space-y-6">
                     {/* Отчет по партнерам */}
                     <div className="bg-white border border-gray-200 rounded-xl">
                       <div className="p-4 border-b bg-gray-50">
@@ -841,14 +986,23 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                               <thead className="bg-gray-100">
                                 <tr>
                                   <th className="p-2 text-left">Партнер</th>
-                                  <th className="p-2 text-right w-32">
+                                  <th className="p-2 text-right w-24">
+                                    Бошланғич сальдо
+                                  </th>
+                                  <th className="p-2 text-right w-24">
                                     1м³ нарх (сўм)
                                   </th>
-                                  <th className="p-2 text-right w-32">
+                                  <th className="p-2 text-right w-24">
                                     Сотилди м³ *
                                   </th>
-                                  <th className="p-2 text-right w-32">
+                                  <th className="p-2 text-right w-24">
                                     Суммаси (сўм)
+                                  </th>
+                                  <th className="p-2 text-right w-24">
+                                    Тўлов суммаси
+                                  </th>
+                                  <th className="p-2 text-right w-24">
+                                    Якуний сальдо
                                   </th>
                                 </tr>
                               </thead>
@@ -866,6 +1020,31 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                           {partner.contractNumber}
                                         </div>
                                       </div>
+                                    </td>
+                                    <td className="p-2">
+                                      <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={partner.startBalance}
+                                        onChange={(e) =>
+                                          handlePartnerStartBalanceChange(
+                                            partner.partnerId,
+                                            e.target.value
+                                          )
+                                        }
+                                        disabled={
+                                          partner.startBalanceDisabled ||
+                                          loading
+                                        }
+                                        className={`w-full text-right border border-gray-300 rounded p-1 no-spinner text-sm ${
+                                          parseFormattedNumber(
+                                            partner.startBalance
+                                          ) < 0
+                                            ? "text-red-600"
+                                            : ""
+                                        }`}
+                                        placeholder="0"
+                                      />
                                     </td>
                                     <td className="p-2">
                                       <input
@@ -906,7 +1085,39 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                       />
                                     </td>
                                     <td className="p-2 text-right font-semibold text-sm">
-                                      {formatNumberInput(partner.totalAmount)} ₽
+                                      {formatNumberForDisplay(
+                                        partner.totalAmount
+                                      )}
+                                    </td>
+                                    <td className="p-2">
+                                      <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={formatNumberInput(
+                                          partner.paymentSum
+                                        )}
+                                        onChange={(e) =>
+                                          handlePartnerPaymentSumChange(
+                                            partner.partnerId,
+                                            e.target.value
+                                          )
+                                        }
+                                        disabled={true} // Делаем поле неактивным
+                                        className="w-full text-right border border-gray-300 rounded p-1 no-spinner text-sm bg-gray-100"
+                                        placeholder="0"
+                                      />
+                                    </td>
+                                    <td className="p-2 text-right font-semibold text-sm">
+                                      <span
+                                        className={
+                                          partner.endBalance < 0
+                                            ? "text-red-600"
+                                            : "text-gray-900"
+                                        }>
+                                        {formatNumberForDisplay(
+                                          partner.endBalance
+                                        )}
+                                      </span>
                                     </td>
                                   </tr>
                                 ))}
@@ -916,19 +1127,28 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                   <tr>
                                     <td
                                       className="p-2 font-semibold"
-                                      colSpan="2">
+                                      colSpan="3">
                                       Жами:
                                     </td>
                                     <td className="p-2 text-right font-semibold text-sm">
-                                      {formatNumberInput(partnerTotals.totalM3)}{" "}
+                                      {formatNumberForDisplay(
+                                        partnerTotals.totalM3
+                                      )}{" "}
                                       м³
                                     </td>
                                     <td className="p-2 text-right font-semibold text-sm">
-                                      {formatNumberInput(
+                                      {formatNumberForDisplay(
                                         partnerTotals.totalAmount
                                       )}{" "}
                                       сўм
                                     </td>
+                                    <td className="p-2 text-right font-semibold text-sm">
+                                      {formatNumberForDisplay(
+                                        partnerTotals.totalPaymentSum
+                                      )}{" "}
+                                      сўм
+                                    </td>
+                                    <td></td>
                                   </tr>
                                 </tfoot>
                               )}
@@ -937,8 +1157,8 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                         )}
                       </div>
                     </div>
-                    {/* Общий отчет */}
 
+                    {/* Общий отчет */}
                     <div className="bg-white border border-gray-200 rounded-xl">
                       <div className="p-4 border-b bg-gray-50">
                         <h4 className="text-lg font-semibold">
@@ -1034,7 +1254,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                           </div>
                         </div>
 
-                        {/* ДОБАВЛЕНО НОВОЕ ПОЛЕ - Электронная платежная система */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -1074,7 +1293,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                         Шланглар орқали сотилди
                       </label>
                       <div className="text-lg font-semibold text-green-600">
-                        {formatNumberInput(hoseTotal)} м³
+                        {formatNumberForDisplay(hoseTotal)} м³
                       </div>
                     </div>
                     <div className="text-center">
@@ -1082,7 +1301,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                         Хамкорларга сотилди
                       </label>
                       <div className="text-lg font-semibold text-blue-600">
-                        {formatNumberInput(partnerTotals.totalM3)} м³
+                        {formatNumberForDisplay(partnerTotals.totalM3)} м³
                       </div>
                     </div>
                     <div className="text-center">
@@ -1090,7 +1309,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                         Хамкорларга сотилди
                       </label>
                       <div className="text-lg font-semibold text-purple-600">
-                        {formatNumberInput(partnerTotals.totalAmount)} сўм
+                        {formatNumberForDisplay(partnerTotals.totalAmount)} сўм
                       </div>
                     </div>
                     <div className="text-center">
@@ -1098,7 +1317,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                         Z-ҳисобот
                       </label>
                       <div className="text-lg font-semibold text-orange-600">
-                        {formatNumberInput(calculateCashAmount())} сўм
+                        {formatNumberForDisplay(calculateCashAmount())} сўм
                       </div>
                     </div>
                   </div>
@@ -1183,43 +1402,52 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                   <div className="flex justify-between">
                     <span className="font-medium">Автопилот:</span>
                     <span>
-                      {formatNumberInput(generalData.autopilotReading)}
+                      {formatNumberForDisplay(generalData.autopilotReading)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="font-medium">1м нархи³:</span>
-                    <span>{formatNumberInput(generalData.gasPrice)} ₽</span>
+                    <span>
+                      {formatNumberForDisplay(generalData.gasPrice)} ₽
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="font-medium">Хумо терминал:</span>
-                    <span>{formatNumberInput(generalData.humoTerminal)} ₽</span>
+                    <span>
+                      {formatNumberForDisplay(generalData.humoTerminal)} ₽
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="font-medium">Узкард терминал:</span>
                     <span>
-                      {formatNumberInput(generalData.uzcardTerminal)} ₽
+                      {formatNumberForDisplay(generalData.uzcardTerminal)} ₽
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="font-medium">Электрон тўлов тизими:</span>
                     <span>
-                      {formatNumberInput(generalData.electronicPaymentSystem)} ₽
+                      {formatNumberForDisplay(
+                        generalData.electronicPaymentSystem
+                      )}{" "}
+                      ₽
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="font-medium">
                       Шланглар орқали сотилди:
                     </span>
-                    <span>{formatNumberInput(hoseTotal)} м³</span>
+                    <span>{formatNumberForDisplay(hoseTotal)} м³</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="font-medium">Хамкорларга сотилди:</span>
-                    <span>{formatNumberInput(partnerTotals.totalM3)} м³</span>
+                    <span>
+                      {formatNumberForDisplay(partnerTotals.totalM3)} м³
+                    </span>
                   </div>
                   <div className="flex justify-between border-t border-gray-200 pt-2">
                     <span className="font-bold">Z-ҳисобот:</span>
                     <span className="font-bold text-orange-600">
-                      {formatNumberInput(calculateCashAmount())} ₽
+                      {formatNumberForDisplay(calculateCashAmount())} ₽
                     </span>
                   </div>
                 </div>

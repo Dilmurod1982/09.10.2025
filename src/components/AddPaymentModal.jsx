@@ -6,6 +6,8 @@ import {
   getDocs,
   updateDoc,
   doc,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 import { db, auth } from "../firebase/config";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,6 +44,107 @@ const AddPaymentModal = ({ isOpen, onClose, stations, partners, onSaved }) => {
     setPaymentDate("");
     setPaymentSum("");
     setFilteredPartners(partners);
+  };
+
+  // Функция для пересчета всех последующих отчетов
+  const updateSubsequentReports = async (
+    stationId,
+    partnerId,
+    paymentDate,
+    paymentAmount
+  ) => {
+    try {
+      // Получаем все отчеты начиная с даты оплаты
+      const subsequentReportsQuery = query(
+        collection(db, "unifiedDailyReports"),
+        where("stationId", "==", stationId),
+        where("reportDate", ">=", paymentDate),
+        orderBy("reportDate", "asc")
+      );
+
+      const snapshot = await getDocs(subsequentReportsQuery);
+      const reportsToUpdate = [];
+
+      // Собираем отчеты для обновления
+      for (const reportDoc of snapshot.docs) {
+        const reportData = reportDoc.data();
+        const reportPartners = reportData.partnerData || [];
+
+        const partnerIndex = reportPartners.findIndex(
+          (p) => p.partnerId === partnerId
+        );
+
+        if (partnerIndex >= 0) {
+          reportsToUpdate.push({
+            doc: reportDoc,
+            data: reportData,
+            partnerIndex,
+            partners: reportPartners,
+          });
+        }
+      }
+
+      // Обновляем отчеты последовательно
+      for (const report of reportsToUpdate) {
+        const updatedPartners = [...report.partners];
+        const partner = updatedPartners[report.partnerIndex];
+
+        // Пересчитываем сальдо
+        const startBalance = parseFloat(partner.startBalance) || 0;
+        const totalAmount = parseFloat(partner.totalAmount) || 0;
+        const currentPaymentSum = parseFloat(partner.paymentSum) || 0;
+
+        // Если это отчет с датой оплаты, добавляем новую оплату
+        let newPaymentSum = currentPaymentSum;
+        if (report.data.reportDate === paymentDate) {
+          newPaymentSum = currentPaymentSum + paymentAmount;
+        }
+
+        // Пересчитываем конечное сальдо
+        const endBalance = startBalance + totalAmount - newPaymentSum;
+
+        // Обновляем партнера
+        updatedPartners[report.partnerIndex] = {
+          ...partner,
+          paymentSum: newPaymentSum,
+          endBalance: endBalance,
+        };
+
+        // Если это не первый отчет в цепочке, обновляем startBalance следующего отчета
+        const reportIndex = reportsToUpdate.findIndex(
+          (r) => r.doc.id === report.doc.id
+        );
+        if (reportIndex < reportsToUpdate.length - 1) {
+          const nextReport = reportsToUpdate[reportIndex + 1];
+          const nextPartnerIndex = nextReport.partners.findIndex(
+            (p) => p.partnerId === partnerId
+          );
+
+          if (nextPartnerIndex >= 0) {
+            const nextUpdatedPartners = [...nextReport.partners];
+            nextUpdatedPartners[nextPartnerIndex] = {
+              ...nextUpdatedPartners[nextPartnerIndex],
+              startBalance: endBalance, // startBalance следующего дня = endBalance текущего дня
+            };
+
+            // Обновляем следующий отчет
+            await updateDoc(doc(db, "unifiedDailyReports", nextReport.doc.id), {
+              partnerData: nextUpdatedPartners,
+            });
+          }
+        }
+
+        // Обновляем текущий отчет
+        await updateDoc(doc(db, "unifiedDailyReports", report.doc.id), {
+          partnerData: updatedPartners,
+        });
+      }
+
+      return reportsToUpdate.length;
+    } catch (error) {
+      console.error("Ошибка при обновлении последующих отчетов:", error);
+      throw error;
+    }
   };
 
   // Сохранение платежа
@@ -98,44 +201,102 @@ const AddPaymentModal = ({ isOpen, onClose, stations, partners, onSaved }) => {
         (p) => p.partnerId === selectedPartner
       );
 
-      // Создаем объект платежа БЕЗ serverTimestamp()
+      // Создаем объект платежа
       const paymentData = {
         paymentDate: paymentDate,
         paymentSum: numericSum,
         paymentCreatedBy: userEmail,
-        paymentCreatedAt: new Date().toISOString(), // Используем обычную дату вместо serverTimestamp()
+        paymentCreatedAt: new Date().toISOString(),
       };
 
       let updatedPartners;
+      let updatedPartner;
 
       if (existingPartnerIndex >= 0) {
         // Обновляем существующего партнера
         updatedPartners = [...reportPartners];
-        updatedPartners[existingPartnerIndex] = {
-          ...updatedPartners[existingPartnerIndex],
+        const existingPartner = updatedPartners[existingPartnerIndex];
+
+        // Получаем текущие значения
+        const currentStartBalance =
+          parseFloat(existingPartner.startBalance) || 0;
+        const currentTotalAmount = parseFloat(existingPartner.totalAmount) || 0;
+        const currentPaymentSum = parseFloat(existingPartner.paymentSum) || 0;
+
+        // Добавляем новую оплату к существующей
+        const newPaymentSum = currentPaymentSum + numericSum;
+
+        // Пересчитываем конечное сальдо
+        const newEndBalance =
+          currentStartBalance + currentTotalAmount - newPaymentSum;
+
+        updatedPartner = {
+          ...existingPartner,
+          paymentSum: newPaymentSum,
+          endBalance: newEndBalance,
           ...paymentData,
         };
+
+        updatedPartners[existingPartnerIndex] = updatedPartner;
       } else {
         // Добавляем нового партнера с оплатой
-        const newPartner = {
+        // Находим startBalance из предыдущего отчета
+        let startBalance = 0;
+
+        // Ищем предыдущий отчет для получения endBalance как startBalance
+        const previousReportQuery = query(
+          collection(db, "unifiedDailyReports"),
+          where("stationId", "==", selectedStation),
+          where("reportDate", "<", paymentDate),
+          orderBy("reportDate", "desc"),
+          limit(1)
+        );
+
+        const previousSnapshot = await getDocs(previousReportQuery);
+        if (!previousSnapshot.empty) {
+          const previousReport = previousSnapshot.docs[0].data();
+          const previousPartner = previousReport.partnerData?.find(
+            (p) => p.partnerId === selectedPartner
+          );
+          if (previousPartner) {
+            startBalance = parseFloat(previousPartner.endBalance) || 0;
+          }
+        }
+
+        // Создаем нового партнера
+        updatedPartner = {
           partnerId: selectedPartner,
           partnerName: selectedPartnerData.partner,
           contractNumber: selectedPartnerData.contractNumber,
+          startBalance: startBalance,
           pricePerM3: 0,
           soldM3: 0,
           totalAmount: 0,
+          paymentSum: numericSum,
+          endBalance: startBalance - numericSum, // totalAmount = 0, поэтому endBalance = startBalance - paymentSum
           ...paymentData,
         };
-        updatedPartners = [...reportPartners, newPartner];
+
+        updatedPartners = [...reportPartners, updatedPartner];
       }
 
-      // Обновляем документ
+      // Обновляем текущий отчет
       await updateDoc(doc(db, "unifiedDailyReports", reportDoc.id), {
         partnerData: updatedPartners,
         hasPartnerData: true,
       });
 
-      toast.success("Оплата успешно сохранена");
+      // Обновляем все последующие отчеты
+      const updatedReportsCount = await updateSubsequentReports(
+        selectedStation,
+        selectedPartner,
+        paymentDate,
+        numericSum
+      );
+
+      toast.success(
+        `Оплата успешно сохранена. Обновлено ${updatedReportsCount} отчетов`
+      );
       resetForm();
       onSaved();
       onClose();
