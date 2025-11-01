@@ -53,6 +53,9 @@ import {
   Dashboard as DashboardIcon,
   Visibility,
   VisibilityOff,
+  Bolt as BoltIcon, // Иконка для электроэнергии
+  Whatshot as GasIcon, // Иконка для газа
+  Calculate as CalculateIcon, // Иконка для расчетов
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import Collapse from "@mui/material/Collapse";
@@ -73,7 +76,7 @@ import {
   query,
   where,
   getDocs,
-  addDoc, // ← Добавьте это
+  addDoc,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
 
@@ -93,6 +96,8 @@ export default function Navbar() {
   const [docsPerpOpen, setDocsPerpOpen] = React.useState(false);
   const [partnersOpen, setPartnersOpen] = React.useState(false);
   const [dailyReportsOpen, setDailyReportsOpen] = React.useState(false);
+  const [energySettlementsOpen, setEnergySettlementsOpen] =
+    React.useState(false); // Новое состояние для меню расчетов
   const [userModalOpen, setUserModalOpen] = React.useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = React.useState(false);
   const [passwordData, setPasswordData] = React.useState({
@@ -126,7 +131,7 @@ export default function Navbar() {
       document.removeEventListener("click", handleClickOutside);
     };
   }, [userMenuOpen]);
-  // Формируем ФИО пользователя
+
   const getUserFullName = () => {
     if (!userData) return "";
 
@@ -140,7 +145,6 @@ export default function Navbar() {
     return fullName.trim();
   };
 
-  // Сокращаем ФИО для мобильных устройств
   const getShortName = () => {
     if (!userData) return "";
 
@@ -174,6 +178,7 @@ export default function Navbar() {
       setDocsPerpOpen(false);
       setPartnersOpen(false);
       setDailyReportsOpen(false);
+      setEnergySettlementsOpen(false); // Закрываем меню расчетов при закрытии drawer
     }
   };
 
@@ -205,6 +210,8 @@ export default function Navbar() {
   const handleDocsPerpClick = () => setDocsPerpOpen(!docsPerpOpen);
   const handlePartnersClick = () => setPartnersOpen(!partnersOpen);
   const handleDailyReportsClick = () => setDailyReportsOpen(!dailyReportsOpen);
+  const handleEnergySettlementsClick = () =>
+    setEnergySettlementsOpen(!energySettlementsOpen); // Обработчик для меню расчетов
 
   // Функции для управления паролем
   const handlePasswordChange = () => {
@@ -237,7 +244,6 @@ export default function Navbar() {
       ...prev,
       [field]: event.target.value,
     }));
-    // Очищаем ошибку при изменении поля
     if (passwordError) {
       setPasswordError("");
     }
@@ -250,7 +256,6 @@ export default function Navbar() {
     }));
   };
 
-  // Функция проверки силы пароля
   const validatePassword = (password) => {
     const minLength = 8;
     const hasUpperCase = /[A-Z]/.test(password);
@@ -267,12 +272,7 @@ export default function Navbar() {
     );
   };
 
-  // Функция обновления пароля
-  // Функция обновления пароля
-  // Функция обновления пароля
-  // Функция обновления пароля
   const handleUpdatePassword = async () => {
-    // Валидация
     if (
       !passwordData.currentPassword ||
       !passwordData.newPassword ||
@@ -305,32 +305,24 @@ export default function Navbar() {
         return;
       }
 
-      // 1. Обновляем пароль в Firebase Authentication
       await updatePassword(currentUser, passwordData.newPassword);
 
-      // 2. Обновляем пароль в Firestore коллекции users
       try {
-        // Ищем пользователя в Firestore по email
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("email", "==", userData.email));
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
-          // Берем первый найденный документ
           const userDoc = querySnapshot.docs[0];
           const userDocRef = doc(db, "users", userDoc.id);
 
           await updateDoc(userDocRef, {
-            password: passwordData.newPassword, // Сохраняем пароль
+            password: passwordData.newPassword,
             lastPasswordChange: new Date(),
             passwordChanged: true,
             updatedAt: new Date(),
           });
-
-          // console.log("Пароль сохранен в Firestore");
         } else {
-          // console.warn("Пользователь не найден в Firestore");
-          // Создаем запись если не найдено
           await addDoc(collection(db, "users"), {
             uid: currentUser.uid,
             email: currentUser.email,
@@ -343,18 +335,14 @@ export default function Navbar() {
             createdAt: new Date(),
             updatedAt: new Date(),
           });
-          // console.log("Создана новая запись пользователя в Firestore");
         }
       } catch (firestoreError) {
-        // console.error("Ошибка при обновлении Firestore:", firestoreError);
         throw new Error("Не удалось сохранить пароль в базе данных");
       }
 
       toast.success("Пароль успешно изменен");
       handlePasswordClose();
     } catch (error) {
-      // console.error("Ошибка изменения пароля:", error);
-
       let errorMessage = "Ошибка при изменении пароля";
       switch (error.code) {
         case "auth/requires-recent-login":
@@ -421,6 +409,20 @@ export default function Navbar() {
       text: "Контрольные суммы",
       icon: <AccountBalanceWalletIcon />,
       path: "/controlpayments",
+    },
+  ];
+
+  // 🔹 Расчеты по энергоносителям
+  const energySettlementsItems = [
+    {
+      text: "Расчеты по газу",
+      icon: <GasIcon />,
+      path: "/gassettlements",
+    },
+    {
+      text: "Расчеты по электроэнергии",
+      icon: <BoltIcon />,
+      path: "/elektrsettlements",
     },
   ];
 
@@ -497,10 +499,8 @@ export default function Navbar() {
       ? menuItems.filter((item) => item.text === "Партнёры")
       : [];
 
-  // Проверяем, является ли пользователь rahbar или booker
   const isRahbarOrBooker = role === "rahbar" || role === "buxgalter";
 
-  // Бейдж роли с цветами
   const getRoleBadge = () => {
     const roleConfig = {
       admin: { color: "#ef4444", text: "Админ" },
@@ -974,6 +974,76 @@ export default function Navbar() {
                   </>
                 )}
 
+                {/* 🔹 Расчеты по энергоносителям (для admin, buxgalter и rahbar) */}
+                {(role === "admin" ||
+                  role === "buxgalter" ||
+                  role === "rahbar") && (
+                  <>
+                    <ListItem disablePadding sx={{ mb: 1 }}>
+                      <ListItemButton
+                        onClick={handleEnergySettlementsClick}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                          },
+                        }}>
+                        <ListItemIcon sx={{ color: "white" }}>
+                          <CalculateIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="⚡ Расчеты по энергоносителям"
+                          primaryTypographyProps={{ fontWeight: "500" }}
+                        />
+                        {energySettlementsOpen ? (
+                          <ExpandLess />
+                        ) : (
+                          <ExpandMore />
+                        )}
+                      </ListItemButton>
+                    </ListItem>
+                    <Collapse
+                      in={energySettlementsOpen}
+                      timeout="auto"
+                      unmountOnExit>
+                      <List component="div" disablePadding>
+                        {energySettlementsItems.map((item) => (
+                          <ListItem
+                            key={item.text}
+                            disablePadding
+                            sx={{ pl: 2 }}>
+                            <ListItemButton
+                              onClick={() => handleMenuClick(item.path)}
+                              sx={{
+                                borderRadius: "8px",
+                                py: 1.2,
+                                transition: "all 0.3s ease",
+                                "&:hover": {
+                                  backgroundColor: "rgba(255,255,255,0.08)",
+                                  transform: "translateX(5px)",
+                                },
+                              }}>
+                              <ListItemIcon
+                                sx={{ color: "rgba(255,255,255,0.8)" }}>
+                                {item.icon}
+                              </ListItemIcon>
+                              <ListItemText
+                                primary={item.text}
+                                primaryTypographyProps={{
+                                  fontSize: "14px",
+                                  color: "rgba(255,255,255,0.9)",
+                                }}
+                              />
+                            </ListItemButton>
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Collapse>
+                  </>
+                )}
+
                 {/* 🔹 Партнеры (только для admin и buxgalter) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
@@ -1005,11 +1075,9 @@ export default function Navbar() {
                       <List component="div" disablePadding>
                         {partnersItems
                           .filter((item) => {
-                            // Для оператора показываем только "Задолженности партнеров"
                             if (role === "operator") {
                               return item.text === "Задолженности партнеров";
                             }
-                            // Для остальных ролей показываем все пункты
                             return true;
                           })
                           .map((item) => (
@@ -1084,11 +1152,9 @@ export default function Navbar() {
                       <List component="div" disablePadding>
                         {dailyReportsItems
                           .filter((item) => {
-                            // Для оператора скрываем "Контрольные суммы"
                             if (role === "operator") {
                               return item.text !== "Контрольные суммы";
                             }
-                            // Для остальных ролей показываем все пункты
                             return true;
                           })
                           .map((item) => (

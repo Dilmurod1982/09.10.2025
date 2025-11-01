@@ -41,6 +41,8 @@ import {
   Payments,
   ReportOnDebtsPartners,
   HomeChief,
+  GasSettlements,
+  ElektrSettlements,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -398,7 +400,7 @@ function App() {
           path: "/payments",
           element: (
             <ProtectedLayout
-              allowedRoles={["buxgalter"]}
+              allowedRoles={["buxgalter", "admin"]}
               element={<Payments />}
             />
           ),
@@ -407,7 +409,7 @@ function App() {
           path: "/reportondebtspartners",
           element: (
             <ProtectedLayout
-              allowedRoles={["buxgalter", "operator"]}
+              allowedRoles={["buxgalter", "operator", "admin"]}
               element={<ReportOnDebtsPartners />}
             />
           ),
@@ -431,6 +433,14 @@ function App() {
         {
           path: "/employeesdocdeadlineinf",
           element: <EmployeesDocDeadlineInf />,
+        },
+        {
+          path: "/gassettlements",
+          element: <GasSettlements />,
+        },
+        {
+          path: "/elektrsettlements",
+          element: <ElektrSettlements />,
         },
       ],
     },

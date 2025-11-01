@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  limit,
-} from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { useAppStore } from "../lib/zustand";
 import * as XLSX from "xlsx";
@@ -15,11 +8,12 @@ import { toast } from "react-hot-toast";
 const ReportOnDebtsPartners = () => {
   const userData = useAppStore((state) => state.userData);
   const [stations, setStations] = useState([]);
-  const [partners, setPartners] = useState([]);
+  const [contracts, setContracts] = useState([]);
   const [selectedStation, setSelectedStation] = useState("");
-  const [selectedPartner, setSelectedPartner] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedQuarter, setSelectedQuarter] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -27,33 +21,45 @@ const ReportOnDebtsPartners = () => {
   const periodOptions = [
     { value: "month", label: "Месячный" },
     { value: "quarter", label: "Квартальный" },
-    { value: "halfYear", label: "Полугодовой" },
     { value: "year", label: "Годовой" },
   ];
 
-  // Месяцы для выбора
-  const monthOptions = useMemo(() => {
+  // Годы для выбора
+  const yearOptions = useMemo(() => {
     const options = [];
-    const currentDate = new Date();
-    const startDate = new Date(2025, 0, 1);
+    const currentYear = new Date().getFullYear();
+    const startYear = 2025; // Начальный год
 
-    for (
-      let date = new Date(startDate);
-      date <= currentDate;
-      date.setMonth(date.getMonth() + 1)
-    ) {
-      const year = date.getFullYear();
-      const month = date.getMonth();
-      const value = `${year}-${String(month + 1).padStart(2, "0")}`;
-      const label = date.toLocaleDateString("ru-RU", {
-        year: "numeric",
-        month: "long",
-      });
-      options.push({ value, label });
+    for (let year = startYear; year <= currentYear; year++) {
+      options.push({ value: year.toString(), label: year.toString() });
     }
 
     return options.reverse();
   }, []);
+
+  // Месяцы для выбора
+  const monthOptions = [
+    { value: "01", label: "Январь" },
+    { value: "02", label: "Февраль" },
+    { value: "03", label: "Март" },
+    { value: "04", label: "Апрель" },
+    { value: "05", label: "Май" },
+    { value: "06", label: "Июнь" },
+    { value: "07", label: "Июль" },
+    { value: "08", label: "Август" },
+    { value: "09", label: "Сентябрь" },
+    { value: "10", label: "Октябрь" },
+    { value: "11", label: "Ноябрь" },
+    { value: "12", label: "Декабрь" },
+  ];
+
+  // Кварталы для выбора
+  const quarterOptions = [
+    { value: "I", label: "I квартал (январь-март)" },
+    { value: "II", label: "II квартал (апрель-июнь)" },
+    { value: "III", label: "III квартал (июль-сентябрь)" },
+    { value: "IV", label: "IV квартал (октябрь-декабрь)" },
+  ];
 
   // Загрузка станций
   useEffect(() => {
@@ -75,9 +81,9 @@ const ReportOnDebtsPartners = () => {
     fetchStations();
   }, [userData]);
 
-  // Загрузка партнеров и контрактов
+  // Загрузка контрактов
   useEffect(() => {
-    const fetchPartners = async () => {
+    const fetchContracts = async () => {
       if (!userData?.stations?.length) return;
 
       try {
@@ -87,151 +93,91 @@ const ReportOnDebtsPartners = () => {
         );
 
         const snapshot = await getDocs(contractsQuery);
-        const partnersData = snapshot.docs.map((doc) => ({
+        const contractsData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
 
-        setPartners(partnersData);
+        setContracts(contractsData);
       } catch (error) {
         toast.error(error);
       }
     };
 
-    fetchPartners();
+    fetchContracts();
   }, [userData]);
 
-  // Фильтрация партнеров при выборе станции
-  const filteredPartners = useMemo(() => {
-    if (selectedStation) {
-      return partners.filter(
-        (partner) => partner.stationId === selectedStation
-      );
-    }
-    return partners;
-  }, [partners, selectedStation]);
-
   // Расчет дат периода
-  const getPeriodDates = (periodType, baseMonth) => {
-    if (!baseMonth) return { startDate: "", endDate: "" };
+  const getPeriodDates = (periodType, year, month = null, quarter = null) => {
+    if (!year) return { startDate: "", endDate: "" };
 
-    const [year, month] = baseMonth.split("-").map(Number);
     let startDate, endDate;
+    const yearNum = parseInt(year);
 
     switch (periodType) {
       case "month":
-        startDate = new Date(year, month - 1, 1);
-        endDate = new Date(year, month, 0); // Последний день месяца
+        if (!month) return { startDate: "", endDate: "" };
+        const monthNum = parseInt(month);
+        startDate = new Date(yearNum, monthNum - 1, 1);
+        endDate = new Date(yearNum, monthNum, 0); // Последний день месяца
         break;
+
       case "quarter":
-        const quarterStartMonth = Math.floor((month - 1) / 3) * 3;
-        startDate = new Date(year, quarterStartMonth, 1);
-        endDate = new Date(year, quarterStartMonth + 3, 0);
+        if (!quarter) return { startDate: "", endDate: "" };
+        let quarterStartMonth, quarterEndMonth;
+
+        switch (quarter) {
+          case "I":
+            quarterStartMonth = 0; // Январь
+            quarterEndMonth = 3; // Апрель
+            break;
+          case "II":
+            quarterStartMonth = 3; // Апрель
+            quarterEndMonth = 6; // Июль
+            break;
+          case "III":
+            quarterStartMonth = 6; // Июль
+            quarterEndMonth = 9; // Октябрь
+            break;
+          case "IV":
+            quarterStartMonth = 9; // Октябрь
+            quarterEndMonth = 12; // Январь следующего года
+            break;
+          default:
+            quarterStartMonth = 0;
+            quarterEndMonth = 3;
+        }
+
+        startDate = new Date(yearNum, quarterStartMonth, 1);
+        endDate = new Date(yearNum, quarterEndMonth, 0);
         break;
-      case "halfYear":
-        const halfYearStartMonth = month <= 6 ? 0 : 6;
-        startDate = new Date(year, halfYearStartMonth, 1);
-        endDate = new Date(year, halfYearStartMonth + 6, 0);
-        break;
+
       case "year":
-        startDate = new Date(year, 0, 1);
-        endDate = new Date(year, 11, 31);
+        startDate = new Date(yearNum, 0, 1);
+        endDate = new Date(yearNum, 11, 31);
         break;
+
       default:
-        startDate = new Date(year, month - 1, 1);
-        endDate = new Date(year, month, 0);
+        return { startDate: "", endDate: "" };
     }
 
-    // Преобразуем в строки и убедимся, что это правильные даты
-    const startDateStr = startDate.toISOString().split("T")[0];
-    const endDateStr = endDate.toISOString().split("T")[0];
-
-    console.log("Рассчитанный период:", {
-      baseMonth,
-      periodType,
-      startDate: startDateStr,
-      endDate: endDateStr,
-      startDateObj: startDate,
-      endDateObj: endDate,
-    });
-
     return {
-      startDate: startDateStr,
-      endDate: endDateStr,
+      startDate: startDate.toISOString().split("T")[0],
+      endDate: endDate.toISOString().split("T")[0],
     };
   };
 
-  // Загрузка начального сальдо из последнего отчета предыдущего месяца
-  const getStartBalances = async (stationIds, startDate) => {
-    try {
-      const startBalances = {};
-
-      for (const stationId of stationIds) {
-        // Получаем последний отчет предыдущего месяца для определения начального сальдо
-        const previousMonthQuery = query(
-          collection(db, "unifiedDailyReports"),
-          where("stationId", "==", stationId),
-          where("reportDate", "<", startDate),
-          orderBy("reportDate", "desc"),
-          limit(1)
-        );
-
-        const previousSnapshot = await getDocs(previousMonthQuery);
-
-        if (!previousSnapshot.empty) {
-          const lastReport = previousSnapshot.docs[0].data();
-          const reportPartners = lastReport.partnerData || [];
-
-          reportPartners.forEach((partner) => {
-            const partnerId = partner.partnerId;
-            if (!startBalances[partnerId]) {
-              startBalances[partnerId] = {
-                startBalance: parseFloat(partner.endBalance) || 0, // Берем endBalance предыдущего отчета как startBalance текущего
-                partnerName: partner.partnerName,
-                contractNumber: partner.contractNumber,
-              };
-            }
-          });
-        } else {
-          // Если предыдущих отчетов нет, ищем первый отчет текущего месяца
-          const firstReportQuery = query(
-            collection(db, "unifiedDailyReports"),
-            where("stationId", "==", stationId),
-            where("reportDate", ">=", startDate),
-            orderBy("reportDate", "asc"),
-            limit(1)
-          );
-
-          const firstSnapshot = await getDocs(firstReportQuery);
-
-          if (!firstSnapshot.empty) {
-            const firstReport = firstSnapshot.docs[0].data();
-            const reportPartners = firstReport.partnerData || [];
-
-            reportPartners.forEach((partner) => {
-              const partnerId = partner.partnerId;
-              if (!startBalances[partnerId]) {
-                startBalances[partnerId] = {
-                  startBalance: parseFloat(partner.startBalance) || 0,
-                  partnerName: partner.partnerName,
-                  contractNumber: partner.contractNumber,
-                };
-              }
-            });
-          }
-        }
-      }
-
-      return startBalances;
-    } catch (error) {
-      console.error("Error loading start balances:", error);
-      return {};
-    }
-  };
-
-  // Загрузка и расчет данных отчета
+  // Расчет данных отчета
   useEffect(() => {
-    if (!selectedPeriod || !selectedMonth) {
+    if (!selectedPeriod || !selectedYear) {
+      setReportData([]);
+      return;
+    }
+
+    if (
+      (selectedPeriod === "month" && !selectedMonth) ||
+      (selectedPeriod === "quarter" && !selectedQuarter)
+    ) {
       setReportData([]);
       return;
     }
@@ -241,15 +187,10 @@ const ReportOnDebtsPartners = () => {
       try {
         const { startDate, endDate } = getPeriodDates(
           selectedPeriod,
-          selectedMonth
-        );
-
-        console.log("Период отчета:", {
-          startDate,
-          endDate,
-          selectedPeriod,
+          selectedYear,
           selectedMonth,
-        });
+          selectedQuarter
+        );
 
         // Определяем ID станций для запроса
         let stationIds = [];
@@ -264,131 +205,91 @@ const ReportOnDebtsPartners = () => {
           return;
         }
 
-        // Загружаем начальные сальдо из последнего отчета предыдущего месяца
-        const startBalances = await getStartBalances(stationIds, startDate);
-
-        // Загружаем все отчеты за период
-        const reportsQuery = query(
-          collection(db, "unifiedDailyReports"),
-          where("stationId", "in", stationIds),
-          where("reportDate", ">=", startDate),
-          where("reportDate", "<=", endDate),
-          orderBy("reportDate", "asc")
+        // Фильтруем контракты по выбранным станциям
+        const filteredContracts = contracts.filter((contract) =>
+          stationIds.includes(contract.stationId)
         );
-
-        const snapshot = await getDocs(reportsQuery);
-        const allReports = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        console.log("Все отчеты за период:", allReports);
-        console.log("Начальные сальдо:", startBalances);
 
         // Собираем данные по партнерам
         const partnerReportData = {};
 
-        // Обрабатываем каждый отчет
-        allReports.forEach((report) => {
-          console.log(
-            `Обработка отчета за ${report.reportDate}:`,
-            report.partnerData
-          );
+        // Обрабатываем каждый контракт
+        filteredContracts.forEach((contract) => {
+          const {
+            id: contractId,
+            partner,
+            contractNumber,
+            startBalance,
+            startBalanceDate,
+            transactions = [],
+          } = contract;
 
-          const reportPartners = report.partnerData || [];
+          // Пропускаем контракты без startBalanceDate
+          if (!startBalanceDate) return;
 
-          reportPartners.forEach((partner) => {
-            const partnerId = partner.partnerId;
+          const startBalanceDateObj = new Date(startBalanceDate);
+          const periodStartDateObj = new Date(startDate);
+          const periodEndDateObj = new Date(endDate);
 
-            // Фильтрация по выбранному партнеру
-            if (selectedPartner && partnerId !== selectedPartner) {
-              return;
+          // Если startBalanceDate позже конца периода, пропускаем
+          if (startBalanceDateObj > periodEndDateObj) return;
+
+          // Рассчитываем начальное сальдо на начало периода
+          let currentBalance = parseFloat(startBalance) || 0;
+          let totalSoldAmount = 0;
+          let totalPaid = 0;
+
+          // Обрабатываем транзакции до начала периода (для накопления сальдо)
+          transactions.forEach((transaction) => {
+            const transactionDate = new Date(transaction.reportDate);
+
+            // Если транзакция до начала периода, добавляем к начальному сальдо
+            if (transactionDate < periodStartDateObj) {
+              const soldAmount = parseFloat(transaction.totalAmount) || 0;
+              const payment = parseFloat(transaction.paymentSum) || 0;
+
+              currentBalance += soldAmount - payment;
             }
-
-            // Отладочная информация для каждого партнера
-            console.log(
-              `Партнер ${partner.partnerName} в отчете ${report.reportDate}:`,
-              {
-                soldM3: partner.soldM3,
-                totalAmount: partner.totalAmount,
-                paymentSum: partner.paymentSum,
-                startBalance: partner.startBalance,
-                endBalance: partner.endBalance,
-              }
-            );
-
-            if (!partnerReportData[partnerId]) {
-              // Используем данные из начальных сальдо или создаем новую запись
-              const startBalanceData = startBalances[partnerId];
-
-              if (!startBalanceData) {
-                // Если нет данных о начальном сальдо, используем данные из первого отчета
-                partnerReportData[partnerId] = {
-                  partnerId,
-                  partnerName: partner.partnerName,
-                  contractNumber: partner.contractNumber,
-                  startBalance: parseFloat(partner.startBalance) || 0,
-                  totalSoldM3: 0,
-                  totalSoldAmount: 0,
-                  totalPaid: 0,
-                };
-              } else {
-                partnerReportData[partnerId] = {
-                  partnerId,
-                  partnerName: startBalanceData.partnerName,
-                  contractNumber: startBalanceData.contractNumber,
-                  startBalance: startBalanceData.startBalance,
-                  totalSoldM3: 0,
-                  totalSoldAmount: 0,
-                  totalPaid: 0,
-                };
-              }
-            }
-
-            const partnerData = partnerReportData[partnerId];
-
-            // Добавляем проданный газ
-            const soldM3 = parseFloat(partner.soldM3) || 0;
-            const totalAmount = parseFloat(partner.totalAmount) || 0;
-
-            partnerData.totalSoldM3 += soldM3;
-            partnerData.totalSoldAmount += totalAmount;
-
-            // Добавляем оплаты
-            const paymentSum = parseFloat(partner.paymentSum) || 0;
-            partnerData.totalPaid += paymentSum;
-
-            console.log(`После обработки партнера ${partner.partnerName}:`, {
-              totalSoldM3: partnerData.totalSoldM3,
-              totalSoldAmount: partnerData.totalSoldAmount,
-              totalPaid: partnerData.totalPaid,
-            });
-          });
-        });
-
-        // Преобразуем в массив и рассчитываем конечное сальдо
-        const reportArray = Object.values(partnerReportData).map((partner) => {
-          const endBalance =
-            partner.startBalance + partner.totalSoldAmount - partner.totalPaid;
-
-          console.log(`Итог по партнеру ${partner.partnerName}:`, {
-            startBalance: partner.startBalance,
-            totalSoldAmount: partner.totalSoldAmount,
-            totalPaid: partner.totalPaid,
-            endBalance: endBalance,
           });
 
-          return {
-            ...partner,
-            endBalance: endBalance,
-          };
+          // Теперь обрабатываем транзакции в пределах периода
+          transactions.forEach((transaction) => {
+            const transactionDate = new Date(transaction.reportDate);
+
+            // Если транзакция в пределах периода
+            if (
+              transactionDate >= periodStartDateObj &&
+              transactionDate <= periodEndDateObj
+            ) {
+              const soldAmount = parseFloat(transaction.totalAmount) || 0;
+              const payment = parseFloat(transaction.paymentSum) || 0;
+
+              totalSoldAmount += soldAmount;
+              totalPaid += payment;
+              currentBalance += soldAmount - payment;
+            }
+          });
+
+          // Добавляем данные в отчет
+          if (!partnerReportData[contractId]) {
+            partnerReportData[contractId] = {
+              contractId,
+              partnerName: partner,
+              contractNumber,
+              startBalance: currentBalance - totalSoldAmount + totalPaid, // Сальдо на начало периода
+              totalSoldAmount,
+              totalPaid,
+              endBalance: currentBalance,
+            };
+          }
         });
 
-        console.log("Итоговые данные отчета:", reportArray);
+        // Преобразуем в массив
+        const reportArray = Object.values(partnerReportData);
 
         setReportData(reportArray);
       } catch (error) {
-        console.error("Error generating report:", error);
+        toast.error("Ошибка при генерации отчета");
         setReportData([]);
       } finally {
         setLoading(false);
@@ -398,22 +299,19 @@ const ReportOnDebtsPartners = () => {
     generateReport();
   }, [
     selectedStation,
-    selectedPartner,
     selectedPeriod,
+    selectedYear,
     selectedMonth,
+    selectedQuarter,
     userData,
-    partners,
+    contracts,
   ]);
 
-  // Сброс фильтра партнера при изменении станции
+  // Сброс зависимых фильтров при изменении периода
   useEffect(() => {
-    if (selectedPartner) {
-      const partner = partners.find((p) => p.id === selectedPartner);
-      if (partner && selectedStation && partner.stationId !== selectedStation) {
-        setSelectedPartner("");
-      }
-    }
-  }, [selectedStation, selectedPartner, partners]);
+    setSelectedMonth("");
+    setSelectedQuarter("");
+  }, [selectedPeriod]);
 
   // Форматирование чисел
   const formatNumber = (number) => {
@@ -430,12 +328,31 @@ const ReportOnDebtsPartners = () => {
 
     const { startDate, endDate } = getPeriodDates(
       selectedPeriod,
-      selectedMonth
+      selectedYear,
+      selectedMonth,
+      selectedQuarter
     );
+
     const periodLabel = periodOptions.find(
       (p) => p.value === selectedPeriod
     )?.label;
+
     const selectedStationData = stations.find((s) => s.id === selectedStation);
+
+    let periodDetail = "";
+    if (selectedPeriod === "month") {
+      const monthLabel = monthOptions.find(
+        (m) => m.value === selectedMonth
+      )?.label;
+      periodDetail = `${monthLabel} ${selectedYear}`;
+    } else if (selectedPeriod === "quarter") {
+      const quarterLabel = quarterOptions.find(
+        (q) => q.value === selectedQuarter
+      )?.label;
+      periodDetail = `${quarterLabel} ${selectedYear}`;
+    } else if (selectedPeriod === "year") {
+      periodDetail = selectedYear;
+    }
 
     const worksheetData = [
       ["Отчет по задолженностям партнеров"],
@@ -444,21 +361,13 @@ const ReportOnDebtsPartners = () => {
           ? `Станция: ${selectedStationData?.stationName || selectedStation}`
           : `Все станции`,
       ],
-      [
-        selectedPartner
-          ? `Партнер: ${
-              partners.find((p) => p.id === selectedPartner)?.partner ||
-              selectedPartner
-            }`
-          : `Все партнеры`,
-      ],
-      [`Период: ${periodLabel} (${startDate} - ${endDate})`],
+      [`Период: ${periodLabel} (${periodDetail})`],
+      [`Даты: ${startDate} - ${endDate}`],
       [],
       [
         "Партнер",
         "Договор",
         "Сальдо на начало периода",
-        "Продано газа (м³)",
         "Продано газа (сумма)",
         "Оплачено",
         "Сальдо на конец периода",
@@ -467,7 +376,6 @@ const ReportOnDebtsPartners = () => {
         partner.partnerName,
         partner.contractNumber,
         partner.startBalance,
-        partner.totalSoldM3,
         partner.totalSoldAmount,
         partner.totalPaid,
         partner.endBalance,
@@ -482,7 +390,6 @@ const ReportOnDebtsPartners = () => {
       { wch: 25 }, // Партнер
       { wch: 15 }, // Договор
       { wch: 20 }, // Сальдо на начало
-      { wch: 15 }, // Продано м³
       { wch: 20 }, // Продано сумма
       { wch: 15 }, // Оплачено
       { wch: 20 }, // Сальдо на конец
@@ -490,7 +397,10 @@ const ReportOnDebtsPartners = () => {
 
     ws["!cols"] = colWidths;
 
-    const fileName = `Задолженности_партнеров_${selectedPeriod}_${selectedMonth}`;
+    const fileName = `Задолженности_партнеров_${selectedPeriod}_${selectedYear}`;
+    if (selectedMonth) fileName += `_${selectedMonth}`;
+    if (selectedQuarter) fileName += `_${selectedQuarter}`;
+
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
 
@@ -528,30 +438,6 @@ const ReportOnDebtsPartners = () => {
               </select>
             </div>
 
-            {/* Выбор партнера */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Партнер
-              </label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={selectedPartner}
-                onChange={(e) => setSelectedPartner(e.target.value)}
-                disabled={!selectedStation && filteredPartners.length > 0}>
-                <option value="">Все партнеры</option>
-                {filteredPartners.map((partner) => (
-                  <option key={partner.id} value={partner.id}>
-                    {partner.partner} ({partner.contractNumber})
-                  </option>
-                ))}
-              </select>
-              {selectedStation && filteredPartners.length === 0 && (
-                <p className="text-sm text-orange-600 mt-1">
-                  На выбранной станции нет прикрепленных партнеров
-                </p>
-              )}
-            </div>
-
             {/* Выбор периода */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -570,23 +456,62 @@ const ReportOnDebtsPartners = () => {
               </select>
             </div>
 
-            {/* Выбор месяца */}
+            {/* Выбор года */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Месяц *
+                Год *
               </label>
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}>
-                <option value="">Выберите месяц...</option>
-                {monthOptions.map((option) => (
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}>
+                <option value="">Выберите год...</option>
+                {yearOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
                 ))}
               </select>
             </div>
+
+            {/* Дополнительные фильтры в зависимости от периода */}
+            {selectedPeriod === "month" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Месяц *
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}>
+                  <option value="">Выберите месяц...</option>
+                  {monthOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {selectedPeriod === "quarter" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Квартал *
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={selectedQuarter}
+                  onChange={(e) => setSelectedQuarter(e.target.value)}>
+                  <option value="">Выберите квартал...</option>
+                  {quarterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Кнопка экспорта */}
@@ -608,7 +533,7 @@ const ReportOnDebtsPartners = () => {
         )}
 
         {/* Таблица отчета */}
-        {!loading && selectedPeriod && selectedMonth && (
+        {!loading && selectedPeriod && selectedYear && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             {reportData.length > 0 ? (
               <div className="overflow-x-auto">
@@ -625,9 +550,6 @@ const ReportOnDebtsPartners = () => {
                         Сальдо на начало
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                        Продано газа (м³)
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                         Продано газа (сумма)
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
@@ -641,7 +563,7 @@ const ReportOnDebtsPartners = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {reportData.map((partner) => (
                       <tr
-                        key={partner.partnerId}
+                        key={partner.contractId}
                         className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                           {partner.partnerName}
@@ -656,9 +578,6 @@ const ReportOnDebtsPartners = () => {
                               : "text-green-600"
                           }`}>
                           {formatNumber(partner.startBalance)} сўм
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600">
-                          {formatNumber(partner.totalSoldM3)} м³
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-semibold">
                           {formatNumber(partner.totalSoldAmount)} сўм
@@ -705,7 +624,7 @@ const ReportOnDebtsPartners = () => {
         )}
 
         {/* Сообщение о выборе параметров */}
-        {(!selectedPeriod || !selectedMonth) && !loading && (
+        {(!selectedPeriod || !selectedYear) && !loading && (
           <div className="text-center py-12">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md mx-auto">
               <svg
@@ -724,7 +643,7 @@ const ReportOnDebtsPartners = () => {
                 Выберите параметры
               </h3>
               <p className="mt-2 text-sm text-gray-500">
-                Выберите период и месяц для генерации отчета
+                Выберите период и год для генерации отчета
               </p>
             </div>
           </div>

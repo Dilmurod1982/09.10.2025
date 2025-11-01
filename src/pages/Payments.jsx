@@ -1,14 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  updateDoc,
-  doc,
-  arrayUnion,
-} from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { useAppStore } from "../lib/zustand";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,7 +9,7 @@ import AddPaymentModal from "../components/AddPaymentModal";
 const Payments = () => {
   const userData = useAppStore((state) => state.userData);
   const [stations, setStations] = useState([]);
-  const [partners, setPartners] = useState([]);
+  const [contracts, setContracts] = useState([]);
   const [selectedStation, setSelectedStation] = useState(null);
   const [selectedPartner, setSelectedPartner] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState("");
@@ -71,9 +62,9 @@ const Payments = () => {
     fetchStations();
   }, [userData]);
 
-  // Загрузка партнеров
+  // Загрузка контрактов
   useEffect(() => {
-    const fetchPartners = async () => {
+    const fetchContracts = async () => {
       if (!userData?.stations?.length) return;
 
       try {
@@ -83,21 +74,21 @@ const Payments = () => {
         );
 
         const snapshot = await getDocs(contractsQuery);
-        const partnersData = snapshot.docs.map((doc) => ({
+        const contractsData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
 
-        setPartners(partnersData);
+        setContracts(contractsData);
       } catch (error) {
-        console.error("Ошибка при загрузке партнеров:", error);
+        console.error("Ошибка при загрузке контрактов:", error);
       }
     };
 
-    fetchPartners();
-  }, [userData]);
+    fetchContracts();
+  }, [userData, refreshTrigger]);
 
-  // Загрузка платежей
+  // Загрузка платежей из контрактов
   useEffect(() => {
     if (!selectedMonth) {
       setPayments([]);
@@ -123,49 +114,70 @@ const Payments = () => {
           return;
         }
 
-        const q = query(
-          collection(db, "unifiedDailyReports"),
-          where("stationId", "in", stationIds),
-          where("reportDate", ">=", startDate),
-          where("reportDate", "<=", endDate),
-          orderBy("reportDate", "asc")
+        // Фильтруем контракты по выбранным станциям
+        const filteredContracts = contracts.filter((contract) =>
+          stationIds.includes(contract.stationId)
         );
 
-        const snapshot = await getDocs(q);
-        const allReports = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        // Извлекаем платежи из partnerData
+        // Извлекаем платежи из массива transactions каждого контракта
         const paymentsData = [];
 
-        allReports.forEach((report) => {
-          const reportPartners = report.partnerData || [];
+        filteredContracts.forEach((contract) => {
+          const {
+            id: contractId,
+            partner,
+            contractNumber,
+            stationId,
+            station: stationName,
+            transactions = [],
+          } = contract;
 
-          reportPartners.forEach((partner) => {
-            if (partner.paymentDate && partner.paymentSum) {
-              // Проверяем фильтр по партнеру
-              if (selectedPartner && partner.partnerId !== selectedPartner.id) {
-                return;
+          // Фильтруем по выбранному партнеру
+          if (selectedPartner && contractId !== selectedPartner.id) {
+            return;
+          }
+
+          // Обрабатываем транзакции контракта
+          transactions.forEach((transaction, index) => {
+            const transactionDate = transaction.reportDate;
+
+            // Проверяем, что транзакция входит в выбранный месяц
+            if (transactionDate >= startDate && transactionDate <= endDate) {
+              const paymentSum = parseFloat(transaction.paymentSum) || 0;
+
+              // Добавляем платеж только если есть сумма оплаты
+              if (paymentSum > 0) {
+                paymentsData.push({
+                  id: `${contractId}_${index}`,
+                  contractId,
+                  stationId,
+                  stationName,
+                  reportDate: transaction.reportDate,
+                  paymentDate:
+                    transaction.paymentCreatedAt ||
+                    transaction.createdAt ||
+                    transaction.reportDate,
+                  paymentSum: paymentSum,
+                  createdBy:
+                    transaction.paymentCreatedBy ||
+                    transaction.createdBy ||
+                    "unknown",
+                  createdAt:
+                    transaction.paymentCreatedAt || transaction.createdAt,
+                  partnerName: partner,
+                  partnerId: contractId,
+                  contractNumber: contractNumber,
+                  transactionData: transaction, // Сохраняем всю транзакцию для дополнительной информации
+                });
               }
-
-              paymentsData.push({
-                id: `${report.id}_${partner.partnerId}`,
-                stationName: report.stationName,
-                stationId: report.stationId,
-                reportDate: report.reportDate,
-                paymentDate: partner.paymentDate,
-                paymentSum: partner.paymentSum,
-                createdBy: partner.paymentCreatedBy || report.createdBy,
-                createdAt: partner.paymentCreatedAt,
-                partnerName: partner.partnerName,
-                partnerId: partner.partnerId,
-                contractNumber: partner.contractNumber,
-              });
             }
           });
         });
+
+        // Сортируем платежи по дате
+        paymentsData.sort(
+          (a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)
+        );
 
         setPayments(paymentsData);
       } catch (error) {
@@ -183,16 +195,54 @@ const Payments = () => {
     selectedMonth,
     refreshTrigger,
     userData,
+    contracts,
   ]);
+
+  // Получаем список партнеров из контрактов
+  const partners = useMemo(() => {
+    return contracts.map((contract) => ({
+      id: contract.id,
+      partner: contract.partner,
+      contractNumber: contract.contractNumber,
+      stationId: contract.stationId,
+      stationName: contract.station,
+    }));
+  }, [contracts]);
+
+  // Фильтрация партнеров по выбранной станции
+  const filteredPartners = useMemo(() => {
+    if (selectedStation) {
+      return partners.filter(
+        (partner) => partner.stationId === selectedStation.id
+      );
+    }
+    return partners;
+  }, [partners, selectedStation]);
 
   // Форматирование даты
   const formatDate = (dateString) => {
     if (!dateString) return "";
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}-${month}-${year}`;
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return dateString; // Возвращаем оригинальную строку если дата невалидна
+      }
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  // Форматирование суммы
+  const formatAmount = (amount) => {
+    const num = parseFloat(amount) || 0;
+    return num.toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   };
 
   // Обновление данных после сохранения
@@ -231,6 +281,7 @@ const Payments = () => {
         "Дата оплаты",
         "Сумма оплаты",
         "Внесен пользователем",
+        "Дата создания",
       ],
       ...payments.map((payment) => [
         payment.stationName,
@@ -238,8 +289,9 @@ const Payments = () => {
         payment.contractNumber,
         formatDate(payment.reportDate),
         formatDate(payment.paymentDate),
-        payment.paymentSum,
+        formatAmount(payment.paymentSum),
         payment.createdBy,
+        formatDate(payment.createdAt),
       ]),
     ];
 
@@ -255,6 +307,7 @@ const Payments = () => {
       { wch: 12 }, // Дата оплаты
       { wch: 15 }, // Сумма оплаты
       { wch: 20 }, // Пользователь
+      { wch: 15 }, // Дата создания
     ];
 
     ws["!cols"] = colWidths;
@@ -311,20 +364,20 @@ const Payments = () => {
                 onChange={(e) => {
                   const partner = partners.find((p) => p.id === e.target.value);
                   setSelectedPartner(partner || null);
-                }}>
+                }}
+                disabled={!selectedStation && stations.length > 0}>
                 <option value="">Все партнеры</option>
-                {partners
-                  .filter(
-                    (partner) =>
-                      !selectedStation ||
-                      partner.stationId === selectedStation.id
-                  )
-                  .map((partner) => (
-                    <option key={partner.id} value={partner.id}>
-                      {partner.partner}
-                    </option>
-                  ))}
+                {filteredPartners.map((partner) => (
+                  <option key={partner.id} value={partner.id}>
+                    {partner.partner} ({partner.contractNumber})
+                  </option>
+                ))}
               </select>
+              {selectedStation && filteredPartners.length === 0 && (
+                <p className="text-sm text-orange-600 mt-1">
+                  На выбранной станции нет прикрепленных партнеров
+                </p>
+              )}
             </div>
 
             {/* Выбор месяца */}
@@ -366,6 +419,13 @@ const Payments = () => {
           </div>
         </div>
 
+        {/* Индикатор загрузки */}
+        {loading && (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        )}
+
         {/* Таблица */}
         {!loading && selectedMonth && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -376,6 +436,9 @@ const Payments = () => {
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                         Станция
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                        Дата отчета
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                         Дата оплаты
@@ -403,13 +466,13 @@ const Payments = () => {
                           {payment.stationName}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {formatDate(payment.reportDate)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                           {formatDate(payment.paymentDate)}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600 font-semibold">
-                          {payment.paymentSum?.toLocaleString("ru-RU", {
-                            minimumFractionDigits: 2,
-                          }) || "0.00"}{" "}
-                          сўм
+                          {formatAmount(payment.paymentSum)} сўм
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                           {payment.createdBy}
@@ -451,7 +514,7 @@ const Payments = () => {
         )}
 
         {/* Сообщение о выборе месяца */}
-        {!selectedMonth && (
+        {!selectedMonth && !loading && (
           <div className="text-center py-12">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md mx-auto">
               <svg

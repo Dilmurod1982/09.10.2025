@@ -34,7 +34,8 @@ const PartnersList = () => {
   const [nextContractNumber, setNextContractNumber] = useState(1);
 
   const [partner, setPartner] = useState("");
-  const [contractNumber, setContractNumber] = useState("");
+  const [contractId, setContractId] = useState(""); // Автоматический ID договора
+  const [contractNumber, setContractNumber] = useState(""); // Ручной номер договора
   const [contractDate, setContractDate] = useState("");
   const [contractEndDate, setContractEndDate] = useState("");
   const [station, setStation] = useState("");
@@ -124,10 +125,10 @@ const PartnersList = () => {
     };
   }, [role, userStations]);
 
-  // Устанавливаем автоматический номер при открытии модалки
+  // Устанавливаем автоматический ID при открытии модалки
   useEffect(() => {
     if (isModalOpen) {
-      setContractNumber(nextContractNumber.toString());
+      setContractId(nextContractNumber.toString());
     }
   }, [isModalOpen, nextContractNumber]);
 
@@ -198,6 +199,7 @@ const PartnersList = () => {
   const handleAddContract = async () => {
     if (
       !partner ||
+      !contractId ||
       !contractNumber ||
       !contractDate ||
       !contractEndDate ||
@@ -256,13 +258,16 @@ const PartnersList = () => {
       const selectedPartner = partners.find((p) => p.name === partner);
       const partnerId = selectedPartner ? selectedPartner.id : null;
 
-      // Преобразуем начальное сальдо в число
-      const balanceValue = startBalance ? parseFloat(startBalance) : 0;
+      // Преобразуем начальное сальдо в число (поддерживаем отрицательные значения)
+      const balanceValue = startBalance
+        ? parseFloat(startBalance.replace(",", "."))
+        : 0;
 
       const contractData = {
         partner,
         partnerId,
-        contractNumber,
+        contractId: contractId, // Автоматический ID
+        contractNumber: contractNumber, // Ручной номер договора
         autoId: nextContractNumber,
         contractDate,
         contractEndDate,
@@ -395,6 +400,7 @@ const PartnersList = () => {
 
   const resetForm = () => {
     setPartner("");
+    setContractId("");
     setContractNumber("");
     setContractDate("");
     setContractEndDate("");
@@ -441,8 +447,18 @@ const PartnersList = () => {
   };
 
   const handleBalanceChange = (value) => {
-    const cleanedValue = value.replace(/[^\d.,]/g, "");
-    const formattedValue = cleanedValue.replace(",", ".");
+    // Разрешаем минус в начале, цифры, точку и запятую
+    const cleanedValue = value.replace(/[^\d.,-]/g, "");
+
+    // Убедимся, что минус только в начале
+    let formattedValue = cleanedValue;
+    if (cleanedValue.includes("-") && cleanedValue.indexOf("-") > 0) {
+      formattedValue = cleanedValue.replace(/-/g, "");
+    }
+
+    // Заменяем запятую на точку
+    formattedValue = formattedValue.replace(",", ".");
+
     const parts = formattedValue.split(".");
     if (parts.length > 2) return;
 
@@ -495,6 +511,7 @@ const PartnersList = () => {
 
   const isValid =
     partner.trim() !== "" &&
+    contractId.trim() !== "" &&
     contractNumber.trim() !== "" &&
     contractDate.trim() !== "" &&
     contractEndDate.trim() !== "" &&
@@ -577,7 +594,7 @@ const PartnersList = () => {
                     {c.autoId || "—"}
                   </td>
                   <td className="p-3">{c.partner}</td>
-                  <td className="p-3">{c.contractNumber}</td>
+                  <td className="p-3">{c.contractNumber || "—"}</td>
                   <td className="p-3">{formatDate(c.contractDate)}</td>
                   <td className="p-3">
                     <span
@@ -667,20 +684,37 @@ const PartnersList = () => {
                   ))}
                 </select>
 
-                {/* Номер договора (автоматический) */}
+                {/* ID договора (автоматический) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    ID договора *
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border p-3 rounded-xl bg-gray-50"
+                    value={contractId}
+                    readOnly
+                    disabled
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    ID устанавливается автоматически: {nextContractNumber}
+                  </p>
+                </div>
+
+                {/* Номер договора (ручной ввод) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Номер договора *
                   </label>
                   <input
                     type="text"
-                    className="w-full border p-3 rounded-xl bg-gray-50"
+                    placeholder="Введите номер договора"
+                    className="w-full border p-3 rounded-xl"
                     value={contractNumber}
-                    readOnly
-                    disabled
+                    onChange={(e) => setContractNumber(e.target.value)}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Номер устанавливается автоматически: {nextContractNumber}
+                    Например: ДГ-2024-001, №123/2024 и т.д.
                   </p>
                 </div>
 
@@ -731,13 +765,13 @@ const PartnersList = () => {
                     </label>
                     <input
                       type="text"
-                      placeholder="0.00"
+                      placeholder="0.00 (можно отрицательное)"
                       className="w-full border p-3 rounded-xl"
                       value={startBalance}
                       onChange={(e) => handleBalanceChange(e.target.value)}
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Например: 1500.75
+                      Например: 1500.75 или -500.25
                     </p>
                   </div>
 
@@ -852,7 +886,10 @@ const PartnersList = () => {
                 <h3 className="text-xl font-semibold text-gray-800">
                   {isEditMode
                     ? "Редактирование договора"
-                    : "Договор №" + selectedContract.contractNumber}
+                    : `Договор ${
+                        selectedContract.contractNumber ||
+                        selectedContract.contractId
+                      }`}
                 </h3>
                 <div className="flex gap-2">
                   {!isEditMode &&
@@ -894,10 +931,19 @@ const PartnersList = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
+                      ID договора
+                    </label>
+                    <p className="mt-1 p-2 bg-gray-50 rounded-lg font-mono">
+                      {selectedContract.autoId || selectedContract.contractId}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
                       Номер договора
                     </label>
                     <p className="mt-1 p-2 bg-gray-50 rounded-lg">
-                      {selectedContract.contractNumber}
+                      {selectedContract.contractNumber || "—"}
                     </p>
                   </div>
 
@@ -954,7 +1000,12 @@ const PartnersList = () => {
                       <label className="block text-sm font-medium text-gray-700">
                         Начальное сальдо
                       </label>
-                      <p className="mt-1 p-2 bg-gray-50 rounded-lg font-mono">
+                      <p
+                        className={`mt-1 p-2 rounded-lg font-mono ${
+                          selectedContract.startBalance < 0
+                            ? "bg-red-50 text-red-700"
+                            : "bg-gray-50"
+                        }`}>
                         {formatBalance(selectedContract.startBalance)}
                       </p>
                     </div>

@@ -17,3 +17,4 @@ export { default as PartnerDetailModal } from "./PartnerDetailModal";
 export { default as DetailedReportModal } from "./DetailedReportModal";
 export { default as ControlSumModal } from "./ControlSumModal";
 export { default as AddPaymentModal } from "./AddPaymentModal";
+export { default as AddGasQuantityModal } from "./AddGasQuantityModal";

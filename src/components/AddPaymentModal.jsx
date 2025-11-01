@@ -8,6 +8,7 @@ import {
   doc,
   orderBy,
   limit,
+  getDoc,
 } from "firebase/firestore";
 import { db, auth } from "../firebase/config";
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,6 +45,79 @@ const AddPaymentModal = ({ isOpen, onClose, stations, partners, onSaved }) => {
     setPaymentDate("");
     setPaymentSum("");
     setFilteredPartners(partners);
+  };
+
+  // Функция для сохранения оплаты в коллекцию contracts
+  const savePaymentToContract = async (contractId, paymentData) => {
+    try {
+      const contractRef = doc(db, "contracts", contractId);
+      const contractDoc = await getDoc(contractRef);
+      const currentContract = contractDoc.data();
+
+      // Получаем текущие транзакции или создаем пустой массив
+      const currentTransactions = currentContract.transactions || [];
+
+      // Находим индекс транзакции за указанную дату
+      const transactionIndex = currentTransactions.findIndex(
+        (transaction) => transaction.reportDate === paymentData.reportDate
+      );
+
+      let updatedTransactions;
+
+      if (transactionIndex >= 0) {
+        // Обновляем существующую транзакцию
+        updatedTransactions = [...currentTransactions];
+        const existingTransaction = updatedTransactions[transactionIndex];
+
+        // Добавляем оплату к существующей сумме
+        const currentPaymentSum =
+          parseFloat(existingTransaction.paymentSum) || 0;
+        const newPaymentSum = currentPaymentSum + paymentData.paymentSum;
+
+        updatedTransactions[transactionIndex] = {
+          ...existingTransaction,
+          paymentSum: newPaymentSum,
+          paymentUpdatedAt: new Date().toISOString(),
+          paymentUpdatedBy: auth?.currentUser?.email || "unknown",
+        };
+      } else {
+        // Создаем новую транзакцию с оплатой
+        const selectedPartnerData = partners.find(
+          (p) => p.id === selectedPartner
+        );
+        const selectedStationData = stations.find(
+          (s) => s.id === selectedStation
+        );
+
+        const newTransaction = {
+          reportDate: paymentData.reportDate,
+          paymentSum: paymentData.paymentSum,
+          soldM3: 0, // Для транзакции только с оплатой
+          pricePerM3: 0,
+          totalAmount: 0,
+          stationId: selectedStation,
+          stationName:
+            selectedStationData?.stationName || "Неизвестная станция",
+          partnerName: selectedPartnerData?.partner || "Неизвестный партнер",
+          createdAt: new Date().toISOString(),
+          createdBy: auth?.currentUser?.email || "unknown",
+          paymentCreatedAt: new Date().toISOString(),
+          paymentCreatedBy: auth?.currentUser?.email || "unknown",
+        };
+
+        updatedTransactions = [...currentTransactions, newTransaction];
+      }
+
+      // Обновляем контракт
+      await updateDoc(contractRef, {
+        transactions: updatedTransactions,
+        lastUpdated: new Date(),
+      });
+
+      return true;
+    } catch (error) {
+      throw error;
+    }
   };
 
   // Функция для пересчета всех последующих отчетов
@@ -177,7 +251,17 @@ const AddPaymentModal = ({ isOpen, onClose, stations, partners, onSaved }) => {
         return;
       }
 
-      // Находим отчет за выбранную дату и станцию
+      // 1. Сохраняем оплату в коллекцию contracts
+      const paymentData = {
+        reportDate: paymentDate,
+        paymentSum: numericSum,
+        paymentCreatedBy: userEmail,
+        paymentCreatedAt: new Date().toISOString(),
+      };
+
+      await savePaymentToContract(selectedPartner, paymentData);
+
+      // 2. Находим отчет за выбранную дату и станцию
       const reportQuery = query(
         collection(db, "unifiedDailyReports"),
         where("stationId", "==", selectedStation),
@@ -187,7 +271,11 @@ const AddPaymentModal = ({ isOpen, onClose, stations, partners, onSaved }) => {
       const snapshot = await getDocs(reportQuery);
 
       if (snapshot.empty) {
-        toast.error(`Отчет за дату ${paymentDate} не найден`);
+        // Если отчета нет, просто сохраняем оплату в контракт и выходим
+        toast.success("Оплата успешно сохранена в контракт");
+        resetForm();
+        onSaved();
+        onClose();
         setLoading(false);
         return;
       }
@@ -200,14 +288,6 @@ const AddPaymentModal = ({ isOpen, onClose, stations, partners, onSaved }) => {
       const existingPartnerIndex = reportPartners.findIndex(
         (p) => p.partnerId === selectedPartner
       );
-
-      // Создаем объект платежа
-      const paymentData = {
-        paymentDate: paymentDate,
-        paymentSum: numericSum,
-        paymentCreatedBy: userEmail,
-        paymentCreatedAt: new Date().toISOString(),
-      };
 
       let updatedPartners;
       let updatedPartner;
@@ -234,7 +314,6 @@ const AddPaymentModal = ({ isOpen, onClose, stations, partners, onSaved }) => {
           ...existingPartner,
           paymentSum: newPaymentSum,
           endBalance: newEndBalance,
-          ...paymentData,
         };
 
         updatedPartners[existingPartnerIndex] = updatedPartner;
@@ -274,7 +353,6 @@ const AddPaymentModal = ({ isOpen, onClose, stations, partners, onSaved }) => {
           totalAmount: 0,
           paymentSum: numericSum,
           endBalance: startBalance - numericSum, // totalAmount = 0, поэтому endBalance = startBalance - paymentSum
-          ...paymentData,
         };
 
         updatedPartners = [...reportPartners, updatedPartner];
@@ -286,7 +364,7 @@ const AddPaymentModal = ({ isOpen, onClose, stations, partners, onSaved }) => {
         hasPartnerData: true,
       });
 
-      // Обновляем все последующие отчеты
+      // 3. Обновляем все последующие отчеты
       const updatedReportsCount = await updateSubsequentReports(
         selectedStation,
         selectedPartner,

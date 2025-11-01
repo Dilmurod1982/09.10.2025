@@ -12,6 +12,7 @@ import {
   doc,
   getDoc,
   deleteDoc,
+  arrayUnion,
 } from "firebase/firestore";
 import { db, auth } from "../firebase/config";
 import { motion, AnimatePresence } from "framer-motion";
@@ -210,8 +211,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         // Инициализируем данные партнеров с ценами из последнего отчета
         const initializedPartnerData = contractsData.map((contract) => {
           let pricePerM3 = 0;
-          let startBalance = "0"; // Теперь как строка
-          let startBalanceDisabled = false;
 
           if (hasPreviousReport) {
             const lastReport = lastReportSnapshot.docs[0].data();
@@ -220,25 +219,16 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
             );
             if (lastPartnerData) {
               pricePerM3 = lastPartnerData.pricePerM3 || 0;
-              startBalance = lastPartnerData.endBalance?.toString() || "0"; // Конвертируем в строку
-              startBalanceDisabled = true; // Берем из предыдущего отчета, поэтому поле отключено
             }
-          } else {
-            // Если предыдущего отчета нет, поле активно для ручного ввода
-            startBalanceDisabled = false;
           }
 
           return {
             partnerId: contract.id,
             partnerName: contract.partner,
             contractNumber: contract.contractNumber,
-            startBalance: startBalance, // Теперь строка
-            startBalanceDisabled: startBalanceDisabled,
             pricePerM3: pricePerM3,
             soldM3: "",
             totalAmount: 0,
-            paymentSum: 0, // Добавляем поле для суммы платежа
-            endBalance: parseFormattedNumber(startBalance), // Изначально равно startBalance
           };
         });
 
@@ -274,6 +264,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         setHoseRows(initializedHoseRows);
 
         // Инициализируем общие данные из последнего отчета
+        // НЕ загружаем electronicPaymentSystem из прошлого отчета
         if (hasPreviousReport) {
           const lastReport = lastReportSnapshot.docs[0].data();
           setGeneralData((prev) => ({
@@ -281,10 +272,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
             gasPrice: lastReport.generalData?.gasPrice
               ? lastReport.generalData.gasPrice.toString()
               : "",
-            electronicPaymentSystem: lastReport.generalData
-              ?.electronicPaymentSystem
-              ? lastReport.generalData.electronicPaymentSystem.toString()
-              : "",
+            // Убрано автоматическое заполнение electronicPaymentSystem
           }));
         }
       } catch (error) {
@@ -300,30 +288,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
   // ========== ФУНКЦИИ ДЛЯ ОТЧЕТА ПО ПАРТНЕРАМ ==========
 
-  // Обработчик изменения начального сальдо
-  const handlePartnerStartBalanceChange = (partnerId, value) => {
-    // Используем простую валидацию ввода
-    const formattedValue = formatNumberInput(value);
-
-    setPartnerData((prev) =>
-      prev.map((partner) => {
-        if (partner.partnerId === partnerId) {
-          const numericValue = parseFormattedNumber(formattedValue);
-          const totalAmount = partner.totalAmount || 0;
-          const paymentSum = partner.paymentSum || 0;
-          const endBalance = numericValue + totalAmount - paymentSum;
-
-          return {
-            ...partner,
-            startBalance: formattedValue, // Сохраняем как строку для отображения
-            endBalance: endBalance,
-          };
-        }
-        return partner;
-      })
-    );
-  };
-
   // Обработчик изменения цены
   const handlePartnerPriceChange = (partnerId, newPrice) => {
     const formattedValue = formatNumberInput(newPrice);
@@ -335,16 +299,11 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           const soldM3Value =
             partner.soldM3 === "" ? 0 : parseFormattedNumber(partner.soldM3);
           const totalAmount = soldM3Value * numericValue;
-          const endBalance =
-            parseFormattedNumber(partner.startBalance) +
-            totalAmount -
-            partner.paymentSum;
 
           return {
             ...partner,
             pricePerM3: numericValue,
             totalAmount: totalAmount,
-            endBalance: endBalance,
           };
         }
         return partner;
@@ -359,16 +318,11 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         prev.map((partner) => {
           if (partner.partnerId === partnerId) {
             const totalAmount = 0;
-            const endBalance =
-              parseFormattedNumber(partner.startBalance) +
-              totalAmount -
-              partner.paymentSum;
 
             return {
               ...partner,
               soldM3: "",
               totalAmount: totalAmount,
-              endBalance: endBalance,
             };
           }
           return partner;
@@ -384,40 +338,11 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       prev.map((partner) => {
         if (partner.partnerId === partnerId) {
           const totalAmount = numericValue * partner.pricePerM3;
-          const endBalance =
-            parseFormattedNumber(partner.startBalance) +
-            totalAmount -
-            partner.paymentSum;
 
           return {
             ...partner,
             soldM3: formattedValue,
             totalAmount: totalAmount,
-            endBalance: endBalance,
-          };
-        }
-        return partner;
-      })
-    );
-  };
-
-  // Обработчик изменения суммы платежа
-  const handlePartnerPaymentSumChange = (partnerId, paymentSum) => {
-    const formattedValue = formatNumberInput(paymentSum);
-    const numericValue = parseFormattedNumber(formattedValue);
-
-    setPartnerData((prev) =>
-      prev.map((partner) => {
-        if (partner.partnerId === partnerId) {
-          const endBalance =
-            parseFormattedNumber(partner.startBalance) +
-            partner.totalAmount -
-            numericValue;
-
-          return {
-            ...partner,
-            paymentSum: numericValue,
-            endBalance: endBalance,
           };
         }
         return partner;
@@ -432,10 +357,9 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         partner.soldM3 === "" ? 0 : parseFormattedNumber(partner.soldM3);
       acc.totalM3 += soldM3Value;
       acc.totalAmount += partner.totalAmount;
-      acc.totalPaymentSum += partner.paymentSum;
       return acc;
     },
-    { totalM3: 0, totalAmount: 0, totalPaymentSum: 0 }
+    { totalM3: 0, totalAmount: 0 }
   );
 
   // Проверка, есть ли данные для сохранения у партнеров
@@ -594,13 +518,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     // Если есть прикрепленные партнеры, проверяем их данные
     if (hasPartners) {
       const arePartnersValid = partnerData.every((partner) => {
-        // Проверяем что startBalance заполнено
-        if (
-          partner.startBalance === "" ||
-          isNaN(parseFormattedNumber(partner.startBalance))
-        )
-          return false;
-
         // Если soldM3 пустая строка - невалидно
         if (partner.soldM3 === "") return false;
 
@@ -627,6 +544,51 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     } catch (error) {
       console.error("Ошибка получения IP:", error);
       return "Неизвестно";
+    }
+  };
+
+  // Функция для сохранения данных партнеров в коллекцию contracts
+  const savePartnerDataToContracts = async (partnerDataToSave) => {
+    try {
+      const savePromises = partnerDataToSave.map(async (partner) => {
+        const contractRef = doc(db, "contracts", partner.partnerId);
+
+        // Сначала получаем текущий документ контракта
+        const contractDoc = await getDoc(contractRef);
+        const currentContract = contractDoc.data();
+
+        const partnerTransactionData = {
+          reportDate: reportDate,
+          soldM3: partner.soldM3,
+          pricePerM3: partner.pricePerM3,
+          totalAmount: partner.totalAmount,
+          paymentSum: 0, // Добавляем поле для оплаты
+          stationId: station.id,
+          stationName: station.stationName,
+          createdAt: new Date().toISOString(),
+          createdBy: auth?.currentUser?.email || "unknown",
+        };
+
+        // Получаем текущие транзакции или создаем пустой массив
+        const currentTransactions = currentContract.transactions || [];
+
+        // Добавляем новую транзакцию
+        const updatedTransactions = [
+          ...currentTransactions,
+          partnerTransactionData,
+        ];
+
+        await updateDoc(contractRef, {
+          transactions: updatedTransactions,
+          lastUpdated: serverTimestamp(),
+        });
+      });
+
+      await Promise.all(savePromises);
+      console.log("Данные партнеров успешно сохранены в contracts");
+    } catch (error) {
+      console.error("Ошибка сохранения данных партнеров в contracts:", error);
+      throw error;
     }
   };
 
@@ -677,10 +639,13 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         .map((partner) => ({
           ...partner,
           soldM3: parseFormattedNumber(partner.soldM3),
-          startBalance: parseFormattedNumber(partner.startBalance) || 0,
-          paymentSum: Number(partner.paymentSum) || 0,
-          endBalance: Number(partner.endBalance) || 0,
+          paymentSum: 0, // Добавляем поле для оплаты
         }));
+
+      // Сохраняем данные партнеров в коллекцию contracts
+      if (partnerDataToSave.length > 0) {
+        await savePartnerDataToContracts(partnerDataToSave);
+      }
 
       // Создаем объединенный отчет
       const reportData = {
@@ -692,7 +657,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         partnerData: partnerDataToSave,
         partnerTotalM3: partnerTotals.totalM3,
         partnerTotalAmount: partnerTotals.totalAmount,
-        partnerTotalPaymentSum: partnerTotals.totalPaymentSum,
+        partnerTotalPaymentSum: 0, // Добавляем общую сумму оплат
         hasPartnerData: hasPartnerData(),
 
         // Данные шлангов
@@ -987,9 +952,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                 <tr>
                                   <th className="p-2 text-left">Партнер</th>
                                   <th className="p-2 text-right w-24">
-                                    Бошланғич сальдо
-                                  </th>
-                                  <th className="p-2 text-right w-24">
                                     1м³ нарх (сўм)
                                   </th>
                                   <th className="p-2 text-right w-24">
@@ -997,12 +959,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                   </th>
                                   <th className="p-2 text-right w-24">
                                     Суммаси (сўм)
-                                  </th>
-                                  <th className="p-2 text-right w-24">
-                                    Тўлов суммаси
-                                  </th>
-                                  <th className="p-2 text-right w-24">
-                                    Якуний сальдо
                                   </th>
                                 </tr>
                               </thead>
@@ -1020,31 +976,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                           {partner.contractNumber}
                                         </div>
                                       </div>
-                                    </td>
-                                    <td className="p-2">
-                                      <input
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={partner.startBalance}
-                                        onChange={(e) =>
-                                          handlePartnerStartBalanceChange(
-                                            partner.partnerId,
-                                            e.target.value
-                                          )
-                                        }
-                                        disabled={
-                                          partner.startBalanceDisabled ||
-                                          loading
-                                        }
-                                        className={`w-full text-right border border-gray-300 rounded p-1 no-spinner text-sm ${
-                                          parseFormattedNumber(
-                                            partner.startBalance
-                                          ) < 0
-                                            ? "text-red-600"
-                                            : ""
-                                        }`}
-                                        placeholder="0"
-                                      />
                                     </td>
                                     <td className="p-2">
                                       <input
@@ -1089,36 +1020,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                         partner.totalAmount
                                       )}
                                     </td>
-                                    <td className="p-2">
-                                      <input
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={formatNumberInput(
-                                          partner.paymentSum
-                                        )}
-                                        onChange={(e) =>
-                                          handlePartnerPaymentSumChange(
-                                            partner.partnerId,
-                                            e.target.value
-                                          )
-                                        }
-                                        disabled={true} // Делаем поле неактивным
-                                        className="w-full text-right border border-gray-300 rounded p-1 no-spinner text-sm bg-gray-100"
-                                        placeholder="0"
-                                      />
-                                    </td>
-                                    <td className="p-2 text-right font-semibold text-sm">
-                                      <span
-                                        className={
-                                          partner.endBalance < 0
-                                            ? "text-red-600"
-                                            : "text-gray-900"
-                                        }>
-                                        {formatNumberForDisplay(
-                                          partner.endBalance
-                                        )}
-                                      </span>
-                                    </td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -1127,7 +1028,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                   <tr>
                                     <td
                                       className="p-2 font-semibold"
-                                      colSpan="3">
+                                      colSpan="2">
                                       Жами:
                                     </td>
                                     <td className="p-2 text-right font-semibold text-sm">
@@ -1142,13 +1043,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                       )}{" "}
                                       сўм
                                     </td>
-                                    <td className="p-2 text-right font-semibold text-sm">
-                                      {formatNumberForDisplay(
-                                        partnerTotals.totalPaymentSum
-                                      )}{" "}
-                                      сўм
-                                    </td>
-                                    <td></td>
                                   </tr>
                                 </tfoot>
                               )}
