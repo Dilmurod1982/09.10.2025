@@ -50,36 +50,57 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
     { value: "12", label: "Декабрь" },
   ];
 
-  // Загрузка данных предыдущего месяца и существующих данных
+  // Получение данных предыдущего месяца
+  const getPreviousMonthData = async (year, month) => {
+    try {
+      const prevMonth = parseInt(month) - 1;
+      let prevYear = parseInt(year);
+
+      if (prevMonth === 0) {
+        prevYear = prevYear - 1;
+        prevMonth = 12;
+      }
+
+      const prevMonthStr = String(prevMonth).padStart(2, "0");
+      const prevPeriod = `${prevYear}-${prevMonthStr}`;
+
+      console.log("Загрузка данных за предыдущий период:", prevPeriod);
+
+      const q = query(
+        collection(db, "gasSettlements"),
+        where("period", "==", prevPeriod)
+      );
+
+      const snapshot = await getDocs(q);
+      const data = {};
+
+      snapshot.docs.forEach((doc) => {
+        const settlement = doc.data();
+        data[settlement.stationId] = {
+          endBalance: settlement.endBalance || 0,
+          gasPrice: settlement.gasPrice || 0,
+        };
+      });
+
+      console.log("Данные предыдущего месяца:", data);
+      return data;
+    } catch (error) {
+      console.error("Ошибка загрузки данных предыдущего месяца:", error);
+      return {};
+    }
+  };
+
+  // Загрузка данных при изменении периода
   useEffect(() => {
     if (!isOpen || !selectedYear || !selectedMonth) return;
 
     const loadData = async () => {
       try {
         // Загрузка данных предыдущего месяца
-        const prevMonth = parseInt(selectedMonth) - 1;
-        const prevYear =
-          prevMonth === 0 ? parseInt(selectedYear) - 1 : parseInt(selectedYear);
-        const prevMonthStr =
-          prevMonth === 0 ? "12" : String(prevMonth).padStart(2, "0");
-        const prevPeriod = `${prevYear}-${prevMonthStr}`;
-
-        const prevQ = query(
-          collection(db, "gasSettlements"),
-          where("period", "==", prevPeriod)
+        const prevData = await getPreviousMonthData(
+          selectedYear,
+          selectedMonth
         );
-
-        const prevSnapshot = await getDocs(prevQ);
-        const prevData = {};
-
-        prevSnapshot.docs.forEach((doc) => {
-          const settlement = doc.data();
-          prevData[settlement.stationId] = {
-            endBalance: settlement.endBalance || 0,
-            gasPrice: settlement.gasPrice || 0,
-          };
-        });
-
         setPreviousMonthData(prevData);
 
         // Загрузка существующих данных для выбранного периода
@@ -128,13 +149,15 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
             period: `${selectedYear}-${selectedMonth}`,
           };
         } else {
-          // Новые данные
+          // Новые данные - сальдо на начало берется из конечного сальдо предыдущего месяца
+          const startBalance = prev?.endBalance || 0;
+
           return {
             stationId: station.id,
             stationName: station.stationName,
             period: `${selectedYear}-${selectedMonth}`,
             gasPrice: prev?.gasPrice || 0,
-            startBalance: prev?.endBalance || 0,
+            startBalance: startBalance,
             limit: 0,
             totalAccruedM3: 0,
             meterReading: 0,
@@ -145,7 +168,7 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
             other: 0,
             totalAccruedAmount: 0,
             paid: 0,
-            endBalance: prev?.endBalance || 0,
+            endBalance: startBalance, // Начальное значение равно сальдо на начало
           };
         }
       });
@@ -153,30 +176,19 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
     }
   };
 
-  // Обновление значений полей
-  const updateFieldValue = (index, field, value) => {
+  // Обновление общего количества м³
+  const updateTotalM3 = (index, value) => {
     const newData = [...gasData];
     const numericValue = parseFloat(value) || 0;
 
     newData[index] = {
       ...newData[index],
-      [field]: numericValue,
+      totalAccruedM3: numericValue,
     };
-
-    // Пересчитываем общее количество м³
-    const totalM3 =
-      (newData[index].meterReading || 0) +
-      (newData[index].configError || 0) +
-      (newData[index].lowPressure || 0) +
-      (newData[index].actCalculation || 0) +
-      (newData[index].meterDifference || 0) +
-      (newData[index].other || 0);
-
-    newData[index].totalAccruedM3 = totalM3;
 
     // Пересчитываем общую сумму
     newData[index].totalAccruedAmount =
-      totalM3 * (newData[index].gasPrice || 0);
+      numericValue * (newData[index].gasPrice || 0);
 
     // Пересчитываем конечное сальдо
     newData[index].endBalance =
@@ -222,6 +234,27 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
     };
 
     setGasData(newData);
+  };
+
+  // Обновление начального сальдо (только если нет данных предыдущего месяца)
+  const updateStartBalance = (index, value) => {
+    const newData = [...gasData];
+    const numericValue = parseFloat(value) || 0;
+    const hasPreviousData = previousMonthData[newData[index].stationId];
+
+    // Разрешаем редактирование только если нет данных предыдущего месяца
+    if (!hasPreviousData) {
+      newData[index] = {
+        ...newData[index],
+        startBalance: numericValue,
+        endBalance:
+          numericValue +
+          (newData[index].totalAccruedAmount || 0) -
+          (newData[index].paid || 0),
+      };
+
+      setGasData(newData);
+    }
   };
 
   // Проверка возможности сохранения
@@ -358,13 +391,21 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
               </select>
             </div>
           </div>
+          {selectedYear && selectedMonth && (
+            <div className="mt-4 text-sm text-gray-600">
+              <p>
+                Сальдо на начало месяца будет автоматически заполнено из данных
+                за предыдущий месяц
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Таблица данных */}
         <div className="flex-1 overflow-auto p-6">
           {selectedYear && selectedMonth ? (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[1200px]">
+              <table className="w-full border-collapse">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
@@ -379,11 +420,6 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                       Всего начислено (м³)
                     </th>
-                    <th
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b"
-                      colSpan="6">
-                      В том числе:
-                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                       Всего начислено
                     </th>
@@ -393,20 +429,6 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                       Сальдо на конец
                     </th>
-                  </tr>
-                  <tr>
-                    <th colSpan="4"></th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                      <div className="grid grid-cols-6 gap-1 text-[10px]">
-                        <div>Показание счетчика</div>
-                        <div>Ошибки конфигурации п.6.2.1.1</div>
-                        <div>Низкий перепад давления п.6.2.7</div>
-                        <div>По акту</div>
-                        <div>По разнице счетчиков</div>
-                        <div>Другие</div>
-                      </div>
-                    </th>
-                    <th colSpan="3"></th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -419,7 +441,14 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
                       <tr key={station.stationId} className="hover:bg-gray-50">
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                           {station.stationName}
+                          {hasPreviousData && (
+                            <div className="text-xs text-green-600 mt-1">
+                              Данные из предыдущего месяца
+                            </div>
+                          )}
                         </td>
+
+                        {/* Цена газа за 1 м³ */}
                         <td className="px-4 py-3">
                           <input
                             type="number"
@@ -431,6 +460,8 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
                             }
                           />
                         </td>
+
+                        {/* Сальдо на начало */}
                         <td className="px-4 py-3">
                           <input
                             type="number"
@@ -441,73 +472,46 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
                                 : "border-gray-200 bg-gray-100"
                             }`}
                             value={station.startBalance}
-                            onChange={(e) => {
-                              if (isStartBalanceEditable) {
-                                const newData = [...gasData];
-                                const numericValue =
-                                  parseFloat(e.target.value) || 0;
-                                newData[index].startBalance = numericValue;
-                                newData[index].endBalance =
-                                  numericValue +
-                                  (newData[index].totalAccruedAmount || 0) -
-                                  (newData[index].paid || 0);
-                                setGasData(newData);
-                              }
-                            }}
+                            onChange={(e) =>
+                              updateStartBalance(index, e.target.value)
+                            }
                             disabled={!isStartBalanceEditable}
                             placeholder="0.00"
                           />
-                          {!isStartBalanceEditable && (
+                          {!isStartBalanceEditable ? (
                             <div className="text-xs text-gray-500 mt-1">
                               Авто из пред. месяца
                             </div>
+                          ) : (
+                            <div className="text-xs text-orange-600 mt-1">
+                              Введите вручную
+                            </div>
                           )}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-semibold text-center bg-gray-50">
-                          {station.totalAccruedM3.toLocaleString("ru-RU", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </td>
+
+                        {/* Всего начислено (м³) */}
                         <td className="px-4 py-3">
-                          <div className="grid grid-cols-6 gap-1">
-                            {[
-                              { field: "meterReading", label: "Счетчик" },
-                              {
-                                field: "configError",
-                                label: "Ошибки конфигурации",
-                              },
-                              {
-                                field: "lowPressure",
-                                label: "Низкое давление",
-                              },
-                              { field: "actCalculation", label: "По акту" },
-                              {
-                                field: "meterDifference",
-                                label: "Разница счетчиков",
-                              },
-                              { field: "other", label: "Другие" },
-                            ].map(({ field }) => (
-                              <input
-                                key={field}
-                                type="number"
-                                step="0.01"
-                                className="w-16 px-1 py-1 border border-gray-300 rounded text-xs"
-                                value={station[field]}
-                                onChange={(e) =>
-                                  updateFieldValue(index, field, e.target.value)
-                                }
-                                placeholder="0.00"
-                              />
-                            ))}
-                          </div>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                            value={station.totalAccruedM3}
+                            onChange={(e) =>
+                              updateTotalM3(index, e.target.value)
+                            }
+                            placeholder="0.00"
+                          />
                         </td>
+
+                        {/* Всего начислено */}
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600 font-semibold bg-gray-50">
                           {station.totalAccruedAmount.toLocaleString("ru-RU", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </td>
+
+                        {/* Оплачено */}
                         <td className="px-4 py-3">
                           <input
                             type="number"
@@ -518,6 +522,8 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
                             placeholder="0.00"
                           />
                         </td>
+
+                        {/* Сальдо на конец */}
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold bg-gray-50">
                           <span
                             className={
