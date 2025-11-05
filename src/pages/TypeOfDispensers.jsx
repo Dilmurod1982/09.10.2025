@@ -45,8 +45,7 @@ const TypeOfDispensers = () => {
     powerConsumption: "",
     nozzleCount: "",
     hoseLength: "",
-    resetCounterEnabled: false, // Новое поле для галочки
-    resetThreshold: "", // Порог сброса счетчика
+    resetCounterEnabled: false, // Флаг автообнуления
   });
 
   // Загрузка данных
@@ -81,25 +80,10 @@ const TypeOfDispensers = () => {
     const requiredFields = ["brand", "model", "country"];
 
     // Проверка заполнения обязательных полей
-    const allFieldsFilled = requiredFields.every(
+    return requiredFields.every(
       (field) =>
         currentData[field] && currentData[field].toString().trim() !== ""
     );
-
-    // Если включен сброс счетчика, проверяем заполнение порога
-    if (currentData.resetCounterEnabled) {
-      const threshold = currentData.resetThreshold;
-      if (
-        !threshold ||
-        threshold.toString().trim() === "" ||
-        isNaN(threshold) ||
-        Number(threshold) <= 0
-      ) {
-        return false;
-      }
-    }
-
-    return allFieldsFilled;
   };
 
   // Фильтрация колонок по поиску
@@ -119,21 +103,17 @@ const TypeOfDispensers = () => {
     }
   };
 
-  // Обработчик изменения галочки
+  // Обработчик изменения галочки автообнуления
   const handleResetToggle = (checked) => {
     if (isCreating) {
       setNewDispenser((prev) => ({
         ...prev,
         resetCounterEnabled: checked,
-        // Если галочка снимается, очищаем поле порога
-        resetThreshold: checked ? prev.resetThreshold : "",
       }));
     } else {
       setSelectedDispenser((prev) => ({
         ...prev,
         resetCounterEnabled: checked,
-        // Если галочка снимается, очищаем поле порога
-        resetThreshold: checked ? prev.resetThreshold : "",
       }));
     }
   };
@@ -143,7 +123,6 @@ const TypeOfDispensers = () => {
     setSelectedDispenser({
       ...dispenser,
       resetCounterEnabled: dispenser.resetCounterEnabled || false,
-      resetThreshold: dispenser.resetThreshold || "",
     });
     setIsModalOpen(true);
     setIsEditMode(false);
@@ -162,7 +141,6 @@ const TypeOfDispensers = () => {
       nozzleCount: "",
       hoseLength: "",
       resetCounterEnabled: false,
-      resetThreshold: "",
     });
   };
 
@@ -317,7 +295,7 @@ const TypeOfDispensers = () => {
                   Пистолеты
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden xl:table-cell">
-                  Сброс счетчика
+                  Автообнуление
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden xl:table-cell">
                   Страна
@@ -393,8 +371,8 @@ const TypeOfDispensers = () => {
                             : "text-gray-500"
                         }>
                         {dispenser.resetCounterEnabled
-                          ? `Автосброс: ${dispenser.resetThreshold || "N/A"}`
-                          : "Без автосброса"}
+                          ? "Автообнуление"
+                          : "Без автообнуления"}
                       </span>
                     </div>
                   </td>
@@ -552,7 +530,7 @@ const TypeOfDispensers = () => {
                     </h3>
 
                     <div className="space-y-4">
-                      {/* Галочка для включения сброса счетчика */}
+                      {/* Галочка для включения автообнуления */}
                       <div className="flex items-center gap-3">
                         <div className="relative">
                           <input
@@ -574,11 +552,11 @@ const TypeOfDispensers = () => {
                         <label
                           htmlFor="resetCounterEnabled"
                           className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
-                          Автоматический сброс счетчика при достижении порога
+                          Счетчик с автообнулением
                         </label>
                       </div>
 
-                      {/* Поле для порога сброса (показывается только если галочка активна) */}
+                      {/* Описание функции автообнуления */}
                       {(isCreating
                         ? newDispenser.resetCounterEnabled
                         : selectedDispenser?.resetCounterEnabled) && (
@@ -586,37 +564,12 @@ const TypeOfDispensers = () => {
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: "auto" }}
                           transition={{ duration: 0.3 }}
-                          className="ml-8">
-                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                            Порог сброса счетчика *
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              value={
-                                isCreating
-                                  ? newDispenser.resetThreshold
-                                  : selectedDispenser?.resetThreshold || ""
-                              }
-                              onChange={(e) =>
-                                handleInputChange(
-                                  "resetThreshold",
-                                  e.target.value
-                                )
-                              }
-                              disabled={!isCreating && !isEditMode}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                              placeholder="Введите значение порога"
-                              min="1"
-                              step="1"
-                            />
-                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
-                              единиц
-                            </div>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-2">
-                            Счетчик будет автоматически обнуляться при
-                            достижении этого значения
+                          className="ml-8 bg-green-50 border border-green-200 rounded-lg p-3">
+                          <p className="text-sm text-green-700">
+                            <CheckCircle className="inline mr-2" size={14} />
+                            Данная модель поддерживает функцию автоматического
+                            обнуления счетчика. Счетчик может быть сброшен в
+                            любой момент по необходимости.
                           </p>
                         </motion.div>
                       )}

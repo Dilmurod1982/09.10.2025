@@ -43,6 +43,7 @@ import {
   HomeChief,
   GasSettlements,
   ElektrSettlements,
+  HomeTasischi,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -108,6 +109,7 @@ function App() {
       if (role === "rahbar") return <Navigate to="/homechief" replace />;
       if (role === "buxgalter") return <Navigate to="/homebooker" replace />;
       if (role === "operator") return <Navigate to="/homeoperator" replace />;
+      if (role === "tasischi") return <Navigate to="/hometasischi" replace />;
       return <Navigate to="/" replace />;
     }
     return element;
@@ -384,6 +386,15 @@ function App() {
             <ProtectedLayout
               allowedRoles={["operator"]}
               element={<HomeOperator />}
+            />
+          ),
+        },
+        {
+          path: "/hometasischi",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["tasischi"]}
+              element={<HomeTasischi />}
             />
           ),
         },

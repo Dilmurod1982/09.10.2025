@@ -1159,14 +1159,15 @@ const Stations = () => {
             <thead>
               <tr className="bg-gradient-to-r from-red-500 to-orange-600 text-white">
                 <th className="px-4 py-4 text-left font-semibold">
+                  Организация
+                </th>
+                <th className="px-4 py-4 text-left font-semibold">
                   Номер станции
                 </th>
                 <th className="px-4 py-4 text-left font-semibold">
                   Название станции
                 </th>
-                <th className="px-4 py-4 text-left font-semibold">
-                  Организация
-                </th>
+
                 <th className="px-4 py-4 text-left font-semibold">Адрес</th>
                 <th className="px-4 py-4 text-left font-semibold hidden lg:table-cell">
                   Сотрудники
@@ -1190,16 +1191,6 @@ const Stations = () => {
                   transition={{ duration: 0.4, delay: index * 0.1 }}
                   whileHover={{ scale: 1.01 }}>
                   <td className="px-4 py-4">
-                    <div className="font-semibold text-gray-800">
-                      {station.stationNumber}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="font-semibold text-gray-800">
-                      {station.stationName}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center group-hover:bg-orange-200 transition-colors">
                         <Building className="text-orange-600" size={20} />
@@ -1214,6 +1205,17 @@ const Stations = () => {
                       </div>
                     </div>
                   </td>
+                  <td className="px-4 py-4">
+                    <div className="font-semibold text-gray-800">
+                      {station.stationNumber}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="font-semibold text-gray-800">
+                      {station.stationName}
+                    </div>
+                  </td>
+
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
                       <MapPin className="text-red-500" size={16} />

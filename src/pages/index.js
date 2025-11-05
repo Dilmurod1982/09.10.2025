@@ -41,3 +41,4 @@ export { default as ReportOnDebtsPartners } from "./ReportOnDebtsPartners";
 export { default as HomeChief } from "./HomeChief";
 export { default as GasSettlements } from "./GasSettlements";
 export { default as ElektrSettlements } from "./ElektrSettlements";
+export { default as HomeTasischi } from "./HomeTasischi";
