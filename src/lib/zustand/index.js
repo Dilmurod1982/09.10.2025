@@ -16,6 +16,7 @@ export const useAppStore = create((set, get) => ({
   user: JSON.parse(localStorage.getItem("user")) || null,
   userData: JSON.parse(localStorage.getItem("userData")) || null, // Сохраняем в localStorage
   users: null,
+  managedStations: [],
   loginTime: null,
   logoutTimer: null,
   lastActivity: Date.now(),

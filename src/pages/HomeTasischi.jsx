@@ -3,6 +3,43 @@ import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { motion } from "framer-motion";
 
+// Вспомогательные функции вынесены за пределы компонента
+const formatDate = (dateString) => {
+  if (!dateString) return "";
+
+  const months = {
+    "01": "январь",
+    "02": "февраль",
+    "03": "март",
+    "04": "апрель",
+    "05": "май",
+    "06": "июнь",
+    "07": "июль",
+    "08": "август",
+    "09": "сентябрь",
+    10: "октябрь",
+    11: "ноябрь",
+    12: "декабрь",
+  };
+
+  try {
+    const [year, month, day] = dateString.split("-");
+    const monthName = months[month] || month;
+    return `${day} ${monthName} ${year}`;
+  } catch (error) {
+    console.error("Error formatting date:", error, dateString);
+    return dateString;
+  }
+};
+
+const formatNumber = (num) => {
+  return new Intl.NumberFormat("ru-RU").format(num);
+};
+
+const formatCurrency = (num) => {
+  return new Intl.NumberFormat("ru-RU").format(num) + " ₽";
+};
+
 const HomeTasischi = () => {
   const [analysisData, setAnalysisData] = useState({
     autopilotData: [],
@@ -16,10 +53,15 @@ const HomeTasischi = () => {
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const [comparisonType, setComparisonType] = useState("yesterday");
 
+  // Новые состояния для выпадающих меню
+  const [negativeDiffPeriod, setNegativeDiffPeriod] = useState("1day");
+  const [missingReportsPeriod, setMissingReportsPeriod] = useState("1day");
+  const [controlDiffPeriod, setControlDiffPeriod] = useState("yesterday");
+
   // Загрузка всех данных для анализа
   useEffect(() => {
     loadAnalysisData();
-  }, []);
+  }, [negativeDiffPeriod, missingReportsPeriod, controlDiffPeriod]);
 
   const loadAnalysisData = async () => {
     try {
@@ -50,14 +92,23 @@ const HomeTasischi = () => {
       // Анализ 2: Сравнительные данные
       const comparisonData = analyzeComparisonData(allReports, comparisonType);
 
-      // Анализ 3: Отрицательная разница
-      const negativeDifferenceData = analyzeNegativeDifference(allReports);
+      // Анализ 3: Отрицательная разница с периодом
+      const negativeDifferenceData = analyzeNegativeDifference(
+        allReports,
+        negativeDiffPeriod
+      );
 
-      // Анализ 4: Отсутствующие отчеты
-      const missingReportsData = await analyzeMissingReports(allReports);
+      // Анализ 4: Отсутствующие отчеты с периодом
+      const missingReportsData = await analyzeMissingReports(
+        allReports,
+        missingReportsPeriod
+      );
 
-      // Анализ 5: Разница контрольных сумм
-      const controlDifferenceData = analyzeControlDifference(allReports);
+      // Анализ 5: Разница контрольных сумм с периодом - ОБНОВЛЕННАЯ ВЕРСИЯ
+      const controlDifferenceData = analyzeControlDifference(
+        allReports,
+        controlDiffPeriod
+      );
 
       // Анализ 6: Просроченные документы
       const expiredDocumentsData = analyzeExpiredDocuments(allDocuments);
@@ -92,7 +143,6 @@ const HomeTasischi = () => {
 
   // Анализ 2: Сравнительные данные
   const analyzeComparisonData = (reports, type) => {
-    // Группируем отчеты по станциям и датам
     const stationsMap = new Map();
 
     reports.forEach((report) => {
@@ -108,7 +158,6 @@ const HomeTasischi = () => {
     const comparisonResults = [];
 
     stationsMap.forEach((stationData, stationId) => {
-      // Сортируем отчеты по дате
       stationData.reports.sort(
         (a, b) => new Date(b.reportDate) - new Date(a.reportDate)
       );
@@ -138,9 +187,11 @@ const HomeTasischi = () => {
     return comparisonResults.sort((a, b) => b.difference - a.difference);
   };
 
-  // Анализ 3: Отрицательная разница
-  const analyzeNegativeDifference = (reports) => {
-    const latestReports = getLatestReports(reports);
+  // Анализ 3: Отрицательная разница с периодами
+  const analyzeNegativeDifference = (reports, period) => {
+    const filteredReports = filterReportsByPeriod(reports, period);
+    const latestReports = getLatestReportsByPeriod(filteredReports, period);
+
     return latestReports
       .filter((report) => {
         const autopilot = report.generalData?.autopilotReading || 0;
@@ -160,78 +211,147 @@ const HomeTasischi = () => {
       .sort((a, b) => a.difference - b.difference);
   };
 
-  // Анализ 4: Отсутствующие отчеты
-  const analyzeMissingReports = async (reports) => {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
+  // Анализ 4: Отсутствующие отчеты с периодами
+  const analyzeMissingReports = async (reports, period) => {
+    const datesToCheck = getDatesForPeriod(period);
+    const allStations = await getAllStations();
 
-    // Получаем все уникальные станции
-    const stationsQuery = query(collection(db, "stations"));
-    const stationsSnapshot = await getDocs(stationsQuery);
-    const allStations = stationsSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    const missingReports = [];
 
-    const stationsWithReports = new Set(
-      reports
-        .filter((report) => report.reportDate === yesterdayStr)
-        .map((report) => report.stationId)
-    );
+    datesToCheck.forEach((date) => {
+      const stationsWithReports = new Set(
+        reports
+          .filter((report) => report.reportDate === date)
+          .map((report) => report.stationId)
+      );
 
-    return allStations
-      .filter((station) => !stationsWithReports.has(station.id))
-      .map((station) => ({
-        stationName: station.stationName,
-        stationId: station.id,
-        missingDate: yesterdayStr,
-      }));
+      const stationsMissing = allStations
+        .filter((station) => !stationsWithReports.has(station.id))
+        .map((station) => ({
+          stationName: station.stationName,
+          stationId: station.id,
+          missingDate: date,
+          period: period,
+        }));
+
+      missingReports.push(...stationsMissing);
+    });
+
+    // Убираем дубликаты (если станция отсутствует в нескольких датах)
+    const uniqueStations = new Map();
+    missingReports.forEach((report) => {
+      if (!uniqueStations.has(report.stationId)) {
+        uniqueStations.set(report.stationId, report);
+      }
+    });
+
+    return Array.from(uniqueStations.values());
   };
 
-  // Анализ 5: Разница контрольных сумм
-  const analyzeControlDifference = (reports) => {
-    const today = new Date();
-    const threeDaysAgo = new Date(today);
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  // Анализ 5: Разница контрольных сумм с периодами - ОБНОВЛЕННАЯ ВЕРСИЯ
+  const analyzeControlDifference = (reports, period) => {
+    const filteredReports = filterReportsByPeriod(reports, period);
 
-    const problematicReports = reports
-      .filter((report) => {
-        const reportDate = new Date(report.reportDate);
-        return reportDate <= threeDaysAgo;
-      })
+    const problematicReports = filteredReports
       .filter((report) => {
         const generalData = report.generalData || {};
-        const cashDiff =
-          generalData.cashAmount - (generalData.controlTotalSum || 0);
-        const humoDiff =
-          generalData.humoTerminal - (generalData.controlHumoSum || 0);
-        const uzcardDiff =
-          generalData.uzcardTerminal - (generalData.controlUzcardSum || 0);
-        const electronicDiff =
-          generalData.electronicPaymentSystem -
-          (generalData.controlElectronicSum || 0);
 
-        return (
-          cashDiff < 0 || humoDiff < 0 || uzcardDiff < 0 || electronicDiff < 0
-        );
+        // Получаем значения, заменяем undefined/null на 0
+        const cashAmount = generalData.cashAmount || 0;
+        const humoTerminal = generalData.humoTerminal || 0;
+        const uzcardTerminal = generalData.uzcardTerminal || 0;
+        const electronicPaymentSystem =
+          generalData.electronicPaymentSystem || 0;
+
+        const controlTotalSum = generalData.controlTotalSum || 0;
+        const controlHumoSum = generalData.controlHumoSum || 0;
+        const controlUzcardSum = generalData.controlUzcardSum || 0;
+        const controlElectronicSum = generalData.controlElectronicSum || 0;
+
+        // Проверяем разницы по НОВОЙ логике
+        const cashDiff = cashAmount - controlTotalSum;
+        const humoDiff = humoTerminal - controlHumoSum;
+        const uzcardDiff = uzcardTerminal - controlUzcardSum;
+        const electronicDiff = electronicPaymentSystem - controlElectronicSum;
+
+        // Считаем проблемными если:
+        // 1. Контрольная сумма не введена вообще (равна 0) И есть данные по терминалам
+        // 2. Контрольная сумма меньше суммы отчета (отрицательная разница)
+        const hasMissingControlSums =
+          (cashAmount > 0 && controlTotalSum === 0) ||
+          (humoTerminal > 0 && controlHumoSum === 0) ||
+          (uzcardTerminal > 0 && controlUzcardSum === 0) ||
+          (electronicPaymentSystem > 0 && controlElectronicSum === 0);
+
+        const hasNegativeDifference =
+          cashDiff > 0 || humoDiff > 0 || uzcardDiff > 0 || electronicDiff > 0;
+
+        return hasMissingControlSums || hasNegativeDifference;
       })
       .map((report) => {
         const generalData = report.generalData || {};
+
+        // Получаем значения с заменой undefined/null на 0
+        const cashAmount = generalData.cashAmount || 0;
+        const humoTerminal = generalData.humoTerminal || 0;
+        const uzcardTerminal = generalData.uzcardTerminal || 0;
+        const electronicPaymentSystem =
+          generalData.electronicPaymentSystem || 0;
+
+        const controlTotalSum = generalData.controlTotalSum || 0;
+        const controlHumoSum = generalData.controlHumoSum || 0;
+        const controlUzcardSum = generalData.controlUzcardSum || 0;
+        const controlElectronicSum = generalData.controlElectronicSum || 0;
+
+        // Определяем типы проблем по НОВОЙ логике
+        const problems = [];
+
+        // Проверяем отсутствие контрольных сумм
+        if (cashAmount > 0 && controlTotalSum === 0)
+          problems.push("cash_missing");
+        if (humoTerminal > 0 && controlHumoSum === 0)
+          problems.push("humo_missing");
+        if (uzcardTerminal > 0 && controlUzcardSum === 0)
+          problems.push("uzcard_missing");
+        if (electronicPaymentSystem > 0 && controlElectronicSum === 0)
+          problems.push("electronic_missing");
+
+        // Проверяем отрицательную разницу (контрольная сумма меньше суммы отчета)
+        if (cashAmount > controlTotalSum && controlTotalSum > 0)
+          problems.push("cash_negative");
+        if (humoTerminal > controlHumoSum && controlHumoSum > 0)
+          problems.push("humo_negative");
+        if (uzcardTerminal > controlUzcardSum && controlUzcardSum > 0)
+          problems.push("uzcard_negative");
+        if (
+          electronicPaymentSystem > controlElectronicSum &&
+          controlElectronicSum > 0
+        )
+          problems.push("electronic_negative");
+
         return {
           stationName: report.stationName,
           reportDate: report.reportDate,
           stationId: report.stationId,
           differences: {
-            cash: generalData.cashAmount - (generalData.controlTotalSum || 0),
-            humo: generalData.humoTerminal - (generalData.controlHumoSum || 0),
-            uzcard:
-              generalData.uzcardTerminal - (generalData.controlUzcardSum || 0),
-            electronic:
-              generalData.electronicPaymentSystem -
-              (generalData.controlElectronicSum || 0),
+            cash: cashAmount - controlTotalSum,
+            humo: humoTerminal - controlHumoSum,
+            uzcard: uzcardTerminal - controlUzcardSum,
+            electronic: electronicPaymentSystem - controlElectronicSum,
           },
+          amounts: {
+            cash: cashAmount,
+            humo: humoTerminal,
+            uzcard: uzcardTerminal,
+            electronic: electronicPaymentSystem,
+          },
+          controlAmounts: {
+            cash: controlTotalSum,
+            humo: controlHumoSum,
+            uzcard: controlUzcardSum,
+            electronic: controlElectronicSum,
+          },
+          problems: problems,
           generalData: generalData,
         };
       });
@@ -248,7 +368,6 @@ const HomeTasischi = () => {
       return expiryDate < today;
     });
 
-    // Группируем по станциям
     const stationsMap = new Map();
     expiredDocs.forEach((doc) => {
       if (!stationsMap.has(doc.stationId)) {
@@ -275,7 +394,94 @@ const HomeTasischi = () => {
     return Array.from(stationsMap.values());
   };
 
-  // Вспомогательные функции
+  // Вспомогательные функции для периодов
+  const filterReportsByPeriod = (reports, period) => {
+    const today = new Date();
+    let startDate = new Date();
+
+    switch (period) {
+      case "1day":
+      case "yesterday":
+        startDate.setDate(today.getDate() - 1);
+        break;
+      case "7days":
+        startDate.setDate(today.getDate() - 7);
+        break;
+      case "1month":
+        startDate.setMonth(today.getMonth() - 1);
+        break;
+      case "6months":
+        startDate.setMonth(today.getMonth() - 6);
+        break;
+      case "1year":
+        startDate.setFullYear(today.getFullYear() - 1);
+        break;
+      default:
+        startDate.setDate(today.getDate() - 1);
+    }
+
+    const startDateStr = startDate.toISOString().split("T")[0];
+    const todayStr = today.toISOString().split("T")[0];
+
+    return reports.filter(
+      (report) =>
+        report.reportDate >= startDateStr && report.reportDate <= todayStr
+    );
+  };
+
+  const getDatesForPeriod = (period) => {
+    const dates = [];
+    const today = new Date();
+    let daysBack = 1;
+
+    switch (period) {
+      case "1day":
+        daysBack = 1;
+        break;
+      case "7days":
+        daysBack = 7;
+        break;
+      case "1month":
+        daysBack = 30;
+        break;
+      case "6months":
+        daysBack = 180;
+        break;
+      case "1year":
+        daysBack = 365;
+        break;
+      default:
+        daysBack = 1;
+    }
+
+    for (let i = 1; i <= daysBack; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      dates.push(date.toISOString().split("T")[0]);
+    }
+
+    return dates;
+  };
+
+  const getLatestReportsByPeriod = (reports, period) => {
+    if (period === "1day") {
+      // Для одного дня берем последний отчет каждой станции
+      return getLatestReports(reports);
+    } else {
+      // Для периодов больше дня показываем все отчеты в периоде
+      return reports;
+    }
+  };
+
+  const getAllStations = async () => {
+    const stationsQuery = query(collection(db, "stations"));
+    const stationsSnapshot = await getDocs(stationsQuery);
+    return stationsSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+  };
+
   const getLatestReports = (reports) => {
     const latestMap = new Map();
     reports.forEach((report) => {
@@ -290,12 +496,16 @@ const HomeTasischi = () => {
     return Array.from(latestMap.values());
   };
 
-  const formatNumber = (num) => {
-    return new Intl.NumberFormat("ru-RU").format(num);
-  };
-
-  const formatCurrency = (num) => {
-    return new Intl.NumberFormat("ru-RU").format(num) + " ₽";
+  const getPeriodDisplayName = (period) => {
+    const periodNames = {
+      "1day": "за 1 день",
+      "7days": "за 7 дней",
+      "1month": "за месяц",
+      "6months": "за полгода",
+      "1year": "за год",
+      yesterday: "за вчерашний день",
+    };
+    return periodNames[period] || period;
   };
 
   // Компоненты для отображения деталей анализа
@@ -317,13 +527,25 @@ const HomeTasischi = () => {
         return (
           <NegativeDifferenceDetails
             data={analysisData.negativeDifferenceData}
+            period={negativeDiffPeriod}
+            onPeriodChange={setNegativeDiffPeriod}
           />
         );
       case "missingReports":
-        return <MissingReportsDetails data={analysisData.missingReportsData} />;
+        return (
+          <MissingReportsDetails
+            data={analysisData.missingReportsData}
+            period={missingReportsPeriod}
+            onPeriodChange={setMissingReportsPeriod}
+          />
+        );
       case "controlDifference":
         return (
-          <ControlDifferenceDetails data={analysisData.controlDifferenceData} />
+          <ControlDifferenceDetails
+            data={analysisData.controlDifferenceData}
+            period={controlDiffPeriod}
+            onPeriodChange={setControlDiffPeriod}
+          />
         );
       case "expiredDocuments":
         return (
@@ -378,7 +600,9 @@ const HomeTasischi = () => {
             title="Отрицательная разница"
             value={analysisData.negativeDifferenceData.length}
             subtitle="проблемных станций"
-            description="hoseTotalGas - autopilotReading < 0"
+            description={`hoseTotalGas - autopilotReading < 0 (${getPeriodDisplayName(
+              negativeDiffPeriod
+            )})`}
             onClick={() => setSelectedAnalysis({ type: "negativeDifference" })}
             color="red"
             icon="⚠️"
@@ -388,7 +612,9 @@ const HomeTasischi = () => {
             title="Отсутствующие отчеты"
             value={analysisData.missingReportsData.length}
             subtitle="станций без отчета"
-            description="Отчеты не сданы вовремя"
+            description={`Отчеты не сданы вовремя (${getPeriodDisplayName(
+              missingReportsPeriod
+            )})`}
             onClick={() => setSelectedAnalysis({ type: "missingReports" })}
             color="orange"
             icon="⏰"
@@ -398,7 +624,9 @@ const HomeTasischi = () => {
             title="Разница контрольных сумм"
             value={analysisData.controlDifferenceData.length}
             subtitle="проблемных отчетов"
-            description="Расхождения в финансовых данных"
+            description={`Расхождения в финансовых данных (${getPeriodDisplayName(
+              controlDiffPeriod
+            )})`}
             onClick={() => setSelectedAnalysis({ type: "controlDifference" })}
             color="purple"
             icon="💰"
@@ -422,7 +650,7 @@ const HomeTasischi = () => {
   );
 };
 
-// Компонент карточки анализа
+// Компонент карточки анализа (остается без изменений)
 const AnalysisCard = ({
   title,
   value,
@@ -464,29 +692,370 @@ const AnalysisCard = ({
   );
 };
 
-// Компоненты для деталей анализа
+// Компоненты для деталей анализа с выпадающими меню
+
+const NegativeDifferenceDetails = ({ data, period, onPeriodChange }) => (
+  <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6 mb-6">
+    <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+      <h3 className="text-lg md:text-xl font-semibold">
+        Отрицательная разница
+      </h3>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="text-sm text-gray-500">Период:</div>
+        <select
+          value={period}
+          onChange={(e) => onPeriodChange(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 w-full sm:w-auto">
+          <option value="1day">За 1 день</option>
+          <option value="7days">За 7 дней</option>
+          <option value="1month">За месяц</option>
+        </select>
+        <div className="text-sm text-red-600 font-semibold whitespace-nowrap">
+          {data.length} проблемных станций
+        </div>
+      </div>
+    </div>
+    <div className="overflow-x-auto">
+      <table className="w-full table-auto min-w-[600px]">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
+              Станция
+            </th>
+            <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
+              AutoPilot (м³)
+            </th>
+            <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
+              Шланги (м³)
+            </th>
+            <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
+              Разница
+            </th>
+            <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
+              Дата
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {data.map((station, index) => (
+            <tr
+              key={station.stationId}
+              className="hover:bg-gray-50 transition-colors">
+              <td className="px-3 py-2 md:px-4 md:py-3">
+                <div className="font-medium text-gray-900 text-sm">
+                  {station.stationName}
+                </div>
+              </td>
+              <td className="px-3 py-2 md:px-4 md:py-3 text-right text-blue-600 text-sm">
+                {formatNumber(station.autopilotReading)} м³
+              </td>
+              <td className="px-3 py-2 md:px-4 md:py-3 text-right text-green-600 text-sm">
+                {formatNumber(station.hoseTotalGas)} м³
+              </td>
+              <td className="px-3 py-2 md:px-4 md:py-3 text-right font-semibold text-red-600 text-sm">
+                {formatNumber(station.difference)} м³
+              </td>
+              <td className="px-3 py-2 md:px-4 md:py-3 text-gray-600 text-sm">
+                {formatDate(station.reportDate)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+const MissingReportsDetails = ({ data, period, onPeriodChange }) => (
+  <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6 mb-6">
+    <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+      <h3 className="text-lg md:text-xl font-semibold">Отсутствующие отчеты</h3>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="text-sm text-gray-500">Период:</div>
+        <select
+          value={period}
+          onChange={(e) => onPeriodChange(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 w-full sm:w-auto">
+          <option value="1day">За 1 день</option>
+          <option value="7days">За 7 дней</option>
+          <option value="1month">За месяц</option>
+          <option value="6months">За полгода</option>
+          <option value="1year">За год</option>
+        </select>
+        <div className="text-sm text-red-600 font-semibold whitespace-nowrap">
+          {data.length} станций не сдали отчет
+        </div>
+      </div>
+    </div>
+    <div className="overflow-x-auto">
+      <table className="w-full table-auto min-w-[500px]">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
+              Станция
+            </th>
+            <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
+              Отсутствует отчет за
+            </th>
+            <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
+              Статус
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {data.map((station, index) => (
+            <tr
+              key={station.stationId}
+              className="hover:bg-gray-50 transition-colors">
+              <td className="px-3 py-2 md:px-4 md:py-3">
+                <div className="font-medium text-gray-900 text-sm">
+                  {station.stationName}
+                </div>
+              </td>
+              <td className="px-3 py-2 md:px-4 md:py-3 font-semibold text-red-600 text-sm">
+                {formatDate(station.missingDate)}
+              </td>
+              <td className="px-3 py-2 md:px-4 md:py-3">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                  Просрочено
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+// ОБНОВЛЕННЫЙ компонент ControlDifferenceDetails
+const ControlDifferenceDetails = ({ data, period, onPeriodChange }) => {
+  const getProblemText = (problems) => {
+    const problemTexts = {
+      cash_negative: "Контрольная сумма по кассе меньше суммы отчета",
+      humo_negative: "Контрольная сумма по Хумо меньше суммы отчета",
+      uzcard_negative: "Контрольная сумма по Узкард меньше суммы отчета",
+      electronic_negative:
+        "Контрольная сумма по электронным меньше суммы отчета",
+      cash_missing: "Не введена контрольная сумма по кассе",
+      humo_missing: "Не введена контрольная сумма по Хумо",
+      uzcard_missing: "Не введена контрольная сумма по Узкард",
+      electronic_missing: "Не введена контрольная сумма по электронным",
+    };
+
+    return problems
+      .map((problem) => problemTexts[problem] || problem)
+      .join(", ");
+  };
+
+  const getStatusBadge = (problems) => {
+    const hasMissing = problems.some((p) => p.includes("missing"));
+    const hasNegative = problems.some((p) => p.includes("negative"));
+
+    if (hasMissing) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          Не введена
+        </span>
+      );
+    } else if (hasNegative) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          Меньше отчета
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+        Другая проблема
+      </span>
+    );
+  };
+
+  // Функция для определения цвета разницы
+  const getDifferenceColor = (amount, controlAmount, difference) => {
+    if (controlAmount === 0 && amount > 0) {
+      return "text-red-600"; // Красный - не введена контрольная сумма
+    } else if (difference > 0) {
+      return "text-yellow-600"; // Желтый - контрольная сумма меньше суммы отчета
+    } else {
+      return "text-green-600"; // Зеленый - все в порядке
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6 mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+        <h3 className="text-lg md:text-xl font-semibold">
+          Разница контрольных сумм
+        </h3>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="text-sm text-gray-500">Период:</div>
+          <select
+            value={period}
+            onChange={(e) => onPeriodChange(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 w-full sm:w-auto">
+            <option value="yesterday">За вчерашний день</option>
+            <option value="7days">За 7 дней</option>
+            <option value="1month">За месяц</option>
+            <option value="6months">За полгода</option>
+            <option value="1year">За год</option>
+          </select>
+          <div className="text-sm text-red-600 font-semibold whitespace-nowrap">
+            {data.length} проблемных отчетов
+          </div>
+        </div>
+      </div>
+
+      {data.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          Нет проблемных отчетов с контрольными суммами за выбранный период
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full table-auto min-w-[800px]">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
+                  Станция
+                </th>
+                <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
+                  Дата
+                </th>
+                <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
+                  Проблемы
+                </th>
+                <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
+                  Касса
+                </th>
+                <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
+                  Хумо
+                </th>
+                <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
+                  Узкард
+                </th>
+                <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
+                  Электронные
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {data.map((station, index) => (
+                <tr key={index} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-3 py-2 md:px-4 md:py-3">
+                    <div className="font-medium text-gray-900 text-sm">
+                      {station.stationName}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 md:px-4 md:py-3 text-gray-600 text-sm">
+                    {formatDate(station.reportDate)}
+                  </td>
+                  <td className="px-3 py-2 md:px-4 md:py-3">
+                    <div className="space-y-1">
+                      {getStatusBadge(station.problems)}
+                      <div className="text-xs text-gray-500 max-w-[150px] md:max-w-xs">
+                        {getProblemText(station.problems)}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 md:px-4 md:py-3">
+                    <div className="text-right">
+                      <div
+                        className={`font-semibold text-sm ${getDifferenceColor(
+                          station.amounts.cash,
+                          station.controlAmounts.cash,
+                          station.differences.cash
+                        )}`}>
+                        {formatCurrency(station.differences.cash)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatCurrency(station.amounts.cash)} /{" "}
+                        {formatCurrency(station.controlAmounts.cash)}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 md:px-4 md:py-3">
+                    <div className="text-right">
+                      <div
+                        className={`font-semibold text-sm ${getDifferenceColor(
+                          station.amounts.humo,
+                          station.controlAmounts.humo,
+                          station.differences.humo
+                        )}`}>
+                        {formatCurrency(station.differences.humo)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatCurrency(station.amounts.humo)} /{" "}
+                        {formatCurrency(station.controlAmounts.humo)}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 md:px-4 md:py-3">
+                    <div className="text-right">
+                      <div
+                        className={`font-semibold text-sm ${getDifferenceColor(
+                          station.amounts.uzcard,
+                          station.controlAmounts.uzcard,
+                          station.differences.uzcard
+                        )}`}>
+                        {formatCurrency(station.differences.uzcard)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatCurrency(station.amounts.uzcard)} /{" "}
+                        {formatCurrency(station.controlAmounts.uzcard)}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 md:px-4 md:py-3">
+                    <div className="text-right">
+                      <div
+                        className={`font-semibold text-sm ${getDifferenceColor(
+                          station.amounts.electronic,
+                          station.controlAmounts.electronic,
+                          station.differences.electronic
+                        )}`}>
+                        {formatCurrency(station.differences.electronic)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatCurrency(station.amounts.electronic)} /{" "}
+                        {formatCurrency(station.controlAmounts.electronic)}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Остальные компоненты остаются без изменений
 const AutopilotDetails = ({ data }) => (
-  <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-    <div className="flex items-center justify-between mb-6">
-      <h3 className="text-xl font-semibold">
+  <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6 mb-6">
+    <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+      <h3 className="text-lg md:text-xl font-semibold">
         Станции по количеству принятого газа через AutoPilotPro
       </h3>
       <div className="text-sm text-gray-500">Всего: {data.length} станций</div>
     </div>
     <div className="overflow-x-auto">
-      <table className="w-full table-auto">
+      <table className="w-full table-auto min-w-[600px]">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+            <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
               #
             </th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+            <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
               Станция
             </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
+            <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
               AutoPilot (м³)
             </th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+            <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
               Дата отчета
             </th>
           </tr>
@@ -496,19 +1065,21 @@ const AutopilotDetails = ({ data }) => (
             <tr
               key={station.stationId}
               className="hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-3 text-sm text-gray-600">{index + 1}</td>
-              <td className="px-4 py-3">
-                <div className="font-medium text-gray-900">
+              <td className="px-3 py-2 md:px-4 md:py-3 text-gray-600 text-sm">
+                {index + 1}
+              </td>
+              <td className="px-3 py-2 md:px-4 md:py-3">
+                <div className="font-medium text-gray-900 text-sm">
                   {station.stationName}
                 </div>
               </td>
-              <td className="px-4 py-3 text-right">
-                <div className="font-semibold text-blue-600">
+              <td className="px-3 py-2 md:px-4 md:py-3 text-right">
+                <div className="font-semibold text-blue-600 text-sm">
                   {formatNumber(station.autopilotReading)} м³
                 </div>
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600">
-                {station.reportDate}
+              <td className="px-3 py-2 md:px-4 md:py-3 text-gray-600 text-sm">
+                {formatDate(station.reportDate)}
               </td>
             </tr>
           ))}
@@ -519,13 +1090,15 @@ const AutopilotDetails = ({ data }) => (
 );
 
 const ComparisonDetails = ({ data, type, onTypeChange }) => (
-  <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-    <div className="flex items-center justify-between mb-6">
-      <h3 className="text-xl font-semibold">Сравнительный анализ продаж</h3>
+  <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6 mb-6">
+    <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+      <h3 className="text-lg md:text-xl font-semibold">
+        Сравнительный анализ продаж
+      </h3>
       <select
         value={type}
         onChange={(e) => onTypeChange(e.target.value)}
-        className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-auto">
         <option value="yesterday">Сравнение с предыдущим днем</option>
         <option value="last7days">Сравнение по дням недели</option>
         <option value="last30days">Сравнение по последним отчетам</option>
@@ -533,22 +1106,22 @@ const ComparisonDetails = ({ data, type, onTypeChange }) => (
     </div>
 
     <div className="overflow-x-auto">
-      <table className="w-full table-auto">
+      <table className="w-full table-auto min-w-[700px]">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+            <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
               Станция
             </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
+            <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
               Текущие продажи (м³)
             </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
+            <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
               Предыдущие продажи (м³)
             </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
+            <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
               Разница
             </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
+            <th className="px-3 py-2 md:px-4 md:py-3 text-right text-xs md:text-sm font-semibold text-gray-700">
               Изменение
             </th>
           </tr>
@@ -556,29 +1129,30 @@ const ComparisonDetails = ({ data, type, onTypeChange }) => (
         <tbody className="divide-y divide-gray-200">
           {data.map((station, index) => (
             <tr key={index} className="hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-3">
-                <div className="font-medium text-gray-900">
+              <td className="px-3 py-2 md:px-4 md:py-3">
+                <div className="font-medium text-gray-900 text-sm">
                   {station.stationName}
                 </div>
                 <div className="text-xs text-gray-500">
-                  {station.currentDate} vs {station.previousDate}
+                  {formatDate(station.currentDate)} vs{" "}
+                  {formatDate(station.previousDate)}
                 </div>
               </td>
-              <td className="px-4 py-3 text-right font-semibold text-green-600">
+              <td className="px-3 py-2 md:px-4 md:py-3 text-right font-semibold text-green-600 text-sm">
                 {formatNumber(station.currentValue)} м³
               </td>
-              <td className="px-4 py-3 text-right text-gray-600">
+              <td className="px-3 py-2 md:px-4 md:py-3 text-right text-gray-600 text-sm">
                 {formatNumber(station.previousValue)} м³
               </td>
               <td
-                className={`px-4 py-3 text-right font-semibold ${
+                className={`px-3 py-2 md:px-4 md:py-3 text-right font-semibold text-sm ${
                   station.difference >= 0 ? "text-green-600" : "text-red-600"
                 }`}>
                 {station.difference >= 0 ? "+" : ""}
                 {formatNumber(station.difference)} м³
               </td>
               <td
-                className={`px-4 py-3 text-right font-semibold ${
+                className={`px-3 py-2 md:px-4 md:py-3 text-right font-semibold text-sm ${
                   station.percentageChange >= 0
                     ? "text-green-600"
                     : "text-red-600"
@@ -594,201 +1168,12 @@ const ComparisonDetails = ({ data, type, onTypeChange }) => (
   </div>
 );
 
-const NegativeDifferenceDetails = ({ data }) => (
-  <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-    <div className="flex items-center justify-between mb-6">
-      <h3 className="text-xl font-semibold">
-        Станции с отрицательной разницей
-      </h3>
-      <div className="text-sm text-gray-500">
-        Всего проблемных: {data.length} станций
-      </div>
-    </div>
-    <div className="overflow-x-auto">
-      <table className="w-full table-auto">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              Станция
-            </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
-              AutoPilot (м³)
-            </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
-              Шланги (м³)
-            </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
-              Разница
-            </th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              Дата
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {data.map((station, index) => (
-            <tr
-              key={station.stationId}
-              className="hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-3">
-                <div className="font-medium text-gray-900">
-                  {station.stationName}
-                </div>
-              </td>
-              <td className="px-4 py-3 text-right text-blue-600">
-                {formatNumber(station.autopilotReading)} м³
-              </td>
-              <td className="px-4 py-3 text-right text-green-600">
-                {formatNumber(station.hoseTotalGas)} м³
-              </td>
-              <td className="px-4 py-3 text-right font-semibold text-red-600">
-                {formatNumber(station.difference)} м³
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-600">
-                {station.reportDate}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
-
-const MissingReportsDetails = ({ data }) => (
-  <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-    <div className="flex items-center justify-between mb-6">
-      <h3 className="text-xl font-semibold">Отсутствующие отчеты</h3>
-      <div className="text-sm text-red-600 font-semibold">
-        {data.length} станций не сдали отчет
-      </div>
-    </div>
-    <div className="overflow-x-auto">
-      <table className="w-full table-auto">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              Станция
-            </th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              Отсутствует отчет за
-            </th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              Статус
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {data.map((station, index) => (
-            <tr
-              key={station.stationId}
-              className="hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-3">
-                <div className="font-medium text-gray-900">
-                  {station.stationName}
-                </div>
-              </td>
-              <td className="px-4 py-3 font-semibold text-red-600">
-                {station.missingDate}
-              </td>
-              <td className="px-4 py-3">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-                  Просрочено
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
-
-const ControlDifferenceDetails = ({ data }) => (
-  <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-    <div className="flex items-center justify-between mb-6">
-      <h3 className="text-xl font-semibold">Разница контрольных сумм</h3>
-      <div className="text-sm text-red-600 font-semibold">
-        {data.length} проблемных отчетов
-      </div>
-    </div>
-    <div className="overflow-x-auto">
-      <table className="w-full table-auto">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              Станция
-            </th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              Дата отчета
-            </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
-              Касса
-            </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
-              Хумо
-            </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
-              Узкард
-            </th>
-            <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
-              Электронные
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {data.map((station, index) => (
-            <tr key={index} className="hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-3">
-                <div className="font-medium text-gray-900">
-                  {station.stationName}
-                </div>
-              </td>
-              <td className="px-4 py-3 text-gray-600">{station.reportDate}</td>
-              <td
-                className={`px-4 py-3 text-right font-semibold ${
-                  station.differences.cash < 0
-                    ? "text-red-600"
-                    : "text-green-600"
-                }`}>
-                {formatCurrency(station.differences.cash)}
-              </td>
-              <td
-                className={`px-4 py-3 text-right font-semibold ${
-                  station.differences.humo < 0
-                    ? "text-red-600"
-                    : "text-green-600"
-                }`}>
-                {formatCurrency(station.differences.humo)}
-              </td>
-              <td
-                className={`px-4 py-3 text-right font-semibold ${
-                  station.differences.uzcard < 0
-                    ? "text-red-600"
-                    : "text-green-600"
-                }`}>
-                {formatCurrency(station.differences.uzcard)}
-              </td>
-              <td
-                className={`px-4 py-3 text-right font-semibold ${
-                  station.differences.electronic < 0
-                    ? "text-red-600"
-                    : "text-green-600"
-                }`}>
-                {formatCurrency(station.differences.electronic)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
-
 const ExpiredDocumentsDetails = ({ data }) => (
-  <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-    <div className="flex items-center justify-between mb-6">
-      <h3 className="text-xl font-semibold">Просроченные документы</h3>
+  <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6 mb-6">
+    <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+      <h3 className="text-lg md:text-xl font-semibold">
+        Просроченные документы
+      </h3>
       <div className="text-sm text-red-600 font-semibold">
         {data.length} станций с просрочкой
       </div>
@@ -805,7 +1190,7 @@ const ExpiredDocumentsDetails = ({ data }) => (
             {station.documents.map((doc, docIndex) => (
               <div
                 key={docIndex}
-                className="flex justify-between items-center bg-white p-3 rounded-lg border border-red-100">
+                className="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white p-3 rounded-lg border border-red-100 gap-2">
                 <div>
                   <span className="font-medium text-gray-900">
                     {doc.docType}
@@ -813,7 +1198,7 @@ const ExpiredDocumentsDetails = ({ data }) => (
                   <span className="text-gray-600 ml-2">№{doc.docNumber}</span>
                   {doc.issueDate && (
                     <div className="text-sm text-gray-500">
-                      Выдан: {doc.issueDate}
+                      Выдан: {formatDate(doc.issueDate)}
                     </div>
                   )}
                 </div>
@@ -822,7 +1207,7 @@ const ExpiredDocumentsDetails = ({ data }) => (
                     Просрочено на {doc.daysOverdue} дней
                   </div>
                   <div className="text-sm text-gray-600">
-                    Истек: {doc.expiryDate}
+                    Истек: {formatDate(doc.expiryDate)}
                   </div>
                 </div>
               </div>
@@ -833,13 +1218,5 @@ const ExpiredDocumentsDetails = ({ data }) => (
     </div>
   </div>
 );
-
-const formatNumber = (num) => {
-  return new Intl.NumberFormat("ru-RU").format(num);
-};
-
-const formatCurrency = (num) => {
-  return new Intl.NumberFormat("ru-RU").format(num) + " ₽";
-};
 
 export default HomeTasischi;
