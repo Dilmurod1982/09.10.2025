@@ -44,6 +44,7 @@ import {
   GasSettlements,
   ElektrSettlements,
   HomeTasischi,
+  JobTitle,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -139,6 +140,12 @@ function App() {
           path: "/stations",
           element: (
             <ProtectedLayout allowedRoles={["admin"]} element={<Stations />} />
+          ),
+        },
+        {
+          path: "/jobtitle",
+          element: (
+            <ProtectedLayout allowedRoles={["admin"]} element={<JobTitle />} />
           ),
         },
         {

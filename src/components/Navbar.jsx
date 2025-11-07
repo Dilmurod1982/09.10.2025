@@ -56,6 +56,7 @@ import {
   Bolt as BoltIcon, // Иконка для электроэнергии
   Whatshot as GasIcon, // Иконка для газа
   Calculate as CalculateIcon, // Иконка для расчетов
+  Work as WorkIcon, // Иконка для должностей
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import Collapse from "@mui/material/Collapse";
@@ -97,7 +98,7 @@ export default function Navbar() {
   const [partnersOpen, setPartnersOpen] = React.useState(false);
   const [dailyReportsOpen, setDailyReportsOpen] = React.useState(false);
   const [energySettlementsOpen, setEnergySettlementsOpen] =
-    React.useState(false); // Новое состояние для меню расчетов
+    React.useState(false);
   const [userModalOpen, setUserModalOpen] = React.useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = React.useState(false);
   const [passwordData, setPasswordData] = React.useState({
@@ -178,7 +179,7 @@ export default function Navbar() {
       setDocsPerpOpen(false);
       setPartnersOpen(false);
       setDailyReportsOpen(false);
-      setEnergySettlementsOpen(false); // Закрываем меню расчетов при закрытии drawer
+      setEnergySettlementsOpen(false);
     }
   };
 
@@ -211,7 +212,7 @@ export default function Navbar() {
   const handlePartnersClick = () => setPartnersOpen(!partnersOpen);
   const handleDailyReportsClick = () => setDailyReportsOpen(!dailyReportsOpen);
   const handleEnergySettlementsClick = () =>
-    setEnergySettlementsOpen(!energySettlementsOpen); // Обработчик для меню расчетов
+    setEnergySettlementsOpen(!energySettlementsOpen);
 
   // Функции для управления паролем
   const handlePasswordChange = () => {
@@ -373,6 +374,7 @@ export default function Navbar() {
     { text: "Пользователи", icon: <PeopleIcon />, path: "/users" },
     { text: "ООО", icon: <CorporateFareIcon />, path: "/ltds" },
     { text: "Банк", icon: <AccountBalanceIcon />, path: "/banks" },
+    { text: "Должности", icon: <WorkIcon />, path: "/jobtitle" }, // Добавлен пункт Должности
   ];
 
   const partnersItems = [
