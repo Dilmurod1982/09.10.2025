@@ -30,6 +30,11 @@ const GasSettlements = () => {
   const [selectedSettlement, setSelectedSettlement] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // Проверка роли пользователя
+  const isRahbar = userData?.role === "rahbar";
+  const canAddGasQuantity = !isRahbar;
+  const canAddPayment = !isRahbar;
+
   // Годы для выбора
   const yearOptions = useMemo(() => {
     const options = [];
@@ -401,6 +406,10 @@ const GasSettlements = () => {
 
   // Добавление оплаты
   const handleAddPayment = () => {
+    if (isRahbar) {
+      toast.error("Доступ запрещен для вашей роли");
+      return;
+    }
     toast.success("Функция добавления оплаты будет реализована позже");
   };
 
@@ -413,6 +422,15 @@ const GasSettlements = () => {
             Расчеты по получаемому газу
           </h1>
           <p className="text-gray-600">Расчеты станций с рай/горгазами</p>
+          {isRahbar && (
+            <div className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded-lg">
+              <p className="text-yellow-800 text-sm">
+                <strong>Режим просмотра:</strong> Вы можете только просматривать
+                данные. Добавление количества газа и оплаты недоступно для вашей
+                роли.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Панель управления */}
@@ -472,25 +490,37 @@ const GasSettlements = () => {
               </select>
             </div>
 
-            {/* Кнопки действий */}
-            <div className="flex items-end gap-2">
-              <button
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => setShowAddModal(true)}
-                disabled={!selectedYear || !selectedMonth}>
-                Добавление количества газа
-              </button>
-            </div>
+            {/* Кнопки действий - скрыта для rahbar */}
+            {canAddGasQuantity && (
+              <div className="flex items-end gap-2">
+                <button
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => setShowAddModal(true)}
+                  disabled={!selectedYear || !selectedMonth}>
+                  Добавление количества газа
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Дополнительные кнопки */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-            <button
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={handleAddPayment}
-              disabled={!selectedYear || !selectedMonth}>
-              Добавление оплаты
-            </button>
+          <div
+            className={`grid gap-4 mt-4 ${
+              canAddPayment
+                ? "grid-cols-1 md:grid-cols-4"
+                : "grid-cols-1 md:grid-cols-3"
+            }`}>
+            {/* Кнопка добавления оплаты - скрыта для rahbar */}
+            {canAddPayment && (
+              <button
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleAddPayment}
+                disabled={!selectedYear || !selectedMonth}>
+                Добавление оплаты
+              </button>
+            )}
+
+            {/* Остальные кнопки доступны всем */}
             <button
               className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleExportToExcel}
@@ -722,9 +752,9 @@ const GasSettlements = () => {
           )}
       </div>
 
-      {/* Модальное окно добавления количества газа */}
+      {/* Модальное окно добавления количества газа - скрыто для rahbar */}
       <AnimatePresence>
-        {showAddModal && (
+        {showAddModal && canAddGasQuantity && (
           <AddGasQuantityModal
             isOpen={showAddModal}
             onClose={() => setShowAddModal(false)}

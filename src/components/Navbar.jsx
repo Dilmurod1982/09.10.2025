@@ -1075,7 +1075,7 @@ export default function Navbar() {
                       <List component="div" disablePadding>
                         {partnersItems
                           .filter((item) => {
-                            if (role === "operator") {
+                            if (role === "operator" || role === "rahbar") {
                               return item.text === "Задолженности партнеров";
                             }
                             return true;
