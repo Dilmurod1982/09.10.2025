@@ -14,6 +14,8 @@ const HomeChief = () => {
   const [missingReportsPeriod, setMissingReportsPeriod] = useState("1day");
   const [controlDiffPeriod, setControlDiffPeriod] = useState("yesterday");
   const [autopilotPeriod, setAutopilotPeriod] = useState("1day");
+  const [gasPaymentsPeriod, setGasPaymentsPeriod] = useState("1day");
+  const [gasPaymentsDateRange, setGasPaymentsDateRange] = useState(null);
 
   const userData = useAppStore((state) => state.userData);
   const managedStations = userData?.stations || [];
@@ -30,6 +32,8 @@ const HomeChief = () => {
       controlDiffPeriod,
       comparisonType,
       autopilotPeriod,
+      gasPaymentsPeriod,
+      gasPaymentsDateRange,
     });
   };
 
@@ -201,6 +205,25 @@ const HomeChief = () => {
             color="yellow"
             icon="📄"
           />
+
+          {/* НОВАЯ КАРТОЧКА: Расход газа и платежи */}
+          <AnalysisCard
+            title="Расход газа и платежи"
+            value={
+              analysisData.gasAndPaymentsData?.summary
+                ? "Сводка"
+                : analysisData.gasAndPaymentsData.length
+            }
+            subtitle={
+              analysisData.gasAndPaymentsData?.summary
+                ? "за период"
+                : "станций с данными"
+            }
+            description="Анализ продаж и поступлений"
+            onClick={() => setSelectedAnalysis({ type: "gasAndPayments" })}
+            color="teal"
+            icon="⛽"
+          />
         </div>
 
         {/* Детали анализа */}
@@ -213,6 +236,8 @@ const HomeChief = () => {
             missingReportsPeriod,
             controlDiffPeriod,
             autopilotPeriod,
+            gasPaymentsPeriod,
+            gasPaymentsDateRange,
           }}
           onFiltersChange={{
             setComparisonType,
@@ -220,6 +245,8 @@ const HomeChief = () => {
             setMissingReportsPeriod,
             setControlDiffPeriod,
             setAutopilotPeriod,
+            setGasPaymentsPeriod,
+            setGasPaymentsDateRange,
           }}
           onRefresh={applyFilters}
         />

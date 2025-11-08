@@ -36,6 +36,7 @@ import {
   Calendar,
   UserCheck,
   UserX,
+  Briefcase,
 } from "lucide-react";
 
 const Stations = () => {
@@ -48,6 +49,7 @@ const Stations = () => {
   const [gasChillers, setGasChillers] = useState([]);
   const [positions, setPositions] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [jobTitles, setJobTitles] = useState([]); // Новая коллекция для должностей
   const [selectedStation, setSelectedStation] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -106,6 +108,7 @@ const Stations = () => {
       phone: "",
     },
     staff: [],
+    positions: [], // Новое поле для штатов/должностей
     compressors: [],
     dispensers: [],
     dryers: [],
@@ -138,6 +141,7 @@ const Stations = () => {
           chillersSnapshot,
           positionsSnapshot,
           employeesSnapshot,
+          jobTitlesSnapshot, // Новая загрузка должностей
         ] = await Promise.all([
           getDocs(collection(db, "stations")),
           getDocs(collection(db, "organizations")),
@@ -148,6 +152,7 @@ const Stations = () => {
           getDocs(collection(db, "gasChillers")),
           getDocs(collection(db, "positions")),
           getDocs(collection(db, "employees")),
+          getDocs(collection(db, "jobtitles")), // Загружаем должности
         ]);
 
         setStations(
@@ -179,6 +184,9 @@ const Stations = () => {
         );
         setEmployees(
           employeesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+        );
+        setJobTitles(
+          jobTitlesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
         );
       } catch (error) {
         console.error("Error loading data:", error);
@@ -768,6 +776,51 @@ const Stations = () => {
     handleInputChange("electricitySuppliers", updatedList);
   };
 
+  // Обработчики для штатов/должностей
+  const addPosition = () => {
+    const currentData = isCreating ? newStation : selectedStation;
+    const updatedList = [
+      ...(currentData.positions || []),
+      {
+        jobTitleId: "",
+        jobTitleName: "",
+        description: "",
+        requirements: "",
+        responsibilities: "",
+        salaryRange: "",
+        type: "",
+      },
+    ];
+    handleInputChange("positions", updatedList);
+  };
+
+  const removePosition = (index) => {
+    const currentData = isCreating ? newStation : selectedStation;
+    const updatedList = currentData.positions.filter((_, i) => i !== index);
+    handleInputChange("positions", updatedList);
+  };
+
+  const handlePositionChange = (index, jobTitleId) => {
+    const selectedJobTitle = jobTitles.find((job) => job.id === jobTitleId);
+    if (selectedJobTitle) {
+      const currentData = isCreating ? newStation : selectedStation;
+      const updatedPositions = currentData.positions.map((pos, i) =>
+        i === index
+          ? {
+              jobTitleId: jobTitleId,
+              jobTitleName: selectedJobTitle.name,
+              description: selectedJobTitle.description || "",
+              requirements: selectedJobTitle.requirements || "",
+              responsibilities: selectedJobTitle.responsibilities || "",
+              salaryRange: selectedJobTitle.salaryRange || "",
+              type: selectedJobTitle.type || "",
+            }
+          : pos
+      );
+      handleInputChange("positions", updatedPositions);
+    }
+  };
+
   // Открытие модального окна
   const handleStationClick = (station) => {
     setSelectedStation({ ...station });
@@ -793,6 +846,7 @@ const Stations = () => {
         phone: "",
       },
       staff: [],
+      positions: [], // Инициализируем пустой массив должностей
       compressors: [],
       dispensers: [],
       dryers: [],
@@ -1170,7 +1224,7 @@ const Stations = () => {
 
                 <th className="px-4 py-4 text-left font-semibold">Адрес</th>
                 <th className="px-4 py-4 text-left font-semibold hidden lg:table-cell">
-                  Сотрудники
+                  Штаты
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden xl:table-cell">
                   Компрессоры
@@ -1226,8 +1280,8 @@ const Stations = () => {
                   </td>
                   <td className="px-4 py-4 text-gray-600 hidden lg:table-cell">
                     <div className="flex items-center gap-2">
-                      <Users className="text-blue-500" size={16} />
-                      <span>{station.staff?.length || 0} чел.</span>
+                      <Briefcase className="text-blue-500" size={16} />
+                      <span>{station.positions?.length || 0} шт.</span>
                     </div>
                   </td>
                   <td className="px-4 py-4 text-gray-600 hidden xl:table-cell">
@@ -1507,6 +1561,141 @@ const Stations = () => {
                         />
                       </div>
                     </div>
+                  </div>
+
+                  {/* Штаты/Должности */}
+                  <div className="border-t pt-6">
+                    <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
+                      <Briefcase size={18} />
+                      Штаты станции
+                    </h3>
+
+                    {(isCreating || isEditMode) && (
+                      <div className="mb-4">
+                        <button
+                          type="button"
+                          onClick={addPosition}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                          <Plus size={16} />
+                          Добавить должность
+                        </button>
+                      </div>
+                    )}
+
+                    {(
+                      getNestedValue(
+                        isCreating ? newStation : selectedStation,
+                        "positions"
+                      ) || []
+                    ).length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse border border-gray-200 rounded-lg">
+                          <thead>
+                            <tr className="bg-gray-50">
+                              <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
+                                Должность
+                              </th>
+                              <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
+                                Описание
+                              </th>
+                              <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
+                                Требования
+                              </th>
+                              <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
+                                Обязанности
+                              </th>
+                              <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
+                                Зарплата
+                              </th>
+                              <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
+                                Тип
+                              </th>
+                              {(isCreating || isEditMode) && (
+                                <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
+                                  Действия
+                                </th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(
+                              getNestedValue(
+                                isCreating ? newStation : selectedStation,
+                                "positions"
+                              ) || []
+                            ).map((position, index) => (
+                              <tr key={index} className="hover:bg-gray-50">
+                                <td className="border border-gray-200 px-4 py-3">
+                                  {isCreating || isEditMode ? (
+                                    <select
+                                      value={position.jobTitleId || ""}
+                                      onChange={(e) =>
+                                        handlePositionChange(
+                                          index,
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                                      <option value="">
+                                        Выберите должность
+                                      </option>
+                                      {jobTitles.map((job) => (
+                                        <option key={job.id} value={job.id}>
+                                          {job.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <span className="font-medium">
+                                      {position.jobTitleName}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="border border-gray-200 px-4 py-3">
+                                  <div className="max-w-xs">
+                                    {position.description || "-"}
+                                  </div>
+                                </td>
+                                <td className="border border-gray-200 px-4 py-3">
+                                  <div className="max-w-xs">
+                                    {position.requirements || "-"}
+                                  </div>
+                                </td>
+                                <td className="border border-gray-200 px-4 py-3">
+                                  <div className="max-w-xs">
+                                    {position.responsibilities || "-"}
+                                  </div>
+                                </td>
+                                <td className="border border-gray-200 px-4 py-3">
+                                  {position.salaryRange || "-"}
+                                </td>
+                                <td className="border border-gray-200 px-4 py-3">
+                                  {position.type || "-"}
+                                </td>
+                                {(isCreating || isEditMode) && (
+                                  <td className="border border-gray-200 px-4 py-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => removePosition(index)}
+                                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <Briefcase
+                          className="mx-auto mb-2 text-gray-400"
+                          size={32}
+                        />
+                        <p>Должности не добавлены</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Персонал - только руководитель */}

@@ -1,5 +1,5 @@
 // hooks/AnalysisComponents.jsx
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
   formatNumber,
@@ -25,6 +25,7 @@ export const AnalysisCard = ({
     orange: "bg-orange-50 border-orange-200 hover:bg-orange-100",
     purple: "bg-purple-50 border-purple-200 hover:bg-purple-100",
     yellow: "bg-yellow-50 border-yellow-200 hover:bg-yellow-100",
+    teal: "bg-teal-50 border-teal-200 hover:bg-teal-100", // НОВЫЙ ЦВЕТ
   };
 
   return (
@@ -40,6 +41,334 @@ export const AnalysisCard = ({
       <div className="text-3xl font-bold text-gray-900 mb-2">{value}</div>
       <div className="text-sm text-gray-600 mb-1">{subtitle}</div>
       <div className="text-xs text-gray-500">{description}</div>
+    </motion.div>
+  );
+};
+
+// НОВЫЙ КОМПОНЕНТ: Детали анализа расхода газа и платежей
+export const GasAndPaymentsDetails = ({
+  analysisData,
+  filters = {},
+  onFiltersChange = {},
+  onRefresh,
+}) => {
+  const [dateRange, setDateRange] = useState({
+    startDate: new Date().toISOString().split("T")[0],
+    endDate: new Date().toISOString().split("T")[0],
+    rangeType: "custom",
+  });
+
+  const handleDateRangeChange = (field, value) => {
+    const newDateRange = { ...dateRange, [field]: value };
+    setDateRange(newDateRange);
+
+    // Если это кастомный диапазон, применяем фильтр
+    if (field === "startDate" || field === "endDate") {
+      onFiltersChange.setGasPaymentsDateRange?.(newDateRange);
+    }
+  };
+
+  const handleQuickRangeSelect = (rangeType) => {
+    const today = new Date();
+    let startDate = new Date();
+
+    switch (rangeType) {
+      case "today":
+        startDate = today;
+        break;
+      case "yesterday":
+        startDate.setDate(today.getDate() - 1);
+        break;
+      case "week":
+        startDate.setDate(today.getDate() - 7);
+        break;
+      case "month":
+        startDate.setMonth(today.getMonth() - 1);
+        break;
+      case "year":
+        startDate.setFullYear(today.getFullYear() - 1);
+        break;
+      default:
+        startDate = today;
+    }
+
+    const newDateRange = {
+      startDate: startDate.toISOString().split("T")[0],
+      endDate: today.toISOString().split("T")[0],
+      rangeType: rangeType,
+    };
+
+    setDateRange(newDateRange);
+    onFiltersChange.setGasPaymentsDateRange?.(newDateRange);
+  };
+
+  const renderGasAndPaymentsDetails = () => {
+    const data = analysisData.gasAndPaymentsData;
+
+    // Проверяем структуру данных (может быть массивом или объектом с summary)
+    const isDateRangeData = data && data.summary;
+    const summary = isDateRangeData ? data.summary : null;
+    const stationsData = isDateRangeData ? data.stationsData : data;
+    const dailyData = isDateRangeData ? data.dailyData : [];
+
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-semibold">
+            Анализ расхода газа и поступлений платежей
+          </h3>
+          <div className="flex gap-2">
+            {/* Быстрый выбор периода */}
+            <select
+              value={dateRange.rangeType}
+              onChange={(e) => handleQuickRangeSelect(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg">
+              <option value="custom">Выберите период</option>
+              <option value="today">Сегодня</option>
+              <option value="yesterday">Вчера</option>
+              <option value="week">Неделя</option>
+              <option value="month">Месяц</option>
+              <option value="year">Год</option>
+            </select>
+
+            {/* Кастомный диапазон дат */}
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={dateRange.startDate}
+                onChange={(e) =>
+                  handleDateRangeChange("startDate", e.target.value)
+                }
+                className="px-3 py-2 border border-gray-300 rounded-lg"
+              />
+              <span className="self-center">по</span>
+              <input
+                type="date"
+                value={dateRange.endDate}
+                onChange={(e) =>
+                  handleDateRangeChange("endDate", e.target.value)
+                }
+                className="px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+
+            <button
+              onClick={onRefresh}
+              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+              Обновить
+            </button>
+          </div>
+        </div>
+
+        {/* Общая сводка */}
+        {summary && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="text-2xl font-bold text-blue-600">
+                {formatNumber(summary.totalGas)} м3
+              </div>
+              <div className="text-sm text-gray-600">Всего продано газа</div>
+            </div>
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(summary.totalPayments)}
+              </div>
+              <div className="text-sm text-gray-600">Всего поступлений</div>
+            </div>
+            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="text-2xl font-bold text-purple-600">
+                {summary.reportsCount}
+              </div>
+              <div className="text-sm text-gray-600">Отчетов</div>
+            </div>
+            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="text-2xl font-bold text-orange-600">
+                {stationsData?.length || 0}
+              </div>
+              <div className="text-sm text-gray-600">Станций</div>
+            </div>
+          </div>
+        )}
+
+        {/* Распределение платежей */}
+        {summary && (
+          <div className="p-4 bg-white rounded-lg border mb-6">
+            <h4 className="font-semibold mb-3">Распределение платежей</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="text-center p-3 bg-green-50 rounded">
+                <div className="font-semibold text-green-600">
+                  {formatCurrency(summary.totalCash)}
+                </div>
+                <div className="text-gray-600">Наличные</div>
+                <div className="text-xs text-gray-500">
+                  {summary.totalPayments > 0
+                    ? (
+                        (summary.totalCash / summary.totalPayments) *
+                        100
+                      ).toFixed(1)
+                    : 0}
+                  %
+                </div>
+              </div>
+              <div className="text-center p-3 bg-blue-50 rounded">
+                <div className="font-semibold text-blue-600">
+                  {formatCurrency(summary.totalHumo)}
+                </div>
+                <div className="text-gray-600">HUMO</div>
+                <div className="text-xs text-gray-500">
+                  {summary.totalPayments > 0
+                    ? (
+                        (summary.totalHumo / summary.totalPayments) *
+                        100
+                      ).toFixed(1)
+                    : 0}
+                  %
+                </div>
+              </div>
+              <div className="text-center p-3 bg-purple-50 rounded">
+                <div className="font-semibold text-purple-600">
+                  {formatCurrency(summary.totalUzcard)}
+                </div>
+                <div className="text-gray-600">Uzcard</div>
+                <div className="text-xs text-gray-500">
+                  {summary.totalPayments > 0
+                    ? (
+                        (summary.totalUzcard / summary.totalPayments) *
+                        100
+                      ).toFixed(1)
+                    : 0}
+                  %
+                </div>
+              </div>
+              <div className="text-center p-3 bg-orange-50 rounded">
+                <div className="font-semibold text-orange-600">
+                  {formatCurrency(summary.totalElectronic)}
+                </div>
+                <div className="text-gray-600">Электронные</div>
+                <div className="text-xs text-gray-500">
+                  {summary.totalPayments > 0
+                    ? (
+                        (summary.totalElectronic / summary.totalPayments) *
+                        100
+                      ).toFixed(1)
+                    : 0}
+                  %
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Данные по станциям */}
+        <div>
+          <h4 className="font-semibold mb-3">Данные по станциям</h4>
+          {!stationsData || stationsData.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              Нет данных за выбранный период
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {stationsData.map((station, index) => (
+                <div
+                  key={station.stationId}
+                  className="p-4 bg-white rounded-lg border">
+                  <div className="flex justify-between items-center mb-3">
+                    <h5 className="font-semibold">{station.stationName}</h5>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-blue-600">
+                        {formatNumber(station.totalGas)} м3
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {formatCurrency(station.totalPayments)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <div className="font-semibold">Наличные</div>
+                      <div>{formatCurrency(station.totalCash)}</div>
+                      <div className="text-xs text-gray-500">
+                        {station.paymentDistribution?.cashPercentage?.toFixed(
+                          1
+                        ) || 0}
+                        %
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-semibold">HUMO</div>
+                      <div>{formatCurrency(station.totalHumo)}</div>
+                      <div className="text-xs text-gray-500">
+                        {station.paymentDistribution?.humoPercentage?.toFixed(
+                          1
+                        ) || 0}
+                        %
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-semibold">Uzcard</div>
+                      <div>{formatCurrency(station.totalUzcard)}</div>
+                      <div className="text-xs text-gray-500">
+                        {station.paymentDistribution?.uzcardPercentage?.toFixed(
+                          1
+                        ) || 0}
+                        %
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-semibold">Электронные</div>
+                      <div>{formatCurrency(station.totalElectronic)}</div>
+                      <div className="text-xs text-gray-500">
+                        {station.paymentDistribution?.electronicPercentage?.toFixed(
+                          1
+                        ) || 0}
+                        %
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 text-xs text-gray-500">
+                    {station.reportsCount} отчетов
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Ежедневные данные (только для диапазона дат) */}
+        {dailyData && dailyData.length > 0 && (
+          <div className="mt-6">
+            <h4 className="font-semibold mb-3">Ежедневная статистика</h4>
+            <div className="space-y-2">
+              {dailyData.map((day, index) => (
+                <div key={index} className="p-3 bg-gray-50 rounded border">
+                  <div className="flex justify-between items-center">
+                    <div className="font-semibold">{formatDate(day.date)}</div>
+                    <div className="text-right">
+                      <div className="text-sm font-semibold">
+                        {formatNumber(day.totalGas)} м3
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        {formatCurrency(day.totalPayments)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-6 bg-white rounded-2xl shadow-lg mb-6">
+      {renderGasAndPaymentsDetails()}
     </motion.div>
   );
 };
@@ -94,12 +423,12 @@ export const AnalysisDetails = ({
                   <h4 className="font-semibold">{station.stationName}</h4>
                   <p className="text-sm text-gray-600">
                     Среднее значение:{" "}
-                    {formatNumber(station.averageAutopilot.toFixed(2))} л
+                    {formatNumber(station.averageAutopilot.toFixed(2))} м3
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold">
-                    {formatNumber(station.totalAutopilot)} л
+                    {formatNumber(station.totalAutopilot)} м3
                   </p>
                   <p className="text-sm text-gray-600">
                     {station.reportsCount} отчетов
@@ -153,18 +482,18 @@ export const AnalysisDetails = ({
                       : "bg-red-100 text-red-800"
                   }`}>
                   {station.difference >= 0 ? "+" : ""}
-                  {formatNumber(station.difference)} л
+                  {formatNumber(station.difference)} м3
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p>Текущее: {formatNumber(station.currentValue)} л</p>
+                  <p>Текущее: {formatNumber(station.currentValue)} м3</p>
                   <p className="text-gray-600">
                     {formatDate(station.currentDate)}
                   </p>
                 </div>
                 <div>
-                  <p>Предыдущее: {formatNumber(station.previousValue)} л</p>
+                  <p>Предыдущее: {formatNumber(station.previousValue)} м3</p>
                   <p className="text-gray-600">
                     {formatDate(station.previousDate)}
                   </p>
@@ -215,13 +544,13 @@ export const AnalysisDetails = ({
               <div className="flex justify-between items-center mb-2">
                 <h4 className="font-semibold">{station.stationName}</h4>
                 <span className="bg-red-100 text-red-800 px-2 py-1 rounded">
-                  {formatNumber(station.difference)} л
+                  {formatNumber(station.difference)} м3
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p>AutoPilot: {formatNumber(station.autopilotReading)} л</p>
-                  <p>Hose Total: {formatNumber(station.hoseTotalGas)} л</p>
+                  <p>AutoPilot: {formatNumber(station.autopilotReading)} м3</p>
+                  <p>Hose Total: {formatNumber(station.hoseTotalGas)} м3</p>
                 </div>
                 <div className="text-right">
                   <p className="text-gray-600">
@@ -493,6 +822,15 @@ export const AnalysisDetails = ({
     </div>
   );
 
+  const renderGasAndPaymentsDetails = () => (
+    <GasAndPaymentsDetails
+      analysisData={analysisData}
+      filters={filters}
+      onFiltersChange={onFiltersChange}
+      onRefresh={onRefresh}
+    />
+  );
+
   const renderDetails = () => {
     switch (selectedAnalysis.type) {
       case "autopilot":
@@ -507,6 +845,8 @@ export const AnalysisDetails = ({
         return renderControlDifferenceDetails();
       case "expiredDocuments":
         return renderExpiredDocumentsDetails();
+      case "gasAndPayments": // НОВЫЙ СЛУЧАЙ
+        return renderGasAndPaymentsDetails();
       default:
         return null;
     }

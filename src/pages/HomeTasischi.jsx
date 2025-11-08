@@ -13,6 +13,8 @@ const HomeTasischi = () => {
   const [missingReportsPeriod, setMissingReportsPeriod] = useState("1day");
   const [controlDiffPeriod, setControlDiffPeriod] = useState("yesterday");
   const [autopilotPeriod, setAutopilotPeriod] = useState("1day");
+  const [gasPaymentsPeriod, setGasPaymentsPeriod] = useState("1day");
+  const [gasPaymentsDateRange, setGasPaymentsDateRange] = useState(null);
 
   // Для учредителя - все станции (передаем пустой массив)
   const { analysisData, loading, error, loadAnalysisData, debugInfo } =
@@ -20,13 +22,14 @@ const HomeTasischi = () => {
 
   // Функция для применения фильтров
   const applyFilters = () => {
-    console.log("🔄 Применение фильтров...");
     loadAnalysisData({
       negativeDiffPeriod,
       missingReportsPeriod,
       controlDiffPeriod,
       comparisonType,
       autopilotPeriod,
+      gasPaymentsPeriod,
+      gasPaymentsDateRange,
     });
   };
 
@@ -150,6 +153,25 @@ const HomeTasischi = () => {
             color="yellow"
             icon="📄"
           />
+
+          {/* НОВАЯ КАРТОЧКА: Расход газа и платежи */}
+          <AnalysisCard
+            title="Расход газа и платежи"
+            value={
+              analysisData.gasAndPaymentsData?.summary
+                ? "Сводка"
+                : analysisData.gasAndPaymentsData.length
+            }
+            subtitle={
+              analysisData.gasAndPaymentsData?.summary
+                ? "за период"
+                : "станций с данными"
+            }
+            description="Анализ продаж и поступлений"
+            onClick={() => setSelectedAnalysis({ type: "gasAndPayments" })}
+            color="teal"
+            icon="⛽"
+          />
         </div>
 
         {/* Детали анализа */}
@@ -162,6 +184,8 @@ const HomeTasischi = () => {
             missingReportsPeriod,
             controlDiffPeriod,
             autopilotPeriod,
+            gasPaymentsPeriod,
+            gasPaymentsDateRange,
           }}
           onFiltersChange={{
             setComparisonType,
@@ -169,6 +193,8 @@ const HomeTasischi = () => {
             setMissingReportsPeriod,
             setControlDiffPeriod,
             setAutopilotPeriod,
+            setGasPaymentsPeriod,
+            setGasPaymentsDateRange,
           }}
           onRefresh={applyFilters}
         />

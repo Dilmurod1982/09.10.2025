@@ -90,49 +90,45 @@ const Home = () => {
   return (
     <div className="p-6 space-y-8">
       <h1 className="text-3xl font-semibold text-gray-800 dark:text-gray-100">
-        Панель управления АГНКС
+        Заправкалар бошқарув панели
       </h1>
 
       {/* === Карточки статистики === */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard
-          title="Станций"
+          title="Заправкалар"
           value={stats.totalStations}
           color="bg-blue-500"
         />
         <StatCard
-          title="Документов"
+          title="Хужжатлар"
           value={stats.totalDocs}
           color="bg-gray-500"
         />
-        <StatCard title="Истекли" value={stats.expired} color="bg-red-600" />
         <StatCard
-          title="≤ 30 дней"
-          value={stats.less30}
-          color="bg-orange-500"
+          title="Муддати ўтди"
+          value={stats.expired}
+          color="bg-red-600"
         />
-        <StatCard
-          title="≤ 15 дней"
-          value={stats.less15}
-          color="bg-yellow-500"
-        />
-        <StatCard title="≤ 5 дней" value={stats.less5} color="bg-amber-600" />
+        <StatCard title="≤ 30 кун" value={stats.less30} color="bg-orange-500" />
+        <StatCard title="≤ 15 кун" value={stats.less15} color="bg-yellow-500" />
+        <StatCard title="≤ 5 кун" value={stats.less5} color="bg-amber-600" />
       </div>
 
       {/* === Последние документы === */}
       <div>
         <h2 className="text-xl font-semibold mb-3">
-          Последние добавленные документы
+          Охирги кўшилган хужжатлар
         </h2>
         <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow-md">
           <table className="table w-full">
             <thead className="bg-gray-100 dark:bg-gray-700">
               <tr>
                 <th>#</th>
-                <th>Тип</th>
-                <th>Станция</th>
-                <th>Дата окончания</th>
-                <th>Статус</th>
+                <th>Тури</th>
+                <th>Заправка</th>
+                <th>Тугаш муддати</th>
+                <th>Холати</th>
               </tr>
             </thead>
             <tbody>
@@ -160,8 +156,8 @@ const Home = () => {
                       <td className={`font-semibold ${color}`}>
                         {diff != null
                           ? diff < 0
-                            ? "Истёк"
-                            : `Осталось ${diff} дн.`
+                            ? "ўтиб кетди"
+                            : `${diff} кун қолди`
                           : "—"}
                       </td>
                     </tr>

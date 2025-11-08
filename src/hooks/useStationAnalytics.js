@@ -27,7 +27,6 @@ export const formatDate = (dateString) => {
     const monthName = months[month] || month;
     return `${day} ${monthName} ${year}`;
   } catch (error) {
-    console.error("Error formatting date:", error, dateString);
     return dateString;
   }
 };
@@ -48,6 +47,7 @@ export const useStationAnalytics = (managedStations = []) => {
     missingReportsData: [],
     controlDifferenceData: [],
     expiredDocumentsData: [],
+    gasAndPaymentsData: [], // НОВЫЙ АНАЛИЗ
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -163,20 +163,402 @@ export const useStationAnalytics = (managedStations = []) => {
         ...doc.data(),
       }));
     } catch (error) {
-      console.error("Error loading stations:", error);
       return [];
     }
   };
 
-  // ОБНОВЛЕННЫЙ Анализ 1: Станции по autopilotReading с периодами
+  // НОВАЯ ФУНКЦИЯ: Анализ расхода газа и поступлений платежей
+  const analyzeGasAndPayments = (reports, period = "1day") => {
+    try {
+      // Фильтруем отчеты по периоду
+      const filteredReports = filterReportsByPeriod(reports, period);
+
+      if (filteredReports.length === 0) {
+        return [];
+      }
+
+      // Группируем отчеты по станциям
+      const stationsMap = new Map();
+
+      filteredReports.forEach((report) => {
+        const stationId = report.stationId;
+
+        if (!stationsMap.has(stationId)) {
+          stationsMap.set(stationId, {
+            stationName: report.stationName,
+            stationId: stationId,
+            totalGas: 0,
+            totalCash: 0,
+            totalHumo: 0,
+            totalUzcard: 0,
+            totalElectronic: 0,
+            reportsCount: 0,
+            period: period,
+          });
+        }
+
+        const stationData = stationsMap.get(stationId);
+
+        // Суммируем данные
+        stationData.totalGas += report.hoseTotalGas || 0;
+        stationData.totalCash += report.generalData?.cashAmount || 0;
+        stationData.totalHumo += report.generalData?.humoTerminal || 0;
+        stationData.totalUzcard += report.generalData?.uzcardTerminal || 0;
+        stationData.totalElectronic +=
+          report.generalData?.electronicPaymentSystem || 0;
+        stationData.reportsCount += 1;
+      });
+
+      // Преобразуем в массив и добавляем расчеты
+      const result = Array.from(stationsMap.values()).map((station) => {
+        const totalPayments =
+          station.totalCash +
+          station.totalHumo +
+          station.totalUzcard +
+          station.totalElectronic;
+        const averageGasPerReport =
+          station.reportsCount > 0
+            ? station.totalGas / station.reportsCount
+            : 0;
+        const averagePaymentsPerReport =
+          station.reportsCount > 0 ? totalPayments / station.reportsCount : 0;
+
+        return {
+          ...station,
+          totalPayments,
+          averageGasPerReport,
+          averagePaymentsPerReport,
+          paymentDistribution: {
+            cash: station.totalCash,
+            humo: station.totalHumo,
+            uzcard: station.totalUzcard,
+            electronic: station.totalElectronic,
+            cashPercentage:
+              totalPayments > 0 ? (station.totalCash / totalPayments) * 100 : 0,
+            humoPercentage:
+              totalPayments > 0 ? (station.totalHumo / totalPayments) * 100 : 0,
+            uzcardPercentage:
+              totalPayments > 0
+                ? (station.totalUzcard / totalPayments) * 100
+                : 0,
+            electronicPercentage:
+              totalPayments > 0
+                ? (station.totalElectronic / totalPayments) * 100
+                : 0,
+          },
+        };
+      });
+
+      // Сортируем по общему объему газа (по убыванию)
+      return result.sort((a, b) => b.totalGas - a.totalGas);
+    } catch (error) {
+      console.error("Error analyzing gas and payments:", error);
+      return [];
+    }
+  };
+
+  // НОВАЯ ФУНКЦИЯ: Анализ по дням, месяцам, годам
+  const analyzeGasAndPaymentsByDateRange = (reports, dateRange) => {
+    try {
+      const { startDate, endDate, rangeType } = dateRange;
+
+      // Фильтруем отчеты по дате
+      const filteredReports = reports.filter((report) => {
+        const reportDate = new Date(report.reportDate);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999); // Включаем весь конечный день
+
+        return reportDate >= start && reportDate <= end;
+      });
+
+      if (filteredReports.length === 0) {
+        return {
+          summary: {
+            totalGas: 0,
+            totalCash: 0,
+            totalHumo: 0,
+            totalUzcard: 0,
+            totalElectronic: 0,
+            totalPayments: 0,
+            reportsCount: 0,
+            period: `${formatDate(startDate)} - ${formatDate(endDate)}`,
+          },
+          dailyData: [],
+          stationsData: [],
+        };
+      }
+
+      // Группируем по дням для детального анализа
+      const dailyMap = new Map();
+      const stationsMap = new Map();
+
+      filteredReports.forEach((report) => {
+        const reportDate = report.reportDate;
+        const stationId = report.stationId;
+
+        // Группировка по дням
+        if (!dailyMap.has(reportDate)) {
+          dailyMap.set(reportDate, {
+            date: reportDate,
+            totalGas: 0,
+            totalCash: 0,
+            totalHumo: 0,
+            totalUzcard: 0,
+            totalElectronic: 0,
+            reportsCount: 0,
+          });
+        }
+
+        const dailyData = dailyMap.get(reportDate);
+        dailyData.totalGas += report.hoseTotalGas || 0;
+        dailyData.totalCash += report.generalData?.cashAmount || 0;
+        dailyData.totalHumo += report.generalData?.humoTerminal || 0;
+        dailyData.totalUzcard += report.generalData?.uzcardTerminal || 0;
+        dailyData.totalElectronic +=
+          report.generalData?.electronicPaymentSystem || 0;
+        dailyData.reportsCount += 1;
+
+        // Группировка по станциям
+        if (!stationsMap.has(stationId)) {
+          stationsMap.set(stationId, {
+            stationName: report.stationName,
+            stationId: stationId,
+            totalGas: 0,
+            totalCash: 0,
+            totalHumo: 0,
+            totalUzcard: 0,
+            totalElectronic: 0,
+            reportsCount: 0,
+          });
+        }
+
+        const stationData = stationsMap.get(stationId);
+        stationData.totalGas += report.hoseTotalGas || 0;
+        stationData.totalCash += report.generalData?.cashAmount || 0;
+        stationData.totalHumo += report.generalData?.humoTerminal || 0;
+        stationData.totalUzcard += report.generalData?.uzcardTerminal || 0;
+        stationData.totalElectronic +=
+          report.generalData?.electronicPaymentSystem || 0;
+        stationData.reportsCount += 1;
+      });
+
+      // Преобразуем в массивы
+      const dailyData = Array.from(dailyMap.values())
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .map((day) => ({
+          ...day,
+          totalPayments:
+            day.totalCash +
+            day.totalHumo +
+            day.totalUzcard +
+            day.totalElectronic,
+        }));
+
+      const stationsData = Array.from(stationsMap.values())
+        .sort((a, b) => b.totalGas - a.totalGas)
+        .map((station) => ({
+          ...station,
+          totalPayments:
+            station.totalCash +
+            station.totalHumo +
+            station.totalUzcard +
+            station.totalElectronic,
+          paymentDistribution: {
+            cash: station.totalCash,
+            humo: station.totalHumo,
+            uzcard: station.totalUzcard,
+            electronic: station.totalElectronic,
+            cashPercentage:
+              station.totalPayments > 0
+                ? (station.totalCash / station.totalPayments) * 100
+                : 0,
+            humoPercentage:
+              station.totalPayments > 0
+                ? (station.totalHumo / station.totalPayments) * 100
+                : 0,
+            uzcardPercentage:
+              station.totalPayments > 0
+                ? (station.totalUzcard / station.totalPayments) * 100
+                : 0,
+            electronicPercentage:
+              station.totalPayments > 0
+                ? (station.totalElectronic / station.totalPayments) * 100
+                : 0,
+          },
+        }));
+
+      // Общая сводка
+      const summary = {
+        totalGas: dailyData.reduce((sum, day) => sum + day.totalGas, 0),
+        totalCash: dailyData.reduce((sum, day) => sum + day.totalCash, 0),
+        totalHumo: dailyData.reduce((sum, day) => sum + day.totalHumo, 0),
+        totalUzcard: dailyData.reduce((sum, day) => sum + day.totalUzcard, 0),
+        totalElectronic: dailyData.reduce(
+          (sum, day) => sum + day.totalElectronic,
+          0
+        ),
+        totalPayments: dailyData.reduce(
+          (sum, day) => sum + day.totalPayments,
+          0
+        ),
+        reportsCount: filteredReports.length,
+        period: `${formatDate(startDate)} - ${formatDate(endDate)}`,
+        rangeType: rangeType,
+      };
+
+      return {
+        summary,
+        dailyData,
+        stationsData,
+      };
+    } catch (error) {
+      console.error("Error analyzing gas and payments by date range:", error);
+      return {
+        summary: {
+          totalGas: 0,
+          totalCash: 0,
+          totalHumo: 0,
+          totalUzcard: 0,
+          totalElectronic: 0,
+          totalPayments: 0,
+          reportsCount: 0,
+          period: "Ошибка расчета",
+        },
+        dailyData: [],
+        stationsData: [],
+      };
+    }
+  };
+
+  // ОБНОВЛЕННАЯ ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ
+  const loadAnalysisData = async (filters = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      let allReports = [];
+      let allDocuments = [];
+
+      // Загружаем данные unifiedDailyReports
+      try {
+        const reportsQuery = query(
+          collection(db, "unifiedDailyReports"),
+          orderBy("reportDate", "desc")
+        );
+        const reportsSnapshot = await getDocs(reportsQuery);
+        allReports = reportsSnapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .filter(
+            (report) =>
+              managedStations.length === 0 ||
+              managedStations.includes(report.stationId)
+          );
+      } catch (error) {
+        setError(`Ошибка загрузки отчетов: ${error.message}`);
+      }
+
+      // Загружаем данные documents
+      try {
+        const documentsQuery = query(collection(db, "documents"));
+        const documentsSnapshot = await getDocs(documentsQuery);
+        allDocuments = documentsSnapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .filter(
+            (doc) =>
+              managedStations.length === 0 ||
+              managedStations.includes(doc.stationId)
+          );
+      } catch (error) {}
+
+      // Обновляем отладочную информацию
+      setDebugInfo({
+        reportsCount: allReports.length,
+        documentsCount: allDocuments.length,
+        managedStationsCount: managedStations.length,
+      });
+
+      // Если нет отчетов, показываем информационное сообщение
+      if (allReports.length === 0) {
+        setAnalysisData({
+          autopilotData: [],
+          comparisonData: [],
+          negativeDifferenceData: [],
+          missingReportsData: [],
+          controlDifferenceData: [],
+          expiredDocumentsData: [],
+          gasAndPaymentsData: [], // НОВЫЙ АНАЛИЗ
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Выполняем анализы с учетом фильтров
+      const {
+        negativeDiffPeriod = "1day",
+        missingReportsPeriod = "1day",
+        controlDiffPeriod = "yesterday",
+        comparisonType = "yesterday",
+        autopilotPeriod = "1day",
+        gasPaymentsPeriod = "1day", // НОВЫЙ ФИЛЬТР
+        gasPaymentsDateRange = null, // НОВЫЙ ФИЛЬТР ДЛЯ ДИАПАЗОНА ДАТ
+      } = filters;
+
+      const autopilotData = analyzeAutopilotData(allReports, autopilotPeriod);
+      const comparisonData = analyzeComparisonData(allReports, comparisonType);
+      const negativeDifferenceData = analyzeNegativeDifference(
+        allReports,
+        negativeDiffPeriod
+      );
+      const missingReportsData = await analyzeMissingReports(
+        allReports,
+        missingReportsPeriod
+      );
+      const controlDifferenceData = analyzeControlDifference(
+        allReports,
+        controlDiffPeriod
+      );
+      const expiredDocumentsData = analyzeExpiredDocuments(allDocuments);
+
+      // НОВЫЙ АНАЛИЗ: Расход газа и поступления платежей
+      let gasAndPaymentsData = [];
+      if (gasPaymentsDateRange) {
+        gasAndPaymentsData = analyzeGasAndPaymentsByDateRange(
+          allReports,
+          gasPaymentsDateRange
+        );
+      } else {
+        gasAndPaymentsData = analyzeGasAndPayments(
+          allReports,
+          gasPaymentsPeriod
+        );
+      }
+
+      setAnalysisData({
+        autopilotData,
+        comparisonData,
+        negativeDifferenceData,
+        missingReportsData,
+        controlDifferenceData,
+        expiredDocumentsData,
+        gasAndPaymentsData, // НОВЫЙ АНАЛИЗ
+      });
+    } catch (error) {
+      setError(`Ошибка загрузки данных: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Существующие функции анализов (оставляем без изменений)
   const analyzeAutopilotData = (reports, period = "1day") => {
     const filteredReports = filterReportsByPeriod(reports, period);
-
-    console.log("🔍 Анализ AutoPilot данных:", {
-      всего_отчетов: reports.length,
-      отфильтровано: filteredReports.length,
-      период: period,
-    });
 
     // Группируем отчеты по станциям
     const stationsMap = new Map();
@@ -186,10 +568,6 @@ export const useStationAnalytics = (managedStations = []) => {
 
       // Используем autopilotReading из generalData (как показала отладка)
       const autopilotReading = report.generalData?.autopilotReading || 0;
-
-      console.log(
-        `📊 Станция ${report.stationName}: autopilotReading = ${autopilotReading}`
-      );
 
       if (!stationsMap.has(stationId)) {
         stationsMap.set(stationId, {
@@ -222,12 +600,6 @@ export const useStationAnalytics = (managedStations = []) => {
       }))
       .filter((station) => station.totalAutopilot > 0) // Только станции с данными
       .sort((a, b) => a.totalAutopilot - b.totalAutopilot);
-
-    console.log("📈 Результат анализа AutoPilot:", {
-      всего_станций: stationsMap.size,
-      станций_с_данными: result.length,
-      данные: result,
-    });
 
     return result;
   };
@@ -289,15 +661,6 @@ export const useStationAnalytics = (managedStations = []) => {
         const hoseTotal = report.hoseTotalGas || 0;
         const difference = hoseTotal - autopilot;
 
-        console.log(
-          `🔍 Проверка отрицательной разницы: ${report.stationName}`,
-          {
-            hoseTotal,
-            autopilot,
-            difference,
-          }
-        );
-
         return difference < 0;
       })
       .map((report) => {
@@ -314,19 +677,12 @@ export const useStationAnalytics = (managedStations = []) => {
       })
       .sort((a, b) => a.difference - b.difference);
 
-    console.log("📊 Отрицательная разница:", {
-      найдено: negativeReports.length,
-      отчеты: negativeReports,
-    });
-
     return negativeReports;
   };
 
   // Анализ 4: Отсутствующие отчеты с периодами - ИСПРАВЛЕННАЯ ВЕРСИЯ
   const analyzeMissingReports = async (reports, period) => {
     try {
-      console.log("🔍 Анализ отсутствующих отчетов для периода:", period);
-
       // Получаем даты для проверки
       const datesToCheck = getDatesForPeriod(period);
       const allStations = await getAllStations();
@@ -338,12 +694,6 @@ export const useStationAnalytics = (managedStations = []) => {
               return report.reportDate > latest ? report.reportDate : latest;
             }, reports[0].reportDate)
           : null;
-
-      console.log("📅 Диапазон проверки:", {
-        datesToCheck: datesToCheck.length,
-        последняя_дата_отчета: lastReportDate,
-        управляемые_станции: managedStations.length,
-      });
 
       const missingReports = [];
 
@@ -389,14 +739,8 @@ export const useStationAnalytics = (managedStations = []) => {
 
       const result = Array.from(uniqueStations.values());
 
-      console.log("📊 Результат анализа отсутствующих отчетов:", {
-        найдено_пропусков: result.length,
-        отчеты: result,
-      });
-
       return result;
     } catch (error) {
-      console.error("Error analyzing missing reports:", error);
       return [];
     }
   };
@@ -404,11 +748,6 @@ export const useStationAnalytics = (managedStations = []) => {
   // Анализ 5: Разница контрольных сумм с периодами - ДОБАВЛЕНЫ ПЕРИОДЫ
   const analyzeControlDifference = (reports, period) => {
     const filteredReports = filterReportsByPeriod(reports, period);
-
-    console.log("🔍 Анализ контрольных сумм для периода:", period, {
-      всего_отчетов: reports.length,
-      отфильтровано: filteredReports.length,
-    });
 
     const problematicReports = filteredReports
       .filter((report) => {
@@ -424,11 +763,6 @@ export const useStationAnalytics = (managedStations = []) => {
         const controlHumoSum = generalData.controlHumoSum || 0;
         const controlUzcardSum = generalData.controlUzcardSum || 0;
         const controlElectronicSum = generalData.controlElectronicSum || 0;
-
-        const cashDiff = cashAmount - controlTotalSum;
-        const humoDiff = humoTerminal - controlHumoSum;
-        const uzcardDiff = uzcardTerminal - controlUzcardSum;
-        const electronicDiff = electronicPaymentSystem - controlElectronicSum;
 
         const hasMissingControlSums =
           (cashAmount > 0 && controlTotalSum === 0) ||
@@ -454,6 +788,11 @@ export const useStationAnalytics = (managedStations = []) => {
         const controlHumoSum = generalData.controlHumoSum || 0;
         const controlUzcardSum = generalData.controlUzcardSum || 0;
         const controlElectronicSum = generalData.controlElectronicSum || 0;
+
+        const cashDiff = cashAmount - controlTotalSum;
+        const humoDiff = humoTerminal - controlHumoSum;
+        const uzcardDiff = uzcardTerminal - controlUzcardSum;
+        const electronicDiff = electronicPaymentSystem - controlElectronicSum;
 
         const problems = [];
 
@@ -485,10 +824,10 @@ export const useStationAnalytics = (managedStations = []) => {
           reportDate: report.reportDate,
           stationId: report.stationId,
           differences: {
-            cash: cashAmount - controlTotalSum,
-            humo: humoTerminal - controlHumoSum,
-            uzcard: uzcardTerminal - controlUzcardSum,
-            electronic: electronicPaymentSystem - controlElectronicSum,
+            cash: cashDiff,
+            humo: humoDiff,
+            uzcard: uzcardDiff,
+            electronic: electronicDiff,
           },
           amounts: {
             cash: cashAmount,
@@ -506,10 +845,6 @@ export const useStationAnalytics = (managedStations = []) => {
           generalData: generalData,
         };
       });
-
-    console.log("📊 Результат анализа контрольных сумм:", {
-      проблемных_отчетов: problematicReports.length,
-    });
 
     return problematicReports;
   };
@@ -549,139 +884,6 @@ export const useStationAnalytics = (managedStations = []) => {
     return Array.from(stationsMap.values());
   };
 
-  // Основная функция загрузки данных
-  const loadAnalysisData = async (filters = {}) => {
-    try {
-      console.log("🚀 Начало загрузки данных анализа...");
-      setLoading(true);
-      setError(null);
-
-      let allReports = [];
-      let allDocuments = [];
-
-      // Загружаем данные unifiedDailyReports
-      try {
-        console.log("📊 Загрузка отчетов из Firestore...");
-        const reportsQuery = query(
-          collection(db, "unifiedDailyReports"),
-          orderBy("reportDate", "desc")
-        );
-        const reportsSnapshot = await getDocs(reportsQuery);
-        allReports = reportsSnapshot.docs
-          .map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }))
-          .filter(
-            (report) =>
-              managedStations.length === 0 ||
-              managedStations.includes(report.stationId)
-          );
-
-        console.log(`✅ Загружено отчетов: ${allReports.length}`);
-      } catch (error) {
-        console.error("❌ Ошибка загрузки отчетов:", error);
-        setError(`Ошибка загрузки отчетов: ${error.message}`);
-      }
-
-      // Загружаем данные documents
-      try {
-        console.log("📄 Загрузка документов из Firestore...");
-        const documentsQuery = query(collection(db, "documents"));
-        const documentsSnapshot = await getDocs(documentsQuery);
-        allDocuments = documentsSnapshot.docs
-          .map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }))
-          .filter(
-            (doc) =>
-              managedStations.length === 0 ||
-              managedStations.includes(doc.stationId)
-          );
-
-        console.log(`✅ Загружено документов: ${allDocuments.length}`);
-      } catch (error) {
-        console.error("❌ Ошибка загрузки документов:", error);
-        // Не устанавливаем ошибку здесь, так как документы не критичны
-      }
-
-      // Обновляем отладочную информацию
-      setDebugInfo({
-        reportsCount: allReports.length,
-        documentsCount: allDocuments.length,
-        managedStationsCount: managedStations.length,
-      });
-
-      // Если нет отчетов, показываем информационное сообщение
-      if (allReports.length === 0) {
-        console.log("⚠️ Нет данных отчетов для анализа");
-        setAnalysisData({
-          autopilotData: [],
-          comparisonData: [],
-          negativeDifferenceData: [],
-          missingReportsData: [],
-          controlDifferenceData: [],
-          expiredDocumentsData: [],
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Выполняем анализы с учетом фильтров
-      const {
-        negativeDiffPeriod = "1day",
-        missingReportsPeriod = "1day",
-        controlDiffPeriod = "yesterday",
-        comparisonType = "yesterday",
-        autopilotPeriod = "1day",
-      } = filters;
-
-      console.log("🔍 Выполнение анализов...");
-
-      const autopilotData = analyzeAutopilotData(allReports, autopilotPeriod);
-      const comparisonData = analyzeComparisonData(allReports, comparisonType);
-      const negativeDifferenceData = analyzeNegativeDifference(
-        allReports,
-        negativeDiffPeriod
-      );
-      const missingReportsData = await analyzeMissingReports(
-        allReports,
-        missingReportsPeriod
-      );
-      const controlDifferenceData = analyzeControlDifference(
-        allReports,
-        controlDiffPeriod
-      );
-      const expiredDocumentsData = analyzeExpiredDocuments(allDocuments);
-
-      console.log("📈 Результаты анализа:", {
-        autopilotData: autopilotData.length,
-        comparisonData: comparisonData.length,
-        negativeDifferenceData: negativeDifferenceData.length,
-        missingReportsData: missingReportsData.length,
-        controlDifferenceData: controlDifferenceData.length,
-        expiredDocumentsData: expiredDocumentsData.length,
-      });
-
-      setAnalysisData({
-        autopilotData,
-        comparisonData,
-        negativeDifferenceData,
-        missingReportsData,
-        controlDifferenceData,
-        expiredDocumentsData,
-      });
-
-      console.log("✅ Данные анализа успешно загружены");
-    } catch (error) {
-      console.error("❌ Ошибка загрузки данных:", error);
-      setError(`Ошибка загрузки данных: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Загружаем данные при изменении managedStations - ИСПРАВЛЕННЫЙ useEffect
   useEffect(() => {
     // Проверяем, изменились ли managedStations или это первая загрузка
@@ -690,13 +892,6 @@ export const useStationAnalytics = (managedStations = []) => {
       JSON.stringify(prevStations) !== JSON.stringify(managedStations);
 
     if (isInitialLoadRef.current || stationsChanged) {
-      console.log("🔄 useEffect triggered:", {
-        managedStations,
-        prevStations,
-        stationsChanged,
-        isInitialLoad: isInitialLoadRef.current,
-      });
-
       loadAnalysisData();
 
       // Обновляем рефы

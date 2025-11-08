@@ -279,18 +279,18 @@ export default function Navbar() {
       !passwordData.newPassword ||
       !passwordData.confirmPassword
     ) {
-      setPasswordError("Все поля обязательны для заполнения");
+      setPasswordError("Барча майдонлар тўлдирилиши шарт!");
       return;
     }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPasswordError("Новый пароль и подтверждение не совпадают");
+      setPasswordError("Янги парол ва тасдиқлаш мос келмади");
       return;
     }
 
     if (!validatePassword(passwordData.newPassword)) {
       setPasswordError(
-        "Пароль должен содержать минимум 8 символов, включая заглавные и строчные буквы, цифры и специальные символы"
+        "Парол камида 8 та белгидан иборат бўлиши керак, жумладан, катта ва кичик харфлар, рақамлар ва махсус белгилар"
       );
       return;
     }
@@ -302,7 +302,7 @@ export default function Navbar() {
       const currentUser = auth.currentUser;
 
       if (!currentUser) {
-        setPasswordError("Пользователь не аутентифицирован");
+        setPasswordError("Фойдаланувчи тасдиқланмаган");
         return;
       }
 
@@ -338,27 +338,28 @@ export default function Navbar() {
           });
         }
       } catch (firestoreError) {
-        throw new Error("Не удалось сохранить пароль в базе данных");
+        throw new Error(
+          "Паролни маълумотлар базасига сақлашда хатолик юз берди"
+        );
       }
 
-      toast.success("Пароль успешно изменен");
+      toast.success("Пароль мувафақиятли ўзгартирилди");
       handlePasswordClose();
     } catch (error) {
-      let errorMessage = "Ошибка при изменении пароля";
+      let errorMessage = "Паролни ўзгартиришда хатолик юз берди";
       switch (error.code) {
         case "auth/requires-recent-login":
           errorMessage =
-            "Для изменения пароля требуется повторная аутентификация. Пожалуйста, выйдите и войдите снова.";
+            "Паролингизни ўзгартириш қайта аутентификацияни талаб қилади. Илтимос, тизимдан чиқинг ва қайта киринг.";
           break;
         case "auth/weak-password":
-          errorMessage =
-            "Пароль слишком слабый. Используйте более сложный пароль.";
+          errorMessage = "Парол жуда заиф. Мураккаброқ паролдан фойдаланинг.";
           break;
         case "auth/network-request-failed":
-          errorMessage = "Ошибка сети. Проверьте подключение к интернету.";
+          errorMessage = "Тармоқ хатоси. Интернет алоқангизни текширинг.";
           break;
         default:
-          errorMessage = error.message || "Неизвестная ошибка";
+          errorMessage = error.message || "Ноъмалум хатолик";
       }
 
       setPasswordError(errorMessage);
@@ -369,32 +370,32 @@ export default function Navbar() {
 
   // 🔹 Меню
   const menuItems = [
-    { text: "Станции", icon: <LocalGasStationIcon />, path: "/stations" },
-    { text: "Сотрудники", icon: <BadgeIcon />, path: "/employees" },
-    { text: "Пользователи", icon: <PeopleIcon />, path: "/users" },
-    { text: "ООО", icon: <CorporateFareIcon />, path: "/ltds" },
+    { text: "Заправкалар", icon: <LocalGasStationIcon />, path: "/stations" },
+    { text: "Ходимлар", icon: <BadgeIcon />, path: "/employees" },
+    { text: "Фойдаланувчилар", icon: <PeopleIcon />, path: "/users" },
+    { text: "МЧЖлар", icon: <CorporateFareIcon />, path: "/ltds" },
     { text: "Банк", icon: <AccountBalanceIcon />, path: "/banks" },
-    { text: "Должности", icon: <WorkIcon />, path: "/jobtitle" }, // Добавлен пункт Должности
+    { text: "Лавозимлар", icon: <WorkIcon />, path: "/jobtitle" }, // Добавлен пункт Должности
   ];
 
   const partnersItems = [
     {
-      text: "Список партнеров",
+      text: "Ҳамкорлар рўйхати",
       icon: <ListIcon />,
       path: "/partners",
     },
     {
-      text: "Список договоров",
+      text: "Шартномалар рўйхати",
       icon: <AssignmentIcon />,
       path: "/partnerslist",
     },
     {
-      text: "Оплаты",
+      text: "Тўловлар",
       icon: <PaymentIcon />,
       path: "/payments",
     },
     {
-      text: "Задолженности партнеров",
+      text: "Ҳамкорлар қарздорлиги",
       icon: <MoneyOffIcon />,
       path: "/reportondebtspartners",
     },
@@ -403,12 +404,12 @@ export default function Navbar() {
   // 🔹 Ежедневные отчеты
   const dailyReportsItems = [
     {
-      text: "Общий ежедневный отчет",
+      text: "Кундалик ҳисобот",
       icon: <SummarizeIcon />,
       path: "/generaldailyreport",
     },
     {
-      text: "Контрольные суммы",
+      text: "Назорат суммалар",
       icon: <AccountBalanceWalletIcon />,
       path: "/controlpayments",
     },
@@ -417,12 +418,12 @@ export default function Navbar() {
   // 🔹 Расчеты по энергоносителям
   const energySettlementsItems = [
     {
-      text: "Расчеты по газу",
+      text: "Газ бўйича ҳисоб-китоб",
       icon: <GasIcon />,
       path: "/gassettlements",
     },
     {
-      text: "Расчеты по электроэнергии",
+      text: "Электроэнергия бўйича ҳисоб-китоб",
       icon: <BoltIcon />,
       path: "/elektrsettlements",
     },
@@ -430,51 +431,63 @@ export default function Navbar() {
 
   const equipmentDetailsItems = [
     {
-      text: "Сведения о компрессорах",
+      text: "Компрессорлар бўйича маълумот",
       icon: <CompressorIcon />,
       path: "/compressors",
     },
     {
-      text: "Сведения о колонках",
+      text: "Колонкалар бўйича маълумот",
       icon: <LocalGasStationIcon />,
       path: "/dispensers",
     },
     {
-      text: "Сведения об осушках",
+      text: "Осушка бўйича маълумот",
       icon: <DehumidifierIcon />,
       path: "/osushka",
     },
-    { text: "Сведения о чиллерах", icon: <ChillerIcon />, path: "/chillers" },
+    {
+      text: "Чиллерлар бўйича маълумот",
+      icon: <ChillerIcon />,
+      path: "/chillers",
+    },
   ];
 
   const equipmentTypesItems = [
     {
-      text: "Типы компрессоров",
+      text: "Компрессор турлари",
       icon: <CompressorIcon />,
       path: "/typeofcompressors",
     },
     {
-      text: "Типы колонок",
+      text: "Колонкалар турлари",
       icon: <LocalGasStationIcon />,
       path: "/typeofdispensers",
     },
-    { text: "Типы осушок", icon: <DehumidifierIcon />, path: "/typeofosushka" },
-    { text: "Типы чиллеров", icon: <ChillerIcon />, path: "/typeofchillers" },
+    {
+      text: "Осушка турлари",
+      icon: <DehumidifierIcon />,
+      path: "/typeofosushka",
+    },
+    {
+      text: "Чиллерлар турлари",
+      icon: <ChillerIcon />,
+      path: "/typeofchillers",
+    },
   ];
 
   const regionsItems = [
-    { text: "Области", icon: <PublicIcon />, path: "/regions" },
-    { text: "Города и районы", icon: <LocationCityIcon />, path: "/cities" },
+    { text: "Вилоятлар", icon: <PublicIcon />, path: "/regions" },
+    { text: "Шаҳар ва туманлар", icon: <LocationCityIcon />, path: "/cities" },
   ];
 
   const docsTimedItems = [
     {
-      text: "Документы по типам",
+      text: "Хужжатларни турлари бўйича",
       icon: <DescriptionIcon />,
       path: "/docdeadline",
     },
     {
-      text: "Документы по станциям",
+      text: "Заправкалар бўйича хужжатлар",
       icon: <LocalGasStationIcon />,
       path: "/docbystation",
     },
@@ -482,12 +495,12 @@ export default function Navbar() {
 
   const docsPerpItems = [
     {
-      text: "Документы по типам",
+      text: "Хужжатларни турлари бўйича",
       icon: <DescriptionIcon />,
       path: "/docdeadlineinf",
     },
     {
-      text: "Документы по станциям",
+      text: "Заправкалар бўйича хужжатлар",
       icon: <LocalGasStationIcon />,
       path: "/docbystationinf",
     },
@@ -498,7 +511,7 @@ export default function Navbar() {
     role === "admin"
       ? menuItems
       : role === "buxgalter"
-      ? menuItems.filter((item) => item.text === "Партнёры")
+      ? menuItems.filter((item) => item.text === "Ҳамкорлар")
       : [];
 
   const isRahbarOrBooker = role === "rahbar" || role === "buxgalter";
@@ -617,7 +630,7 @@ export default function Navbar() {
                   fontSize: "0.9rem",
                   fontWeight: "500",
                 }}>
-                📄 Документы со сроком
+                📄 Муддалар бўйича хужжатлар
               </Button>
               <Button
                 color="inherit"
@@ -638,7 +651,7 @@ export default function Navbar() {
                   fontSize: "0.9rem",
                   fontWeight: "500",
                 }}>
-                ∞ Бессрочные документы
+                ∞ Муддатсиз хужжатлар
               </Button>
             </Box>
           )}
@@ -690,7 +703,7 @@ export default function Navbar() {
                       className="flex items-center w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors duration-200">
                       <Visibility className="w-5 h-5 text-blue-600 mr-3" />
                       <span className="text-sm font-medium text-gray-900">
-                        Сменить пароль
+                        Паролни ўзгартириш
                       </span>
                     </button>
                   </div>
@@ -721,7 +734,7 @@ export default function Navbar() {
               gap: 1,
             }}>
             {!isMobile && <LogoutIcon sx={{ fontSize: 18 }} />}
-            {isMobile ? "Выход" : "ЧИҚИШ"}
+            {isMobile ? "Чиқиш" : "ЧИҚИШ"}
           </Button>
         </Toolbar>
       </AppBar>
@@ -757,7 +770,7 @@ export default function Navbar() {
           <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
             {/* Заголовок */}
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
-              <h2 className="text-xl font-semibold">🔐 Изменение пароля</h2>
+              <h2 className="text-xl font-semibold">🔐 Паролни ўзгартириш</h2>
             </div>
 
             {/* Содержимое */}
@@ -772,7 +785,7 @@ export default function Navbar() {
                 {/* Текущий пароль */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Текущий пароль
+                    Жорий пароль
                   </label>
                   <div className="relative">
                     <input
@@ -798,7 +811,7 @@ export default function Navbar() {
                 {/* Новый пароль */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Новый пароль
+                    Янги пароль
                   </label>
                   <div className="relative">
                     <input
@@ -806,7 +819,7 @@ export default function Navbar() {
                       value={passwordData.newPassword}
                       onChange={handlePasswordInputChange("newPassword")}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                      placeholder="Введите новый пароль"
+                      placeholder="Янги паролни киритинг"
                     />
                     <button
                       type="button"
@@ -820,15 +833,15 @@ export default function Navbar() {
                     </button>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    Минимум 8 символов, заглавные и строчные буквы, цифры,
-                    специальные символы
+                    Камида 8 та белги, бош ва кичик ҳарфлар, рақамлар, махсус
+                    белгилар
                   </p>
                 </div>
 
                 {/* Подтверждение пароля */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Подтверждение нового пароля
+                    Янги паролни тасдиқлаш
                   </label>
                   <div className="relative">
                     <input
@@ -865,7 +878,7 @@ export default function Navbar() {
                 onClick={handleUpdatePassword}
                 disabled={passwordLoading}
                 className="flex-1 px-4 py-2 text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg hover:shadow-xl">
-                {passwordLoading ? "Изменение..." : "Изменить пароль"}
+                {passwordLoading ? "Ўзгартирилмоқда..." : "Паролни ўзгартириш"}
               </button>
             </div>
           </div>
@@ -913,7 +926,7 @@ export default function Navbar() {
               <Typography
                 variant="h6"
                 sx={{ fontWeight: "700", fontSize: "1.1rem" }}>
-                🗂️ Меню навигации
+                🗂️ Навигация менюси
               </Typography>
               <IconButton
                 onClick={toggleDrawer(false)}
@@ -996,7 +1009,7 @@ export default function Navbar() {
                           <CalculateIcon />
                         </ListItemIcon>
                         <ListItemText
-                          primary="⚡ Расчеты по энергоносителям"
+                          primary="⚡ Энергия ҳисоб-китоблари"
                           primaryTypographyProps={{ fontWeight: "500" }}
                         />
                         {energySettlementsOpen ? (
@@ -1078,7 +1091,7 @@ export default function Navbar() {
                         {partnersItems
                           .filter((item) => {
                             if (role === "operator" || role === "rahbar") {
-                              return item.text === "Задолженности партнеров";
+                              return item.text === "Ҳамкорларни қарздорлиги";
                             }
                             return true;
                           })
@@ -1141,7 +1154,7 @@ export default function Navbar() {
                           <SummarizeIcon />
                         </ListItemIcon>
                         <ListItemText
-                          primary="📊 Ежедневные отчеты"
+                          primary="📊 Кундалик ҳисоботлар"
                           primaryTypographyProps={{ fontWeight: "500" }}
                         />
                         {dailyReportsOpen ? <ExpandLess /> : <ExpandMore />}
@@ -1155,7 +1168,7 @@ export default function Navbar() {
                         {dailyReportsItems
                           .filter((item) => {
                             if (role === "operator") {
-                              return item.text !== "Контрольные суммы";
+                              return item.text !== "Назорат суммалари";
                             }
                             return true;
                           })
@@ -1215,7 +1228,7 @@ export default function Navbar() {
                           <DescriptionIcon />
                         </ListItemIcon>
                         <ListItemText
-                          primary="📑 Документы"
+                          primary="📑 Хужжатлар"
                           primaryTypographyProps={{ fontWeight: "500" }}
                         />
                         {documentsOpen ? <ExpandLess /> : <ExpandMore />}
@@ -1240,7 +1253,7 @@ export default function Navbar() {
                               <CategoryIcon />
                             </ListItemIcon>
                             <ListItemText
-                              primary="Типы документов"
+                              primary="Хужжатлар турлари"
                               primaryTypographyProps={{
                                 fontSize: "14px",
                                 color: "rgba(255,255,255,0.9)",
@@ -1269,7 +1282,7 @@ export default function Navbar() {
                               <ScheduleIcon />
                             </ListItemIcon>
                             <ListItemText
-                              primary="Документы со сроком"
+                              primary="Муддатли хужжатлар"
                               primaryTypographyProps={{
                                 fontSize: "14px",
                                 color: "rgba(255,255,255,0.9)",
@@ -1336,7 +1349,7 @@ export default function Navbar() {
                               <AllInclusiveIcon />
                             </ListItemIcon>
                             <ListItemText
-                              primary="Бессрочные документы"
+                              primary="Муддатсиз хужжатлар"
                               primaryTypographyProps={{
                                 fontSize: "14px",
                                 color: "rgba(255,255,255,0.9)",
@@ -1406,7 +1419,7 @@ export default function Navbar() {
                           <MapIcon />
                         </ListItemIcon>
                         <ListItemText
-                          primary="🗺️ Регионы"
+                          primary="🗺️ Худудлар"
                           primaryTypographyProps={{ fontWeight: "500" }}
                         />
                         {regionsOpen ? <ExpandLess /> : <ExpandMore />}
@@ -1463,7 +1476,7 @@ export default function Navbar() {
                           <BuildIcon />
                         </ListItemIcon>
                         <ListItemText
-                          primary="⚙️ Оборудования"
+                          primary="⚙️ Ускуналар"
                           primaryTypographyProps={{ fontWeight: "500" }}
                         />
                         {equipmentOpen ? <ExpandLess /> : <ExpandMore />}
@@ -1487,7 +1500,7 @@ export default function Navbar() {
                               <SettingsInputComponentIcon />
                             </ListItemIcon>
                             <ListItemText
-                              primary="Сведения об оборудованиях"
+                              primary="Ускуналар ҳақида маълумотлар"
                               primaryTypographyProps={{
                                 fontSize: "14px",
                                 color: "rgba(255,255,255,0.9)",
@@ -1555,7 +1568,7 @@ export default function Navbar() {
                               <CategoryIcon />
                             </ListItemIcon>
                             <ListItemText
-                              primary="Типы оборудования"
+                              primary="Ускуналар турлари"
                               primaryTypographyProps={{
                                 fontSize: "14px",
                                 color: "rgba(255,255,255,0.9)",
