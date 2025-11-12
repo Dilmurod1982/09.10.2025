@@ -359,7 +359,7 @@ const Chillers = () => {
 
   // Удаление чиллера
   const handleDelete = async (chillerId) => {
-    if (window.confirm("Вы уверены, что хотите удалить этот чиллер?")) {
+    if (window.confirm("Ушбу чиллерни ўчириб юборишга аминмисиз?")) {
       try {
         await deleteDoc(doc(db, "gasChillers", chillerId));
         setChillers(chillers.filter((chill) => chill.id !== chillerId));
@@ -422,11 +422,9 @@ const Chillers = () => {
         transition={{ duration: 0.6 }}>
         <div>
           <h1 className="text-3xl lg:text-4xl font-bold text-gray-800 mb-2">
-            Чиллеры
+            Чиллерлар
           </h1>
-          <p className="text-gray-600">
-            Управление чиллерами для охлаждения газа и их движением по станциям
-          </p>
+          <p className="text-gray-600">Чилларни бошқариш сахифаси</p>
         </div>
 
         <motion.button
@@ -435,7 +433,7 @@ const Chillers = () => {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}>
           <Plus size={20} />
-          Добавить чиллер
+          Чиллер қўшиш
         </motion.button>
       </motion.div>
 
@@ -453,7 +451,7 @@ const Chillers = () => {
             />
             <input
               type="text"
-              placeholder="Поиск по марке, модели или заводскому номеру..."
+              placeholder="Чиллерни маркаси, модели ёки завод рақами билан қидириш..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
@@ -461,7 +459,7 @@ const Chillers = () => {
           </div>
           <button className="px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors duration-300 flex items-center gap-2 justify-center">
             <Filter size={20} />
-            <span className="hidden lg:inline">Фильтры</span>
+            <span className="hidden lg:inline">Фильтрлар</span>
           </button>
         </div>
       </motion.div>
@@ -479,13 +477,13 @@ const Chillers = () => {
                 <th className="px-4 py-4 text-left font-semibold">Марка</th>
                 <th className="px-4 py-4 text-left font-semibold">Модель</th>
                 <th className="px-4 py-4 text-left font-semibold hidden md:table-cell">
-                  Заводской номер
+                  Завод рақами
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden lg:table-cell">
-                  Год выпуска
+                  Ишлаб чиқарилган йили
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden xl:table-cell">
-                  Текущая станция
+                  Жорий заправка
                 </th>
                 <th className="px-4 py-4 text-left font-semibold">Действия</th>
               </tr>
@@ -527,7 +525,7 @@ const Chillers = () => {
                     <div className="flex items-center gap-2">
                       <Hash className="text-purple-500" size={16} />
                       <span className="font-medium">
-                        {chiller.serialNumber || "Не указан"}
+                        {chiller.serialNumber || "Кўрсатилмаган"}
                       </span>
                     </div>
                   </td>
@@ -537,7 +535,7 @@ const Chillers = () => {
                     <div className="flex items-center gap-2">
                       <Clock className="text-indigo-500" size={16} />
                       <span className="font-medium">
-                        {chiller.manufactureYear || "Не указан"}
+                        {chiller.manufactureYear || "Кўрсатилмаган"}
                       </span>
                     </div>
                   </td>
@@ -558,7 +556,7 @@ const Chillers = () => {
                         className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        title="Просмотреть">
+                        title="Кўриш">
                         <Edit size={16} />
                       </motion.button>
                       <motion.button
@@ -566,7 +564,7 @@ const Chillers = () => {
                         className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        title="Удалить">
+                        title="Ўчириш">
                         <Trash2 size={16} />
                       </motion.button>
                     </div>
@@ -585,18 +583,18 @@ const Chillers = () => {
             transition={{ duration: 0.6 }}>
             <Snowflake className="mx-auto text-gray-400 mb-4" size={48} />
             <h3 className="text-lg font-semibold text-gray-600 mb-2">
-              {searchTerm ? "Чиллеры не найдены" : "Чиллеры не добавлены"}
+              {searchTerm ? "Чиллерлар топилмади" : "Чиллерлар қўшилмаган"}
             </h3>
             <p className="text-gray-500 mb-4">
               {searchTerm
-                ? "Попробуйте изменить условия поиска"
-                : "Начните с добавления первого чиллера"}
+                ? "Қидириш шартини ўзгартириб кўринг"
+                : "Биринчи чиллерни қўшишдан бошланг"}
             </p>
             {!searchTerm && (
               <button
                 onClick={handleCreateChiller}
                 className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors">
-                Добавить чиллер
+                Чиллер қўшиш
               </button>
             )}
           </motion.div>
@@ -624,10 +622,10 @@ const Chillers = () => {
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">
                     {isCreating
-                      ? "Создание чиллера"
+                      ? "Чиллерни яратиш"
                       : isEditMode
-                      ? "Редактирование чиллера"
-                      : "Информация о чиллере"}
+                      ? "Чиллерни тахрирлаш"
+                      : "Чиллер ҳақида маълумот"}
                   </h2>
                   <motion.button
                     onClick={handleCloseModal}
@@ -646,14 +644,14 @@ const Chillers = () => {
                   <div className="border-b pb-6">
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <Thermometer size={18} />
-                      Основная информация
+                      Асосий маълумот
                     </h3>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                           <Package size={16} />
-                          Тип чиллера *
+                          Чиллер тури *
                         </label>
                         <select
                           value={
@@ -666,7 +664,7 @@ const Chillers = () => {
                           }
                           disabled={!isCreating && !isEditMode}
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                          <option value="">Выберите тип чиллера</option>
+                          <option value="">Чиллер турини танланг</option>
                           {typeChillers.map((type) => (
                             <option key={type.id} value={type.id}>
                               {type.brand} {type.model}
@@ -678,7 +676,7 @@ const Chillers = () => {
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                           <Hash size={16} />
-                          Заводской номер *
+                          Завод рақами *
                         </label>
                         <input
                           type="text"
@@ -692,14 +690,14 @@ const Chillers = () => {
                           }
                           disabled={!isCreating && !isEditMode}
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                          placeholder="Введите заводской номер"
+                          placeholder="Завод рақамини киритинг"
                         />
                       </div>
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                           <Thermometer size={16} />
-                          Марка чиллера *
+                          Чиллер маркаси *
                         </label>
                         <input
                           type="text"
@@ -710,14 +708,14 @@ const Chillers = () => {
                           }
                           readOnly
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed"
-                          placeholder="Выберите тип чиллера"
+                          placeholder="Чиллер турини тангланг"
                         />
                       </div>
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                           <Package size={16} />
-                          Модель чиллера *
+                          Чиллер модели *
                         </label>
                         <input
                           type="text"
@@ -728,14 +726,14 @@ const Chillers = () => {
                           }
                           readOnly
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed"
-                          placeholder="Выберите тип чиллера"
+                          placeholder="Чиллер турини тангланг"
                         />
                       </div>
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                           <Clock size={16} />
-                          Год выпуска *
+                          Ишлаб чиқарилган йили *
                         </label>
                         <input
                           type="text"
@@ -753,7 +751,7 @@ const Chillers = () => {
                               ? "border-red-300 focus:ring-red-500"
                               : "border-gray-200 focus:ring-blue-500"
                           }`}
-                          placeholder="Например: 2023"
+                          placeholder="Мисол: 2023"
                           maxLength={4}
                         />
                         {!isManufactureYearValid() && (
@@ -762,7 +760,7 @@ const Chillers = () => {
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}>
                             <X size={16} />
-                            Введите корректный год выпуска (1900-
+                            Ишлаб чиқарилган йилини тўғри киритинг (1900-
                             {new Date().getFullYear() + 1})
                           </motion.div>
                         )}
@@ -774,13 +772,13 @@ const Chillers = () => {
                   <div className="border-b pb-6">
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <FileText size={18} />
-                      Документы покупки
+                      Сотиб олиш хужжатлари
                     </h3>
 
                     <div className="space-y-4">
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                          Описание документов *
+                          Хужжатлар ҳақида маълумот *
                         </label>
                         <textarea
                           value={
@@ -810,7 +808,7 @@ const Chillers = () => {
                               ? "border-red-300 focus:ring-red-500"
                               : "border-gray-200 focus:ring-blue-500"
                           }`}
-                          placeholder="Описание документов покупки (максимум 200 символов)"
+                          placeholder="Хужжатлар ҳақида маълумот (максимум 200 та символ)"
                         />
                         <div className="flex justify-between items-center mt-1">
                           <div className="text-sm text-gray-500">
@@ -831,7 +829,7 @@ const Chillers = () => {
                             ).trim().length === 0 && (
                               <div className="text-red-600 text-sm flex items-center gap-1">
                                 <X size={14} />
-                                Обязательное поле
+                                Мажбурий қатор
                               </div>
                             )}
                         </div>
@@ -839,7 +837,7 @@ const Chillers = () => {
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                          Файл документа (PDF)
+                          Хужжат файли (PDF)
                         </label>
                         {isCreating || isEditMode ? (
                           <div className="space-y-2">
@@ -853,7 +851,7 @@ const Chillers = () => {
                             {uploadingFile && (
                               <div className="flex items-center gap-2 text-blue-600 text-sm">
                                 <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                Загрузка файла...
+                                Файл юкланмоқда...
                               </div>
                             )}
                             {(isCreating
@@ -862,7 +860,7 @@ const Chillers = () => {
                                   ?.fileUrl) && (
                               <div className="flex items-center gap-2 text-green-600 text-sm">
                                 <FileText size={16} />
-                                Файл успешно загружен:{" "}
+                                Файл мувафақиятли юкланди:{" "}
                                 {isCreating
                                   ? newChiller.purchaseDocuments.fileName
                                   : selectedChiller.purchaseDocuments.fileName}
@@ -887,13 +885,13 @@ const Chillers = () => {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="ml-2 p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                  title="Скачать">
+                                  title="Юклаш">
                                   <Download size={16} />
                                 </a>
                               </div>
                             ) : (
                               <span className="text-gray-500">
-                                Файл не загружен
+                                Файл юкланмади
                               </span>
                             )}
                           </div>
@@ -906,7 +904,7 @@ const Chillers = () => {
                   <div>
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <Truck size={18} />
-                      История движения по станциям
+                      Заправкалар ўртасида юриш тарихи
                     </h3>
 
                     {!isCreating &&
@@ -944,10 +942,10 @@ const Chillers = () => {
                           className="mx-auto mb-2 text-gray-400"
                           size={32}
                         />
-                        <p>История движения пока отсутствует</p>
+                        <p>Заправкалар ўртасида харакати тарихи мавжуд эмас</p>
                         <p className="text-sm">
-                          Движение будет отображаться после прикрепления к
-                          станциям
+                          Харакат фақат заправкаларга бириктирилганидан сўнг
+                          пайдо бўлади
                         </p>
                       </div>
                     )}
@@ -974,7 +972,7 @@ const Chillers = () => {
                               />
                             </motion.div>
                             <span className="text-green-600">
-                              Все обязательные поля заполнены корректно
+                              Барча мажбурий қаторлар тўлдирилди
                             </span>
                           </>
                         ) : (
@@ -986,7 +984,7 @@ const Chillers = () => {
                               <span className="text-white text-xs">!</span>
                             </motion.div>
                             <span className="text-orange-600">
-                              Заполните все обязательные поля (*)
+                              Барча мажбурий каторларни тўлдиринг (*)
                             </span>
                           </>
                         )}
@@ -1006,7 +1004,7 @@ const Chillers = () => {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}>
                       <Edit size={16} />
-                      Редактировать
+                      Тахрирлаш
                     </motion.button>
                   )}
 
@@ -1017,7 +1015,7 @@ const Chillers = () => {
                         className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}>
-                        Отмена
+                        Бекор
                       </motion.button>
                       <motion.button
                         onClick={handleSave}
@@ -1030,7 +1028,7 @@ const Chillers = () => {
                         whileHover={isFormValid ? { scale: 1.02 } : {}}
                         whileTap={isFormValid ? { scale: 0.98 } : {}}>
                         <Save size={16} />
-                        Сохранить
+                        Сақлаш
                       </motion.button>
                     </div>
                   )}
@@ -1041,7 +1039,7 @@ const Chillers = () => {
                       className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}>
-                      Закрыть
+                      Ёпиш
                     </motion.button>
                   )}
                 </div>

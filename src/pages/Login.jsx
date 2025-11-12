@@ -1,20 +1,20 @@
-// components/Login.js
 import React, { useEffect, useState, useRef } from "react";
-import { UpdateIcon } from "@radix-ui/react-icons";
+import { UpdateIcon, EyeOpenIcon, EyeClosedIcon } from "@radix-ui/react-icons";
 import { useAppStore } from "../lib/zustand";
 import Button from "@mui/material/Button";
 import { useLogin } from "../hooks/useLogin";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { useNavigate } from "react-router-dom";
 
 function Login() {
-  const setUser = useAppStore((state) => state.setUser);
-  const setUserData = useAppStore((state) => state.setUserData);
-  const user = useAppStore((state) => state.user);
-  const userData = useAppStore((state) => state.userData);
   const { isPending, signIn } = useLogin();
+  const navigate = useNavigate();
 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [isHovered, setIsHovered] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [showPassword, setShowPassword] = useState(false);
   const formRef = useRef(null);
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
@@ -25,6 +25,10 @@ function Login() {
 
   const handleMouseMove = (e) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   // Проверяем автозаполнение после загрузки
@@ -56,8 +60,14 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const email = formData.email;
+    const email = formData.email.trim();
     const password = formData.password;
+
+    // Валидация полей
+    if (!email || !password) {
+      toast.error("Илтимос, барча қаторларни тўлдиринг");
+      return;
+    }
 
     // Анимация нажатия
     if (formRef.current) {
@@ -72,8 +82,11 @@ function Login() {
     const result = await signIn(email, password);
 
     if (result.success) {
-      // Сессия автоматически запустится через хук useSessionTimeout
-      // Редирект произойдет автоматически через Router
+      // Показываем тост при успешном входе
+      toast.success(result.message);
+    } else {
+      // Показываем ошибку
+      toast.error(result.error);
     }
   };
 
@@ -81,6 +94,21 @@ function Login() {
     <div
       className="min-h-screen w-full relative overflow-hidden bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600"
       onMouseMove={handleMouseMove}>
+      {/* Toast контейнер */}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+        style={{ zIndex: 9999 }}
+      />
+
       {/* Анимированный фон с градиентом */}
       <div
         className="absolute inset-0 opacity-30 transition-transform duration-100 ease-out"
@@ -107,9 +135,9 @@ function Login() {
                 <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
                   <span className="text-2xl">🚀</span>
                 </div>
-                <h2 className="text-3xl font-bold mb-4">Xush kelibsiz</h2>
+                <h2 className="text-3xl font-bold mb-4">Хуш келибсиз!</h2>
                 <p className="text-white/80 text-lg">
-                  Hisobingizga kirish uchun ma'lumotlaringizni kiriting
+                  Тизимга кириш учун маълумотларингизни киритинг
                 </p>
               </div>
             </div>
@@ -131,14 +159,14 @@ function Login() {
                   <div className="flex items-center justify-center space-x-3 mb-4">
                     <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse"></div>
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                      METAN
+                      МЕТАН
                     </h1>
                   </div>
                   <h2 className="text-3xl font-bold text-gray-800 mb-2">
-                    Hisobga kirish
+                    Тизимга кириш
                   </h2>
                   <p className="text-gray-600">
-                    Davom etish uchun hisobingizga kiring
+                    Давом этиш учун қаторларни тўлдиринг
                   </p>
                 </div>
 
@@ -166,26 +194,39 @@ function Login() {
                     </div>
                   </div>
 
-                  {/* Поле Password */}
+                  {/* Поле Password с иконкой глаза */}
                   <div className="relative">
                     <label
                       htmlFor="password"
                       className="block text-sm font-medium text-gray-700 mb-2">
-                      Parol
+                      Парол
                     </label>
                     <div className="relative">
                       <input
                         ref={passwordRef}
                         id="password"
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         name="password"
                         value={formData.password}
                         onChange={handleInputChange("password")}
-                        className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl transition-all duration-300 focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-200 shadow-sm"
+                        className="w-full px-4 py-3 pr-12 bg-white border-2 border-gray-300 rounded-xl transition-all duration-300 focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-200 shadow-sm"
                         placeholder="••••••••"
                         autoComplete="current-password"
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={togglePasswordVisibility}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors duration-200 focus:outline-none"
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }>
+                        {showPassword ? (
+                          <EyeClosedIcon className="w-5 h-5" />
+                        ) : (
+                          <EyeOpenIcon className="w-5 h-5" />
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -220,11 +261,11 @@ function Login() {
                     {isPending ? (
                       <div className="flex items-center justify-center space-x-2">
                         <UpdateIcon className="animate-spin w-5 h-5" />
-                        <span>Kirilmoqda...</span>
+                        <span>Кирилмоқда...</span>
                       </div>
                     ) : (
                       <div className="flex items-center justify-center space-x-2">
-                        <span>Kirish</span>
+                        <span>Кириш</span>
                         <div
                           className={`transition-transform duration-300 ${
                             isHovered ? "translate-x-1" : "translate-x-0"

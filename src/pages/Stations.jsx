@@ -1154,7 +1154,7 @@ const Stations = () => {
         className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}>
+        transition={{ duration: 0 }}>
         <div>
           <h1 className="text-3xl lg:text-4xl font-bold text-gray-800 mb-2">
             АГНКС Станции
