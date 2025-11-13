@@ -230,11 +230,9 @@ const Cities = () => {
         transition={{ duration: 0.6 }}>
         <div>
           <h1 className="text-3xl lg:text-4xl font-bold text-gray-800 mb-2">
-            Города и Районы Узбекистана
+            Ўзбекистон шаҳар ва туманлари
           </h1>
-          <p className="text-gray-600">
-            Управление городами и районами областей Республики Узбекистан
-          </p>
+          <p className="text-gray-600">Шаҳар ва туман номларини бошқариш</p>
         </div>
 
         <motion.button
@@ -243,7 +241,7 @@ const Cities = () => {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}>
           <Plus size={20} />
-          Добавить город/район
+          Шаҳар/туман қўшиш
         </motion.button>
       </motion.div>
 
@@ -261,7 +259,7 @@ const Cities = () => {
             />
             <input
               type="text"
-              placeholder="Поиск по названию, области или типу..."
+              placeholder="Номи билан қидириш..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-300"
@@ -269,7 +267,7 @@ const Cities = () => {
           </div>
           <button className="px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors duration-300 flex items-center gap-2 justify-center">
             <Filter size={20} />
-            <span className="hidden lg:inline">Фильтры</span>
+            <span className="hidden lg:inline">Фильтрлар</span>
           </button>
         </div>
       </motion.div>
@@ -285,17 +283,17 @@ const Cities = () => {
             <thead>
               <tr className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
                 <th className="px-4 py-4 text-left font-semibold">
-                  Город/Район
+                  Шаҳар/туман
                 </th>
                 <th className="px-4 py-4 text-left font-semibold">Тип</th>
                 <th className="px-4 py-4 text-left font-semibold hidden md:table-cell">
-                  Область
+                  Вилоят
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden lg:table-cell">
-                  Население
+                  Аҳоли
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden xl:table-cell">
-                  Площадь
+                  Майдони
                 </th>
               </tr>
             </thead>
@@ -370,19 +368,19 @@ const Cities = () => {
             <Building className="mx-auto text-gray-400 mb-4" size={48} />
             <h3 className="text-lg font-semibold text-gray-600 mb-2">
               {searchTerm
-                ? "Города/районы не найдены"
-                : "Города/районы не добавлены"}
+                ? "Шаҳар/туманлар топилмади"
+                : "Шаҳар/туманлар қўшилмаган"}
             </h3>
             <p className="text-gray-500 mb-4">
               {searchTerm
-                ? "Попробуйте изменить условия поиска"
-                : "Начните с добавления первого города или района"}
+                ? "Қидириш шартини ўзгартириб қўринг"
+                : "Шаҳар/туман қўшиш билан бошланг"}
             </p>
             {!searchTerm && (
               <button
                 onClick={handleCreateCity}
                 className="bg-cyan-500 text-white px-6 py-2 rounded-lg hover:bg-cyan-600 transition-colors">
-                Добавить город/район
+                Шаҳар/туман қўшиш
               </button>
             )}
           </motion.div>
@@ -410,10 +408,10 @@ const Cities = () => {
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">
                     {isCreating
-                      ? "Создание города/района"
+                      ? "Шаҳар/туман яратиш"
                       : isEditMode
-                      ? "Редактирование города/района"
-                      : "Информация о городе/районе"}
+                      ? "Шаҳар/туман таҳрирлаш"
+                      : "Шаҳар/туман ҳақида маълумот"}
                   </h2>
                   <motion.button
                     onClick={handleCloseModal}
@@ -433,7 +431,7 @@ const Cities = () => {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <Building size={16} />
-                        Название *
+                        Номи *
                       </label>
                       <input
                         type="text"
@@ -445,14 +443,14 @@ const Cities = () => {
                         }
                         disabled={!isCreating && !isEditMode}
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                        placeholder="Введите название"
+                        placeholder="Номини киритинг"
                       />
                     </div>
 
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <MapPin size={16} />
-                        Тип
+                        Тури
                       </label>
                       <select
                         value={
@@ -463,9 +461,9 @@ const Cities = () => {
                         }
                         disabled={!isCreating && !isEditMode}
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                        <option value="Город">Город</option>
-                        <option value="Район">Район</option>
-                        <option value="Посёлок">Посёлок</option>
+                        <option value="Город">Шаҳар</option>
+                        <option value="Район">Туман</option>
+                        <option value="Посёлок">Қишлоқ</option>
                       </select>
                     </div>
                   </div>
@@ -474,7 +472,7 @@ const Cities = () => {
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                       <MapPin size={16} />
-                      Область *
+                      Вилоят *
                     </label>
                     <select
                       value={
@@ -485,7 +483,7 @@ const Cities = () => {
                       onChange={(e) => handleRegionChange(e.target.value)}
                       disabled={!isCreating && !isEditMode}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                      <option value="">Выберите область</option>
+                      <option value="">Вилоятни танланг</option>
                       {regions.map((region) => (
                         <option key={region.id} value={region.id}>
                           {region.name}
@@ -499,7 +497,7 @@ const Cities = () => {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <Users size={16} />
-                        Население
+                        Аҳоли сони
                       </label>
                       <input
                         type="text"
@@ -513,14 +511,14 @@ const Cities = () => {
                         }
                         disabled={!isCreating && !isEditMode}
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                        placeholder="Например: 500,000"
+                        placeholder="Мисол: 500,000"
                       />
                     </div>
 
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <Navigation size={16} />
-                        Площадь
+                        Майдони
                       </label>
                       <div className="relative">
                         <input
@@ -553,7 +551,7 @@ const Cities = () => {
                           <>
                             <CheckCircle className="text-green-500" size={16} />
                             <span className="text-green-600">
-                              Все обязательные поля заполнены
+                              Барча мажбурий қаторлар тўлдирилди
                             </span>
                           </>
                         ) : (
@@ -563,7 +561,7 @@ const Cities = () => {
                               size={16}
                             />
                             <span className="text-orange-600">
-                              Заполните все обязательные поля (*)
+                              Барча мажбурий қаторлар тўлдиринг (*)
                             </span>
                           </>
                         )}
@@ -583,7 +581,7 @@ const Cities = () => {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}>
                       <Edit size={16} />
-                      Редактировать
+                      Таҳрирлаш
                     </motion.button>
                   )}
 
@@ -594,7 +592,7 @@ const Cities = () => {
                         className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}>
-                        Отмена
+                        Бекор
                       </motion.button>
                       <motion.button
                         onClick={handleSave}
@@ -607,7 +605,7 @@ const Cities = () => {
                         whileHover={isFormValid ? { scale: 1.02 } : {}}
                         whileTap={isFormValid ? { scale: 0.98 } : {}}>
                         <Save size={16} />
-                        Сохранить
+                        Сақлаш
                       </motion.button>
                     </div>
                   )}
@@ -618,7 +616,7 @@ const Cities = () => {
                       className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}>
-                      Закрыть
+                      Ёпиш
                     </motion.button>
                   )}
                 </div>

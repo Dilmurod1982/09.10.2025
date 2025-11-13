@@ -223,15 +223,15 @@ const Compressors = () => {
   const handleFileUpload = async (file) => {
     if (!file) return;
 
-    console.log("Начало загрузки файла:", file.name);
+    console.log(file.name, "Файла юкланиш бошланди:");
 
     if (file.type !== "application/pdf") {
-      alert("Пожалуйста, загружайте только PDF файлы");
+      alert("Илтимос, фақат PDF файл юкланг");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("Файл слишком большой. Максимальный размер: 5MB");
+      alert("Файл хажми катта. Максимал: 5MB");
       return;
     }
 
@@ -245,7 +245,7 @@ const Compressors = () => {
 
       // Загружаем файл
       const snapshot = await uploadBytes(fileRef, file);
-      console.log("Файл загружен, snapshot:", snapshot);
+      console.log("Файл юкланди, snapshot:", snapshot);
 
       // Получаем URL для скачивания
       const downloadURL = await getDownloadURL(snapshot.ref);
@@ -280,7 +280,7 @@ const Compressors = () => {
         message: error.message,
         stack: error.stack,
       });
-      alert(`Ошибка при загрузке файла: ${error.message}`);
+      alert(`${error.message} файл юланишида хатолик `);
     } finally {
       setUploadingFile(false);
     }
@@ -373,7 +373,7 @@ const Compressors = () => {
 
   // Удаление компрессора
   const handleDelete = async (compressorId) => {
-    if (window.confirm("Вы уверены, что хотите удалить этот компрессор?")) {
+    if (window.confirm("Сиз мазкур компрессорни ўчиришга аминмисиз?")) {
       try {
         await deleteDoc(doc(db, "compressors", compressorId));
         setCompressors(compressors.filter((comp) => comp.id !== compressorId));
@@ -405,7 +405,7 @@ const Compressors = () => {
       !compressor.movementHistory ||
       compressor.movementHistory.length === 0
     ) {
-      return "Не назначена";
+      return "Белгиланмаган";
     }
 
     const sortedHistory = compressor.movementHistory
@@ -414,7 +414,7 @@ const Compressors = () => {
 
     return sortedHistory.length > 0
       ? sortedHistory[0].toStation
-      : "Не назначена";
+      : "Белгиланмаган";
   };
 
   // Проверяем валидность формы для отображения
@@ -442,10 +442,10 @@ const Compressors = () => {
         transition={{ duration: 0.6 }}>
         <div>
           <h1 className="text-3xl lg:text-4xl font-bold text-gray-800 mb-2">
-            Компрессоры
+            Компрессорлар
           </h1>
           <p className="text-gray-600">
-            Управление компрессорами и их движением по станциям
+            Компрессорларни бошқариш ва уларни харакат тарихи
           </p>
         </div>
 
@@ -455,7 +455,7 @@ const Compressors = () => {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}>
           <Plus size={20} />
-          Добавить компрессор
+          Компрессор қўшиш
         </motion.button>
       </motion.div>
 
@@ -473,7 +473,7 @@ const Compressors = () => {
             />
             <input
               type="text"
-              placeholder="Поиск по марке, модели или заводскому номеру..."
+              placeholder="Марка, модели ёки завод рақами билан қидириш..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
@@ -496,16 +496,16 @@ const Compressors = () => {
           <table className="w-full">
             <thead>
               <tr className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white">
-                <th className="px-4 py-4 text-left font-semibold">Марка</th>
-                <th className="px-4 py-4 text-left font-semibold">Модель</th>
+                <th className="px-4 py-4 text-left font-semibold">Маркаси</th>
+                <th className="px-4 py-4 text-left font-semibold">Модели</th>
                 <th className="px-4 py-4 text-left font-semibold hidden md:table-cell">
-                  Заводской номер
+                  Завод рақами
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden lg:table-cell">
-                  Год выпуска
+                  И/ч йили
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden xl:table-cell">
-                  Текущая станция
+                  Жорий заправкада
                 </th>
                 <th className="px-4 py-4 text-left font-semibold">Действия</th>
               </tr>
@@ -547,7 +547,7 @@ const Compressors = () => {
                     <div className="flex items-center gap-2">
                       <Hash className="text-purple-500" size={16} />
                       <span className="font-medium">
-                        {compressor.serialNumber || "Не указан"}
+                        {compressor.serialNumber || "Кўрсатилмаган"}
                       </span>
                     </div>
                   </td>
@@ -557,7 +557,7 @@ const Compressors = () => {
                     <div className="flex items-center gap-2">
                       <Clock className="text-green-500" size={16} />
                       <span className="font-medium">
-                        {compressor.manufactureYear || "Не указан"}
+                        {compressor.manufactureYear || "Кўрсатилмаган"}
                       </span>
                     </div>
                   </td>
@@ -578,7 +578,7 @@ const Compressors = () => {
                         className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        title="Просмотреть">
+                        title="Кўриш">
                         <Edit size={16} />
                       </motion.button>
                       <motion.button
@@ -586,7 +586,7 @@ const Compressors = () => {
                         className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        title="Удалить">
+                        title="Ўчириш">
                         <Trash2 size={16} />
                       </motion.button>
                     </div>
@@ -606,19 +606,19 @@ const Compressors = () => {
             <Settings className="mx-auto text-gray-400 mb-4" size={48} />
             <h3 className="text-lg font-semibold text-gray-600 mb-2">
               {searchTerm
-                ? "Компрессоры не найдены"
-                : "Компрессоры не добавлены"}
+                ? "Компрессорлар топилмади"
+                : "Компрессорлар қўшилмаган"}
             </h3>
             <p className="text-gray-500 mb-4">
               {searchTerm
-                ? "Попробуйте изменить условия поиска"
-                : "Начните с добавления первого компрессора"}
+                ? "Қидириш шартини ўзгартириб кўринг"
+                : "Биринчи компрессорни қўшишдан бошланг"}
             </p>
             {!searchTerm && (
               <button
                 onClick={handleCreateCompressor}
                 className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors">
-                Добавить компрессор
+                Компрессор қўшиш
               </button>
             )}
           </motion.div>
@@ -646,10 +646,10 @@ const Compressors = () => {
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">
                     {isCreating
-                      ? "Создание компрессора"
+                      ? "Компрессор яратиш"
                       : isEditMode
-                      ? "Редактирование компрессора"
-                      : "Информация о компрессоре"}
+                      ? "Компрессорни таҳрирлаш"
+                      : "Компрессор ҳақида маълумот"}
                   </h2>
                   <motion.button
                     onClick={handleCloseModal}
@@ -668,14 +668,14 @@ const Compressors = () => {
                   <div className="border-b pb-6">
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <Settings size={18} />
-                      Основная информация
+                      Асосий маълумот
                     </h3>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                           <Package size={16} />
-                          Тип компрессора *
+                          Компрессор тури *
                         </label>
                         <select
                           value={
@@ -688,7 +688,7 @@ const Compressors = () => {
                           }
                           disabled={!isCreating && !isEditMode}
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                          <option value="">Выберите тип компрессора</option>
+                          <option value="">Компрессора турини танланг</option>
                           {typeCompressors.map((type) => (
                             <option key={type.id} value={type.id}>
                               {type.brand} {type.model}
@@ -700,7 +700,7 @@ const Compressors = () => {
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                           <Hash size={16} />
-                          Заводской номер *
+                          Завод рақами *
                         </label>
                         <input
                           type="text"
@@ -714,14 +714,14 @@ const Compressors = () => {
                           }
                           disabled={!isCreating && !isEditMode}
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                          placeholder="Введите заводской номер"
+                          placeholder="Завод рақамини киритинг"
                         />
                       </div>
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                           <Settings size={16} />
-                          Марка компрессора *
+                          Компрессор маркаси *
                         </label>
                         <input
                           type="text"
@@ -732,14 +732,14 @@ const Compressors = () => {
                           }
                           readOnly
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed"
-                          placeholder="Выберите тип компрессора"
+                          placeholder="Компрессор турини танланг"
                         />
                       </div>
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                           <Package size={16} />
-                          Модель компрессора *
+                          Компрессор модели *
                         </label>
                         <input
                           type="text"
@@ -750,14 +750,14 @@ const Compressors = () => {
                           }
                           readOnly
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed"
-                          placeholder="Выберите тип компрессора"
+                          placeholder="Компрессор турини танланг"
                         />
                       </div>
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                           <Clock size={16} />
-                          Год выпуска *
+                          Ишлаб чиқарилган йили *
                         </label>
                         <input
                           type="text"
@@ -775,7 +775,7 @@ const Compressors = () => {
                               ? "border-red-300 focus:ring-red-500"
                               : "border-gray-200 focus:ring-blue-500"
                           }`}
-                          placeholder="Например: 2023"
+                          placeholder="Мисол: 2023"
                           maxLength={4}
                         />
                         {!isManufactureYearValid() && (
@@ -784,7 +784,7 @@ const Compressors = () => {
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}>
                             <X size={16} />
-                            Введите корректный год выпуска (1900-
+                            Тўғри йилни киритинг (1900-
                             {new Date().getFullYear() + 1})
                           </motion.div>
                         )}
@@ -796,13 +796,13 @@ const Compressors = () => {
                   <div className="border-b pb-6">
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <FileText size={18} />
-                      Документы покупки
+                      Сотиб олиш хужжатлари
                     </h3>
 
                     <div className="space-y-4">
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                          Описание документов
+                          Хужжатлар тавсифи
                         </label>
                         <textarea
                           value={
@@ -821,7 +821,7 @@ const Compressors = () => {
                           maxLength={200}
                           rows={3}
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500 resize-none"
-                          placeholder="Описание документов покупки (максимум 200 символов)"
+                          placeholder="Сотиб олиш хужжатлар тавсифи (максимум 200 та белги)"
                         />
                         <div className="text-right text-sm text-gray-500 mt-1">
                           {isCreating
@@ -835,7 +835,7 @@ const Compressors = () => {
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                          Файл документа (PDF)
+                          Хужжат файли (PDF)
                         </label>
                         {isCreating || isEditMode ? (
                           <div className="space-y-2">
@@ -849,7 +849,7 @@ const Compressors = () => {
                             {uploadingFile && (
                               <div className="flex items-center gap-2 text-blue-600 text-sm">
                                 <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                Загрузка файла...
+                                Файл юкланмоқда...
                               </div>
                             )}
                             {/* Отладочная информация */}
@@ -859,7 +859,7 @@ const Compressors = () => {
                                   ?.fileUrl) && (
                               <div className="flex items-center gap-2 text-green-600 text-sm">
                                 <FileText size={16} />
-                                Файл успешно загружен:{" "}
+                                Файл мувафақиятли юкланди:{" "}
                                 {isCreating
                                   ? newCompressor.purchaseDocuments.fileName
                                   : selectedCompressor.purchaseDocuments
@@ -888,13 +888,13 @@ const Compressors = () => {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="ml-2 p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                  title="Скачать">
+                                  title="Юклаш">
                                   <Download size={16} />
                                 </a>
                               </div>
                             ) : (
                               <span className="text-gray-500">
-                                Файл не загружен
+                                Файл юкланмади
                               </span>
                             )}
                           </div>
@@ -907,7 +907,7 @@ const Compressors = () => {
                   <div>
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <Truck size={18} />
-                      История движения по станциям
+                      Заправкалар бўйича харакат
                     </h3>
 
                     {!isCreating &&
@@ -945,10 +945,10 @@ const Compressors = () => {
                           className="mx-auto mb-2 text-gray-400"
                           size={32}
                         />
-                        <p>История движения пока отсутствует</p>
+                        <p>Заправкалар бўйича харакати мавжуд эмас</p>
                         <p className="text-sm">
-                          Движение будет отображаться после прикрепления к
-                          станциям
+                          Харакати биронта заправкага бириктирилганидан сўнг
+                          кўринишни бошлайди
                         </p>
                       </div>
                     )}
@@ -975,7 +975,7 @@ const Compressors = () => {
                               />
                             </motion.div>
                             <span className="text-green-600">
-                              Все обязательные поля заполнены корректно
+                              Барча тўлдирилиши зарурий каторлар тўлдирилди
                             </span>
                           </>
                         ) : (
@@ -987,7 +987,7 @@ const Compressors = () => {
                               <span className="text-white text-xs">!</span>
                             </motion.div>
                             <span className="text-orange-600">
-                              Заполните все обязательные поля (*)
+                              Барча тўлдирилиши зарурий каторлар тўлдиринг (*)
                             </span>
                           </>
                         )}
@@ -1007,7 +1007,7 @@ const Compressors = () => {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}>
                       <Edit size={16} />
-                      Редактировать
+                      Таҳрирлаш
                     </motion.button>
                   )}
 
@@ -1018,7 +1018,7 @@ const Compressors = () => {
                         className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}>
-                        Отмена
+                        Бекор
                       </motion.button>
                       <motion.button
                         onClick={handleSave}
@@ -1031,7 +1031,7 @@ const Compressors = () => {
                         whileHover={isFormValid ? { scale: 1.02 } : {}}
                         whileTap={isFormValid ? { scale: 0.98 } : {}}>
                         <Save size={16} />
-                        Сохранить
+                        Сақлаш
                       </motion.button>
                     </div>
                   )}
@@ -1042,7 +1042,7 @@ const Compressors = () => {
                       className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}>
-                      Закрыть
+                      Ёпиш
                     </motion.button>
                   )}
                 </div>

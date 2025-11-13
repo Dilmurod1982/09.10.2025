@@ -128,7 +128,7 @@ const ControlPayments = () => {
               (await getStationInfo(report.stationId));
             return {
               ...report,
-              stationName: stationInfo?.stationName || "Неизвестная станция",
+              stationName: stationInfo?.stationName || "Номаълум заправка",
             };
           })
         );
@@ -190,34 +190,34 @@ const ControlPayments = () => {
     if (!reports.length) return;
 
     const worksheetData = [
-      ["Контроль платежей"],
+      ["Тўловлар назорати"],
       [
         selectedStation
-          ? `Станция: ${selectedStation.stationName}`
-          : `Все станции пользователя`,
+          ? `${selectedStation.stationName} заправкаси`
+          : `Фойдаланувчининг барча заправкалари`,
       ],
       [
-        `Период: ${new Date(selectedMonth + "-01").toLocaleDateString("ru-RU", {
+        `Давр: ${new Date(selectedMonth + "-01").toLocaleDateString("ru-RU", {
           month: "long",
           year: "numeric",
         })}`,
       ],
       [],
       [
-        "Станция",
-        "Дата",
+        "Заправка",
+        "Сана",
         "Z-отчет",
-        "Общая контрольная сумма",
-        "Процент",
-        "Сумма Humo",
-        "Контрольная сумма Humo",
-        "Процент Humo",
-        "Сумма Uzcard",
-        "Контрольная сумма Uzcard",
-        "Процент Uzcard",
-        "Электронные платежи",
-        "Контрольная сумма электронных платежей",
-        "Процент электронных платежей",
+        "Жами назорат суммаси",
+        "Фоиз",
+        "Humo",
+        "Humo назорат суммаси",
+        "Humo фоизи",
+        "Uzcard",
+        "Uzcard назорат суммаси",
+        "Uzcard фоизи",
+        "Электрон тўловлар",
+        "Электрон тўловлар назорат суммаси",
+        "Электрон тўловлар фоизи",
       ],
       ...reports.map((report) => {
         const generalData = report.generalData || {};
@@ -263,7 +263,7 @@ const ControlPayments = () => {
 
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Контроль платежей");
+    XLSX.utils.book_append_sheet(wb, ws, "Назорат суммалар");
 
     const colWidths = [
       { wch: 20 },
@@ -285,8 +285,8 @@ const ControlPayments = () => {
     ws["!cols"] = colWidths;
 
     const fileName = selectedStation
-      ? `Контроль_платежей_${selectedStation.stationName}_${selectedMonth}`
-      : `Контроль_платежей_все_станции_${selectedMonth}`;
+      ? `Назорат_суммалар_${selectedStation.stationName}_${selectedMonth}`
+      : `Барча_заправкалар_назорат_суммалар_${selectedMonth}`;
 
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
@@ -298,14 +298,14 @@ const ControlPayments = () => {
         <div className="mb-6 sm:mb-8 text-center sm:text-left">
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-white/20">
             <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-              Контроль платежей
+              Назорат суммалар
             </h1>
             <p className="text-gray-600 text-sm sm:text-base">
-              Контроль и сверка наличных и безналичных платежей
+              Назорат ва нақд ҳамда пул ўтказиш суммаларини солиштириш
             </p>
             {isBuxgalter && (
               <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 mt-2">
-                👑 Режим бухгалтера
+                👑 Бухгалтер режими
               </div>
             )}
           </div>
@@ -330,7 +330,7 @@ const ControlPayments = () => {
                     );
                     setSelectedStation(station || null);
                   }}>
-                  <option value="">Все заправки</option>
+                  <option value="">Барча заправка</option>
                   {stations.map((station) => (
                     <option key={station.id} value={station.id}>
                       {station.stationName}
@@ -342,13 +342,13 @@ const ControlPayments = () => {
               {/* Выбор месяца */}
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">
-                  📅 Месяц *
+                  📅 Ой *
                 </label>
                 <select
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50 backdrop-blur-sm transition-all duration-200 hover:border-gray-300"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}>
-                  <option value="">Выберите месяц...</option>
+                  <option value="">Ойни танланг...</option>
                   {monthOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -361,7 +361,7 @@ const ControlPayments = () => {
             {/* Вторая строка - кнопки действий */}
             <div className="space-y-3">
               <label className="block text-sm font-semibold text-gray-700">
-                🛠️ Действия
+                🛠️ Харакат
               </label>
 
               {/* Кнопки добавления контрольных сумм - только для бухгалтера */}
@@ -372,7 +372,7 @@ const ControlPayments = () => {
                     onClick={() => handleOpenModal("total")}
                     disabled={!selectedStation}>
                     <span className="text-lg">💰</span>
-                    <span className="text-sm font-medium">Общая сумма</span>
+                    <span className="text-sm font-medium">Жами сумма</span>
                   </button>
 
                   <button
@@ -396,7 +396,7 @@ const ControlPayments = () => {
                     onClick={() => handleOpenModal("electronic")}
                     disabled={!selectedStation}>
                     <span className="text-lg">⚡</span>
-                    <span className="text-sm font-medium">Электронные</span>
+                    <span className="text-sm font-medium">Элек тўлов</span>
                   </button>
                 </div>
               )}
@@ -422,7 +422,7 @@ const ControlPayments = () => {
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  Экспорт в Excel
+                  Excel га экспорт
                 </button>
               </div>
             </div>
@@ -434,7 +434,7 @@ const ControlPayments = () => {
           <div className="flex justify-center items-center py-12">
             <div className="flex flex-col items-center gap-3">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              <p className="text-gray-600">Загрузка отчетов...</p>
+              <p className="text-gray-600">Ҳисоботларни юклаш...</p>
             </div>
           </div>
         )}
@@ -449,16 +449,16 @@ const ControlPayments = () => {
                     <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
                       <tr>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Станция
+                          Заправка
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Дата
+                          Сана
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
                           Z-отчет
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Контр. сумма
+                          Назорат. сумма
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
                           %
@@ -467,7 +467,7 @@ const ControlPayments = () => {
                           Humo
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Контр. Humo
+                          Humo назорат
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
                           %
@@ -476,16 +476,16 @@ const ControlPayments = () => {
                           Uzcard
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Контр. Uzcard
+                          Uzcard назорат
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
                           %
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Электронные
+                          Элек.тўлов
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Контр. электро
+                          Элек тўлов назорат
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
                           %
@@ -644,10 +644,10 @@ const ControlPayments = () => {
                     </svg>
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Отчеты не найдены
+                    Ҳисоботлар топилмади
                   </h3>
                   <p className="text-gray-600 text-sm">
-                    Для выбранных параметров отчеты отсутствуют
+                    Танланган параметлар бўйича ҳисобот мавжуд эмас
                   </p>
                 </div>
               </div>
@@ -674,10 +674,10 @@ const ControlPayments = () => {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Выберите месяц
+                Ойни танланг
               </h3>
               <p className="text-gray-600 text-sm">
-                Выберите месяц для просмотра отчетов
+                Ҳисоботни кўриш учун ойни танланг
               </p>
             </div>
           </div>
