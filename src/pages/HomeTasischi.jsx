@@ -39,10 +39,10 @@ const HomeTasischi = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="text-lg text-gray-600 mb-3">
-            Загрузка данных анализа...
+            Таҳлиллар юкланмоқда...
           </div>
           <div className="text-xs text-gray-500">
-            Отчетов: {debugInfo.reportsCount} | Документов:{" "}
+            Ҳисоботлар: {debugInfo.reportsCount} | Хужжатлар:{" "}
             {debugInfo.documentsCount}
           </div>
         </div>
@@ -55,13 +55,13 @@ const HomeTasischi = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center max-w-xs">
           <div className="text-lg text-red-600 mb-2">
-            Ошибка загрузки данных
+            Маълумотлар юклашда хатолик
           </div>
           <div className="text-xs text-gray-500 mb-3">{error}</div>
           <button
             onClick={() => loadAnalysisData()}
             className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">
-            Попробовать снова
+            Қайта уриниш
           </button>
         </div>
       </div>
@@ -75,13 +75,13 @@ const HomeTasischi = () => {
         <div className="flex justify-between items-center mb-4 p-2">
           <div className="flex-1">
             <h1 className="text-lg font-bold text-gray-900 mb-1">
-              Анализ заправок
+              Заправкалар таҳлили
             </h1>
-            <p className="text-xs text-gray-600">Учредитель сетей заправок</p>
+            <p className="text-xs text-gray-600">Таъсисчи</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="text-xs text-gray-500 text-right">
-              {debugInfo.reportsCount} отчетов
+              {debugInfo.reportsCount} ҳисоботлар
             </div>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -108,7 +108,7 @@ const HomeTasischi = () => {
               />
 
               <MobileAnalysisTab
-                title="Сравнение"
+                title="Солиштириш"
                 value={analysisData.comparisonData.length}
                 onClick={() => {
                   setSelectedAnalysis({ type: "comparison" });
@@ -132,7 +132,7 @@ const HomeTasischi = () => {
               />
 
               <MobileAnalysisTab
-                title="Отчеты"
+                title="Ҳисоботлар"
                 value={analysisData.missingReportsData.length}
                 onClick={() => {
                   setSelectedAnalysis({ type: "missingReports" });
@@ -144,7 +144,7 @@ const HomeTasischi = () => {
               />
 
               <MobileAnalysisTab
-                title="Контроль"
+                title="Назорат"
                 value={analysisData.controlDifferenceData.length}
                 onClick={() => {
                   setSelectedAnalysis({ type: "controlDifference" });
@@ -156,7 +156,7 @@ const HomeTasischi = () => {
               />
 
               <MobileAnalysisTab
-                title="Документы"
+                title="Хужжатлар"
                 value={analysisData.expiredDocumentsData.length}
                 onClick={() => {
                   setSelectedAnalysis({ type: "expiredDocuments" });
@@ -168,10 +168,10 @@ const HomeTasischi = () => {
               />
 
               <MobileAnalysisTab
-                title="Газ/Платежи"
+                title="Газ/Тўловлар"
                 value={
                   analysisData.gasAndPaymentsData?.summary
-                    ? "Сводка"
+                    ? "Ҳисобот"
                     : analysisData.gasAndPaymentsData.length
                 }
                 onClick={() => {
@@ -191,7 +191,7 @@ const HomeTasischi = () => {
                 setMobileMenuOpen(false);
               }}
               className="w-full mt-3 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-sm">
-              Обновить данные
+              Маълумотларни янгилаш
             </button>
           </div>
         )}
@@ -226,7 +226,9 @@ const HomeTasischi = () => {
           {/* Статистика по данным */}
           {!selectedAnalysis && (
             <div className="p-3 bg-white rounded-xl shadow-lg">
-              <h3 className="text-base font-semibold mb-3">Общая статистика</h3>
+              <h3 className="text-base font-semibold mb-3">
+                Умумий статистика
+              </h3>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="text-center p-2 bg-blue-50 rounded-lg">
                   <div className="font-semibold text-blue-600 text-sm">
@@ -238,19 +240,19 @@ const HomeTasischi = () => {
                   <div className="font-semibold text-green-600 text-sm">
                     {analysisData.comparisonData.length}
                   </div>
-                  <div className="text-gray-600">Сравнение</div>
+                  <div className="text-gray-600">Солиштириш</div>
                 </div>
                 <div className="text-center p-2 bg-red-50 rounded-lg">
                   <div className="font-semibold text-red-600 text-sm">
                     {analysisData.negativeDifferenceData.length}
                   </div>
-                  <div className="text-gray-600">Проблемы</div>
+                  <div className="text-gray-600">Муаммолар</div>
                 </div>
                 <div className="text-center p-2 bg-purple-50 rounded-lg">
                   <div className="font-semibold text-purple-600 text-sm">
                     {analysisData.controlDifferenceData.length}
                   </div>
-                  <div className="text-gray-600">Финансы</div>
+                  <div className="text-gray-600">Молия</div>
                 </div>
               </div>
             </div>

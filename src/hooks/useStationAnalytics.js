@@ -36,7 +36,7 @@ export const formatNumber = (num) => {
 };
 
 export const formatCurrency = (num) => {
-  return new Intl.NumberFormat("ru-RU").format(num) + " ₽";
+  return new Intl.NumberFormat("ru-RU").format(num) + " сўм";
 };
 
 export const useStationAnalytics = (managedStations = []) => {
@@ -423,7 +423,7 @@ export const useStationAnalytics = (managedStations = []) => {
           totalElectronic: 0,
           totalPayments: 0,
           reportsCount: 0,
-          period: "Ошибка расчета",
+          period: "Ҳисобда хатолик",
         },
         dailyData: [],
         stationsData: [],
@@ -458,7 +458,7 @@ export const useStationAnalytics = (managedStations = []) => {
               managedStations.includes(report.stationId)
           );
       } catch (error) {
-        setError(`Ошибка загрузки отчетов: ${error.message}`);
+        setError(`Ҳисобтларни юклашда хатолик: ${error.message}`);
       }
 
       // Загружаем данные documents
