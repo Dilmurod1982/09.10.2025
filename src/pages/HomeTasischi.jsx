@@ -120,7 +120,7 @@ const HomeTasischi = () => {
               />
 
               <MobileAnalysisTab
-                title="Отрицательная"
+                title="Минуслар"
                 value={analysisData.negativeDifferenceData.length}
                 onClick={() => {
                   setSelectedAnalysis({ type: "negativeDifference" });

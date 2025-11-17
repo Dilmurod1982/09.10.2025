@@ -112,7 +112,7 @@ export const GasAndPaymentsDetails = ({
       <div className="space-y-6">
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
           <h3 className="text-xl font-semibold">
-            Анализ расхода газа и поступлений платежей
+            Сотилган газ ва тушум таҳлили
           </h3>
           <div className="flex flex-col sm:flex-row gap-2">
             {/* Быстрый выбор периода */}
@@ -152,7 +152,7 @@ export const GasAndPaymentsDetails = ({
             <button
               onClick={onRefresh}
               className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm whitespace-nowrap">
-              Обновить
+              Янгилаш
             </button>
           </div>
         </div>
