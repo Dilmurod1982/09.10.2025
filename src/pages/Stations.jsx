@@ -447,7 +447,7 @@ const Stations = () => {
     if (cleanPinfl.length === 14) {
       const exists = await checkPinflExists(cleanPinfl);
       if (exists) {
-        setPinflError("Сотрудник с таким ПИНФЛ уже существует");
+        setPinflError("Бундай ЖШШИРли ходим базада мавжуд");
       } else {
         setPinflError("");
       }
@@ -1157,12 +1157,9 @@ const Stations = () => {
         transition={{ duration: 0 }}>
         <div>
           <h1 className="text-3xl lg:text-4xl font-bold text-gray-800 mb-2">
-            АГНКС Станции
+            Заправкалар
           </h1>
-          <p className="text-gray-600">
-            Управление автомобильными газонаполнительными компрессорными
-            станциями
-          </p>
+          <p className="text-gray-600">Заправкалар бошқариш панели</p>
         </div>
 
         <motion.button
@@ -1171,7 +1168,7 @@ const Stations = () => {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}>
           <Plus size={20} />
-          Добавить АГНКС
+          Янги АГТКШ қўшиш
         </motion.button>
       </motion.div>
 
@@ -1197,7 +1194,7 @@ const Stations = () => {
           </div>
           <button className="px-4 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors duration-300 flex items-center gap-2 justify-center">
             <Filter size={20} />
-            <span className="hidden lg:inline">Фильтры</span>
+            <span className="hidden lg:inline">Фильтрлар</span>
           </button>
         </div>
       </motion.div>
@@ -1212,25 +1209,23 @@ const Stations = () => {
           <table className="w-full">
             <thead>
               <tr className="bg-gradient-to-r from-red-500 to-orange-600 text-white">
+                <th className="px-4 py-4 text-left font-semibold">МЧЖ номи</th>
                 <th className="px-4 py-4 text-left font-semibold">
-                  Организация
+                  Заправка рақами
                 </th>
                 <th className="px-4 py-4 text-left font-semibold">
-                  Номер станции
-                </th>
-                <th className="px-4 py-4 text-left font-semibold">
-                  Название станции
+                  Заправка номи
                 </th>
 
                 <th className="px-4 py-4 text-left font-semibold">Адрес</th>
                 <th className="px-4 py-4 text-left font-semibold hidden lg:table-cell">
-                  Штаты
+                  Штатлар сони
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden xl:table-cell">
-                  Компрессоры
+                  Компрессорлар
                 </th>
                 <th className="px-4 py-4 text-left font-semibold hidden xl:table-cell">
-                  Колонки
+                  Колонкалар
                 </th>
               </tr>
             </thead>
@@ -1310,18 +1305,18 @@ const Stations = () => {
             transition={{ duration: 0.6 }}>
             <Building className="mx-auto text-gray-400 mb-4" size={48} />
             <h3 className="text-lg font-semibold text-gray-600 mb-2">
-              {searchTerm ? "Станции не найдены" : "Станции не добавлены"}
+              {searchTerm ? "Заправкалар топилмади" : "Заправкалар қўшилмаган"}
             </h3>
             <p className="text-gray-500 mb-4">
               {searchTerm
-                ? "Попробуйте изменить условия поиска"
-                : "Начните с добавления первой станции"}
+                ? "Қидириш шартини ўзгартириб кўринг"
+                : "Биринчи заправка қўшишдан бошланг"}
             </p>
             {!searchTerm && (
               <button
                 onClick={handleCreateStation}
                 className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors">
-                Добавить станцию
+                Заправка қўшиш
               </button>
             )}
           </motion.div>
@@ -1349,10 +1344,10 @@ const Stations = () => {
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">
                     {isCreating
-                      ? "Создание АГНКС"
+                      ? "АГТКШ яратиш"
                       : isEditMode
-                      ? "Редактирование АГНКС"
-                      : "Информация об АГНКС"}
+                      ? "АГТКШни таҳрирлаш"
+                      : "АГТКШ маълумотлари"}
                   </h2>
                   <motion.button
                     onClick={handleCloseModal}
@@ -1372,7 +1367,7 @@ const Stations = () => {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <Building size={16} />
-                        Организация *
+                        МЧЖ *
                       </label>
                       <select
                         value={getNestedValue(
@@ -1384,7 +1379,7 @@ const Stations = () => {
                         }
                         disabled={!isCreating && !isEditMode}
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                        <option value="">Выберите организацию</option>
+                        <option value="">МЧЖни танланг</option>
                         {organizations.map((org) => (
                           <option key={org.id} value={org.id}>
                             {org.name}
@@ -1395,7 +1390,7 @@ const Stations = () => {
 
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                        Номер станции *
+                        АГТКШ рақами *
                       </label>
                       <input
                         type="text"
@@ -1408,13 +1403,13 @@ const Stations = () => {
                         }
                         disabled={!isCreating && !isEditMode}
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                        placeholder="Введите номер станции"
+                        placeholder="АГТКШ рақамини киритинг"
                       />
                     </div>
 
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                        Наименование станции *
+                        Заправка номи *
                       </label>
                       <input
                         type="text"
@@ -1427,7 +1422,7 @@ const Stations = () => {
                         }
                         disabled={!isCreating && !isEditMode}
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                        placeholder="Название станции"
+                        placeholder="Заправка номини киритинг"
                       />
                     </div>
                   </div>
@@ -1436,7 +1431,7 @@ const Stations = () => {
                     <div>
                       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                         <Phone size={16} />
-                        Телефон станции *
+                        Заправка телефони *
                       </label>
                       <input
                         type="tel"
@@ -1458,12 +1453,12 @@ const Stations = () => {
                   <div className="border-t pt-6">
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <MapPin size={18} />
-                      Адрес станции
+                      Манзили
                     </h3>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                          Город/Район *
+                          Шаҳар/туман *
                         </label>
                         <select
                           value={getNestedValue(
@@ -1475,7 +1470,7 @@ const Stations = () => {
                           }
                           disabled={!isCreating && !isEditMode}
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                          <option value="">Выберите город/район</option>
+                          <option value="">Шаҳар/туманни танланг</option>
                           {cities.map((city) => (
                             <option key={city.id} value={city.id}>
                               {city.name}
@@ -1486,7 +1481,7 @@ const Stations = () => {
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                          Область
+                          Вилоят
                         </label>
                         <input
                           type="text"
@@ -1504,7 +1499,7 @@ const Stations = () => {
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                           <Home size={16} />
-                          Улица *
+                          Кўча *
                         </label>
                         <input
                           type="text"
@@ -1517,14 +1512,14 @@ const Stations = () => {
                           }
                           disabled={!isCreating && !isEditMode}
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                          placeholder="Название улицы"
+                          placeholder="Кўча номи"
                         />
                       </div>
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                           <Home size={16} />
-                          Дом *
+                          Уй *
                         </label>
                         <input
                           type="text"
@@ -1537,14 +1532,14 @@ const Stations = () => {
                           }
                           disabled={!isCreating && !isEditMode}
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                          placeholder="Номер дома"
+                          placeholder="Уй рақами"
                         />
                       </div>
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                           <Users size={16} />
-                          МСГ
+                          МФЙ
                         </label>
                         <input
                           type="text"
@@ -1557,7 +1552,7 @@ const Stations = () => {
                           }
                           disabled={!isCreating && !isEditMode}
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
-                          placeholder="Махаллинский сход граждан"
+                          placeholder="Махалла фуқаролар йиғини"
                         />
                       </div>
                     </div>
@@ -1567,7 +1562,7 @@ const Stations = () => {
                   <div className="border-t pt-6">
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <Briefcase size={18} />
-                      Штаты станции
+                      Заправка штатлари
                     </h3>
 
                     {(isCreating || isEditMode) && (
@@ -1577,7 +1572,7 @@ const Stations = () => {
                           onClick={addPosition}
                           className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
                           <Plus size={16} />
-                          Добавить должность
+                          Лавозим қўшиш
                         </button>
                       </div>
                     )}
@@ -1593,26 +1588,26 @@ const Stations = () => {
                           <thead>
                             <tr className="bg-gray-50">
                               <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                                Должность
+                                Лавозим
                               </th>
                               <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                                Описание
+                                Тавсиф
                               </th>
                               <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                                Требования
+                                Талаби
                               </th>
                               <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                                Обязанности
+                                Мажбуриятлари
                               </th>
                               <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                                Зарплата
+                                Маоши
                               </th>
                               <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                                Тип
+                                Тури
                               </th>
                               {(isCreating || isEditMode) && (
                                 <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                                  Действия
+                                  Харакати
                                 </th>
                               )}
                             </tr>
@@ -1637,7 +1632,7 @@ const Stations = () => {
                                       }
                                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
                                       <option value="">
-                                        Выберите должность
+                                        Лавозимни тангланг
                                       </option>
                                       {jobTitles.map((job) => (
                                         <option key={job.id} value={job.id}>
@@ -1693,7 +1688,7 @@ const Stations = () => {
                           className="mx-auto mb-2 text-gray-400"
                           size={32}
                         />
-                        <p>Должности не добавлены</p>
+                        <p>Лавозимлар қўшилмаган</p>
                       </div>
                     )}
                   </div>
@@ -1702,7 +1697,7 @@ const Stations = () => {
                   <div className="border-t pt-6">
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <Users size={18} />
-                      Руководитель станции
+                      Заправка бошқарувчиси
                     </h3>
 
                     <div className="overflow-x-auto">
@@ -1710,19 +1705,19 @@ const Stations = () => {
                         <thead>
                           <tr className="bg-gray-50">
                             <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                              Должность *
+                              Лавозим *
                             </th>
                             <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                              Сотрудник *
+                              Ходим *
                             </th>
                             <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                              ПИНФЛ
+                              ЖШШИР
                             </th>
                             <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
                               Паспорт
                             </th>
                             <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
-                              Дата рождения
+                              Туғилган сана
                             </th>
                             <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-700">
                               Телефон
@@ -1740,9 +1735,7 @@ const Stations = () => {
                               <td className="border border-gray-200 px-4 py-3">
                                 <input
                                   type="text"
-                                  value={
-                                    directorPosition?.name || "Руководитель"
-                                  }
+                                  value={directorPosition?.name || "Рахбар"}
                                   readOnly
                                   className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700 font-medium"
                                 />
@@ -1762,11 +1755,11 @@ const Stations = () => {
                                   }
                                   disabled={!isCreating && !isEditMode}
                                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50">
-                                  <option value="">Выберите сотрудника</option>
+                                  <option value="">Ходимни танланг</option>
                                   <option
                                     value="new"
                                     className="text-green-600 font-semibold bg-green-50">
-                                    + Добавить нового сотрудника
+                                    + Янги ходимни танланг
                                   </option>
                                   {employees.map((employee) => (
                                     <option
@@ -1830,7 +1823,7 @@ const Stations = () => {
                   <div className="border-t pt-6">
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <Settings size={18} />
-                      Оборудование станции
+                      Заправка ускуналари
                     </h3>
 
                     {/* Компрессоры */}
@@ -1838,7 +1831,7 @@ const Stations = () => {
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-gray-700 flex items-center gap-2">
                           <Settings size={16} />
-                          Компрессоры
+                          Компрессорлар
                         </h4>
                         {(isCreating || isEditMode) && (
                           <button
@@ -1846,7 +1839,7 @@ const Stations = () => {
                             onClick={() => addEquipment("compressors")}
                             className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
                             <Plus size={16} />
-                            Добавить компрессор
+                            Компрессор қўшиш
                           </button>
                         )}
                       </div>
@@ -1862,7 +1855,7 @@ const Stations = () => {
                           className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель компрессора *
+                              Компрессор модели *
                             </label>
                             <select
                               value={compressor.equipmentId || ""}
@@ -1880,11 +1873,11 @@ const Stations = () => {
                               }}
                               disabled={!isCreating && !isEditMode}
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                              <option value="">Выберите компрессор</option>
+                              <option value="">Компрессор тангланг</option>
                               {availableCompressors.map((comp) => (
                                 <option key={comp.id} value={comp.id}>
                                   {comp.brand} {comp.model} -{" "}
-                                  {comp.serialNumber || "Без номера"}
+                                  {comp.serialNumber || "рақамсиз"}
                                 </option>
                               ))}
                             </select>
@@ -1899,27 +1892,27 @@ const Stations = () => {
                               value={compressor.brand || ""}
                               readOnly
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
-                              placeholder="Автоматически заполнится"
+                              placeholder="Автоматик тўлдирилади"
                             />
                           </div>
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель
+                              Модели
                             </label>
                             <input
                               type="text"
                               value={compressor.modelName || ""}
                               readOnly
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
-                              placeholder="Автоматически заполнится"
+                              placeholder="Автоматик тўлдирилади"
                             />
                           </div>
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               <UserCheck className="inline w-4 h-4 mr-1 text-green-600" />
-                              Дата прикрепления *
+                              Бириктирилган сана *
                             </label>
                             <input
                               type="date"
@@ -1940,7 +1933,7 @@ const Stations = () => {
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               <UserX className="inline w-4 h-4 mr-1 text-red-600" />
-                              Дата открепления
+                              Ажратиш санаси
                             </label>
                             <input
                               type="date"
@@ -1979,7 +1972,7 @@ const Stations = () => {
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-gray-700 flex items-center gap-2">
                           <Droplets size={16} />
-                          Колонки
+                          Колонкалар
                         </h4>
                         {(isCreating || isEditMode) && (
                           <button
@@ -1987,7 +1980,7 @@ const Stations = () => {
                             onClick={() => addEquipment("dispensers")}
                             className="flex items-center gap-2 px-3 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors">
                             <Plus size={16} />
-                            Добавить колонку
+                            Колонка қўшиш
                           </button>
                         )}
                       </div>
@@ -2003,7 +1996,7 @@ const Stations = () => {
                           className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель колонки *
+                              Колонка модели *
                             </label>
                             <select
                               value={dispenser.equipmentId || ""}
@@ -2021,11 +2014,11 @@ const Stations = () => {
                               }}
                               disabled={!isCreating && !isEditMode}
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                              <option value="">Выберите колонку</option>
+                              <option value="">Колонка танланг</option>
                               {availableDispensers.map((disp) => (
                                 <option key={disp.id} value={disp.id}>
                                   {disp.brand} {disp.model} -{" "}
-                                  {disp.serialNumber || "Без номера"}
+                                  {disp.serialNumber || "Рақамсиз"}
                                 </option>
                               ))}
                             </select>
@@ -2033,34 +2026,34 @@ const Stations = () => {
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Марка
+                              Маркаси
                             </label>
                             <input
                               type="text"
                               value={dispenser.brand || ""}
                               readOnly
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
-                              placeholder="Автоматически заполнится"
+                              placeholder="Автоматик тўлдирилади"
                             />
                           </div>
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель
+                              Модели
                             </label>
                             <input
                               type="text"
                               value={dispenser.modelName || ""}
                               readOnly
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
-                              placeholder="Автоматически заполнится"
+                              placeholder="Автоматик тўлдирилади"
                             />
                           </div>
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               <UserCheck className="inline w-4 h-4 mr-1 text-green-600" />
-                              Дата прикрепления *
+                              Бириктириш санаси *
                             </label>
                             <input
                               type="date"
@@ -2081,7 +2074,7 @@ const Stations = () => {
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               <UserX className="inline w-4 h-4 mr-1 text-red-600" />
-                              Дата открепления
+                              Ажратиш санаси
                             </label>
                             <input
                               type="date"
@@ -2120,7 +2113,7 @@ const Stations = () => {
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-gray-700 flex items-center gap-2">
                           <Wind size={16} />
-                          Осушки
+                          Осушка
                         </h4>
                         {(isCreating || isEditMode) && (
                           <button
@@ -2128,7 +2121,7 @@ const Stations = () => {
                             onClick={() => addEquipment("dryers")}
                             className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
                             <Plus size={16} />
-                            Добавить осушку
+                            Осушка қўшиш
                           </button>
                         )}
                       </div>
@@ -2144,7 +2137,7 @@ const Stations = () => {
                           className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель осушки *
+                              Осушка модели *
                             </label>
                             <select
                               value={dryer.equipmentId || ""}
@@ -2162,11 +2155,11 @@ const Stations = () => {
                               }}
                               disabled={!isCreating && !isEditMode}
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                              <option value="">Выберите осушку</option>
+                              <option value="">Осушкани танланг</option>
                               {availableGasDryers.map((dry) => (
                                 <option key={dry.id} value={dry.id}>
                                   {dry.brand} {dry.model} -{" "}
-                                  {dry.serialNumber || "Без номера"}
+                                  {dry.serialNumber || "Рақамсиз"}
                                 </option>
                               ))}
                             </select>
@@ -2174,34 +2167,34 @@ const Stations = () => {
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Марка
+                              Маркаси
                             </label>
                             <input
                               type="text"
                               value={dryer.brand || ""}
                               readOnly
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
-                              placeholder="Автоматически заполнится"
+                              placeholder="Автоматик тўлдирилади"
                             />
                           </div>
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель
+                              Модели
                             </label>
                             <input
                               type="text"
                               value={dryer.modelName || ""}
                               readOnly
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
-                              placeholder="Автоматически заполнится"
+                              placeholder="Автоматик тўлдирилади"
                             />
                           </div>
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               <UserCheck className="inline w-4 h-4 mr-1 text-green-600" />
-                              Дата прикрепления *
+                              Бириктириш санаси *
                             </label>
                             <input
                               type="date"
@@ -2222,7 +2215,7 @@ const Stations = () => {
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               <UserX className="inline w-4 h-4 mr-1 text-red-600" />
-                              Дата открепления
+                              Ажратиш санаси
                             </label>
                             <input
                               type="date"
@@ -2259,7 +2252,7 @@ const Stations = () => {
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-gray-700 flex items-center gap-2">
                           <Snowflake size={16} />
-                          Чиллеры
+                          Чиллерлар
                         </h4>
                         {(isCreating || isEditMode) && (
                           <button
@@ -2267,7 +2260,7 @@ const Stations = () => {
                             onClick={() => addEquipment("chillers")}
                             className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
                             <Plus size={16} />
-                            Добавить чиллер
+                            Чиллер қўшиш
                           </button>
                         )}
                       </div>
@@ -2283,7 +2276,7 @@ const Stations = () => {
                           className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 p-4 border border-gray-200 rounded-xl">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель чиллера *
+                              Чиллер модели *
                             </label>
                             <select
                               value={chiller.equipmentId || ""}
@@ -2301,11 +2294,11 @@ const Stations = () => {
                               }}
                               disabled={!isCreating && !isEditMode}
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                              <option value="">Выберите чиллер</option>
+                              <option value="">Чиллерни танланг</option>
                               {availableGasChillers.map((chill) => (
                                 <option key={chill.id} value={chill.id}>
                                   {chill.brand} {chill.model} -{" "}
-                                  {chill.serialNumber || "Без номера"}
+                                  {chill.serialNumber || "Рақамсиз"}
                                 </option>
                               ))}
                             </select>
@@ -2313,34 +2306,34 @@ const Stations = () => {
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Марка
+                              Маркаси
                             </label>
                             <input
                               type="text"
                               value={chiller.brand || ""}
                               readOnly
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
-                              placeholder="Автоматически заполнится"
+                              placeholder="Автоматик тўлдирилади"
                             />
                           </div>
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Модель
+                              Модели
                             </label>
                             <input
                               type="text"
                               value={chiller.modelName || ""}
                               readOnly
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
-                              placeholder="Автоматически заполнится"
+                              placeholder="Автоматик тўлдирилади"
                             />
                           </div>
 
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               <UserCheck className="inline w-4 h-4 mr-1 text-green-600" />
-                              Дата прикрепления *
+                              Бириктириш санаси *
                             </label>
                             <input
                               type="date"
@@ -2361,7 +2354,7 @@ const Stations = () => {
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               <UserX className="inline w-4 h-4 mr-1 text-red-600" />
-                              Дата открепления
+                              Ажратиш санаси
                             </label>
                             <input
                               type="date"
@@ -2400,13 +2393,13 @@ const Stations = () => {
                   <div className="border-t pt-6">
                     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 mb-4">
                       <Zap size={18} />
-                      Снабжающие организации
+                      Таъминотчи ташкилотлар
                     </h3>
                     {/* Газоснабжение */}
                     <div className="mb-6">
                       <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
                         <Droplets size={16} />
-                        Газоснабжающая организация *
+                        Рай/горгаз *
                       </h4>
                       <div className="flex items-center gap-4">
                         <div className="flex-1">
@@ -2432,7 +2425,7 @@ const Stations = () => {
                             }}
                             disabled={!isCreating && !isEditMode}
                             className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                            <option value="">Выберите город</option>
+                            <option value="">Шаҳар/туман танланг</option>
                             {cities.map((city) => (
                               <option key={city.id} value={city.id}>
                                 {city.name}
@@ -2454,7 +2447,7 @@ const Stations = () => {
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-gray-700 flex items-center gap-2">
                           <Zap size={16} />
-                          Электроснабжающие организации
+                          Рай/гор сеть
                         </h4>
                         {(isCreating || isEditMode) && (
                           <button
@@ -2462,7 +2455,7 @@ const Stations = () => {
                             onClick={addElectricitySupplier}
                             className="flex items-center gap-2 px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors">
                             <Plus size={16} />
-                            Добавить организацию
+                            Рай/гор сеть қўшиш
                           </button>
                         )}
                       </div>
@@ -2496,7 +2489,7 @@ const Stations = () => {
                                               ...item,
                                               cityId: cityId,
                                               cityName: city.name,
-                                              organization: `${city.name} электросети`,
+                                              organization: `${city.name} электросеть`,
                                             }
                                           : item
                                     );
@@ -2508,7 +2501,7 @@ const Stations = () => {
                               }}
                               disabled={!isCreating && !isEditMode}
                               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                              <option value="">Выберите город</option>
+                              <option value="">Шаҳар/туман танланг</option>
                               {cities.map((city) => (
                                 <option key={city.id} value={city.id}>
                                   {city.name}
@@ -2532,7 +2525,7 @@ const Stations = () => {
                     <div>
                       <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
                         <Droplets size={16} />
-                        Водоснабжающая организация
+                        Водоканал
                       </h4>
                       <div className="flex items-center gap-4">
                         <div className="flex-1">
@@ -2561,7 +2554,7 @@ const Stations = () => {
                             }}
                             disabled={!isCreating && !isEditMode}
                             className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500">
-                            <option value="">Выберите город</option>
+                            <option value="">Шаҳар/туман танланг</option>
                             {cities.map((city) => (
                               <option key={city.id} value={city.id}>
                                 {city.name}
@@ -2590,7 +2583,7 @@ const Stations = () => {
                           <>
                             <CheckCircle className="text-green-500" size={16} />
                             <span className="text-green-600">
-                              Все обязательные поля заполнены
+                              Барча тўлдирилиши зарур қаторлар тўлдирилди.
                             </span>
                           </>
                         ) : (
@@ -2600,7 +2593,7 @@ const Stations = () => {
                               size={16}
                             />
                             <span className="text-orange-600">
-                              Заполните все обязательные поля (*)
+                              Барча тўлдирилиши зарур қаторлар тўлдиринг (*)
                             </span>
                           </>
                         )}
@@ -2620,7 +2613,7 @@ const Stations = () => {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}>
                       <Edit size={16} />
-                      Редактировать
+                      Таҳрирлаш
                     </motion.button>
                   )}
 
@@ -2631,7 +2624,7 @@ const Stations = () => {
                         className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}>
-                        Отмена
+                        Бекор
                       </motion.button>
                       <motion.button
                         onClick={handleSave}
@@ -2644,7 +2637,7 @@ const Stations = () => {
                         whileHover={isFormValid ? { scale: 1.02 } : {}}
                         whileTap={isFormValid ? { scale: 0.98 } : {}}>
                         <Save size={16} />
-                        Сохранить
+                        Сақлаш
                       </motion.button>
                     </div>
                   )}
@@ -2655,7 +2648,7 @@ const Stations = () => {
                       className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}>
-                      Закрыть
+                      Ёпиш
                     </motion.button>
                   )}
                 </div>
@@ -2681,7 +2674,7 @@ const Stations = () => {
               transition={{ type: "spring", damping: 25, stiffness: 300 }}>
               <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-2xl sticky top-0 z-10">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-bold">Добавление сотрудника</h2>
+                  <h2 className="text-xl font-bold">Ходимни қўшиш</h2>
                   <motion.button
                     onClick={() => setIsEmployeeModalOpen(false)}
                     className="w-8 h-8 rounded-full bg-white bg-opacity-20 flex items-center justify-center hover:bg-opacity-30 transition-all"
@@ -2697,7 +2690,7 @@ const Stations = () => {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        ФИО *
+                        ФИШ *
                       </label>
                       <input
                         type="text"
@@ -2709,13 +2702,13 @@ const Stations = () => {
                           })
                         }
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Введите ФИО сотрудника"
+                        placeholder="Ходимни ФИШ киритинг"
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Адрес
+                        Манзили
                       </label>
                       <input
                         type="text"
@@ -2727,14 +2720,14 @@ const Stations = () => {
                           })
                         }
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Введите адрес сотрудника"
+                        placeholder="Ходимни яшаш манзилини киритинг"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Серия паспорта
+                          Паспорт серияси
                         </label>
                         <input
                           type="text"
@@ -2754,7 +2747,7 @@ const Stations = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Номер паспорта
+                          Паспорт номери
                         </label>
                         <input
                           type="text"
@@ -2774,7 +2767,7 @@ const Stations = () => {
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        ПИНФЛ
+                        ЖШШИР
                       </label>
                       <input
                         type="text"
@@ -2785,7 +2778,7 @@ const Stations = () => {
                             ? "border-red-500 bg-red-50"
                             : "border-gray-200"
                         }`}
-                        placeholder="14 цифр"
+                        placeholder="14 рақам"
                         maxLength={14}
                       />
                       {pinflError && (
@@ -2797,7 +2790,7 @@ const Stations = () => {
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Дата рождения
+                        Туғилган санаси
                       </label>
                       <input
                         type="date"
@@ -2838,7 +2831,7 @@ const Stations = () => {
                         setPinflError(""); // Сбрасываем ошибку при отмене
                       }}
                       className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors">
-                      Отмена
+                      Бекор
                     </button>
                     <button
                       onClick={handleCreateEmployee}
@@ -2848,7 +2841,7 @@ const Stations = () => {
                           ? "bg-blue-500 hover:bg-blue-600"
                           : "bg-gray-300 cursor-not-allowed"
                       }`}>
-                      Добавить
+                      Қўшиш
                     </button>
                   </div>
                 </div>

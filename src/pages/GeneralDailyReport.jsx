@@ -27,6 +27,7 @@ const GeneralDailyReport = () => {
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
   const [showDetailedModal, setShowDetailedModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Новое состояние для обновления
 
   // Проверка роли пользователя
   const isOperator = useMemo(() => {
@@ -77,45 +78,51 @@ const GeneralDailyReport = () => {
     fetchStations();
   }, [userData]);
 
-  // Загрузка отчетов из unifiedDailyReports
-  useEffect(() => {
+  // Функция для загрузки отчетов
+  const fetchReportsData = async () => {
     if (!selectedStation || !selectedMonth) {
       setReports([]);
       return;
     }
 
-    const fetchReports = async () => {
-      setLoading(true);
-      try {
-        const [year, month] = selectedMonth.split("-");
-        const startDate = `${year}-${month}-01`;
-        const endDate = `${year}-${month}-31`;
+    setLoading(true);
+    try {
+      const [year, month] = selectedMonth.split("-");
+      const startDate = `${year}-${month}-01`;
+      const endDate = `${year}-${month}-31`;
 
-        const q = query(
-          collection(db, "unifiedDailyReports"),
-          where("stationId", "==", selectedStation.id),
-          where("reportDate", ">=", startDate),
-          where("reportDate", "<=", endDate),
-          orderBy("reportDate", "asc")
-        );
+      const q = query(
+        collection(db, "unifiedDailyReports"),
+        where("stationId", "==", selectedStation.id),
+        where("reportDate", ">=", startDate),
+        where("reportDate", "<=", endDate),
+        orderBy("reportDate", "asc")
+      );
 
-        const snapshot = await getDocs(q);
-        const reportsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+      const snapshot = await getDocs(q);
+      const reportsData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-        setReports(reportsData);
-      } catch (error) {
-        console.error("Ошибка при загрузке отчетов:", error);
-        setReports([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+      setReports(reportsData);
+    } catch (error) {
+      console.error("Ошибка при загрузке отчетов:", error);
+      setReports([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchReports();
-  }, [selectedStation, selectedMonth]);
+  // Загрузка отчетов при изменении станции, месяца или триггера обновления
+  useEffect(() => {
+    fetchReportsData();
+  }, [selectedStation, selectedMonth, refreshTrigger]);
+
+  // Функция для принудительного обновления списка отчетов
+  const refreshReports = () => {
+    setRefreshTrigger((prev) => prev + 1);
+  };
 
   // Расчет разницы между показаниями шлангов и счетчика
   const calculateCounterDiff = (report) => {
@@ -139,33 +146,13 @@ const GeneralDailyReport = () => {
     setShowDetailedModal(true);
   };
 
-  const refreshReports = () => {
-    if (selectedStation && selectedMonth) {
-      // Триггерим повторную загрузку отчетов
-      setSelectedMonth(selectedMonth); // Это вызовет useEffect
-    }
-  };
-
   // Экспорт в Excel
   const exportToExcel = () => {
     if (!reports.length) return;
 
     const worksheetData = [
       // Заголовок
-      // Заголовок
-      [
-        "Кунлик ҳисобот",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        isOperator ? "" : "", // Убрали одну пустую ячейку
-        "",
-      ],
+      ["Кунлик ҳисобот", "", "", "", "", "", "", "", "", "", "", ""],
       [
         `Станция: ${selectedStation?.stationName || "Ноъмалум заправка"}`,
         "",
@@ -176,7 +163,8 @@ const GeneralDailyReport = () => {
         "",
         "",
         "",
-        isOperator ? "" : "", // Убрали одну пустую ячейку
+        "",
+        "",
         "",
       ],
       [
@@ -192,7 +180,8 @@ const GeneralDailyReport = () => {
         "",
         "",
         "",
-        isOperator ? "" : "", // Убрали одну пустую ячейку
+        "",
+        "",
         "",
       ],
       [], // Пустая строка
@@ -208,7 +197,7 @@ const GeneralDailyReport = () => {
         "1м³нархи",
         "Терминал Узкард (сўм)",
         "Терминал Хумо (сўм)",
-        "ЭТТ (сўм)", // Новый заголовок
+        "ЭТТ (сўм)",
         "Z-ҳисобот (сўм)",
         ...(isOperator ? [] : ["Назорат суммаси"]),
         "Яратилди",
@@ -228,7 +217,7 @@ const GeneralDailyReport = () => {
           report.generalData?.gasPrice || 0,
           report.generalData?.uzcardTerminal || 0,
           report.generalData?.humoTerminal || 0,
-          report.electronicPaymentSystem || 0, // Новое поле
+          report.generalData?.electronicPaymentSystem || 0,
           report.generalData?.cashAmount || 0,
         ];
 
@@ -260,9 +249,10 @@ const GeneralDailyReport = () => {
           0
         ),
         reports.reduce(
-          (sum, report) => sum + (report.electronicPaymentSystem || 0),
+          (sum, report) =>
+            sum + (report.generalData?.electronicPaymentSystem || 0),
           0
-        ), // Сумма ЭТТ
+        ),
         reports.reduce(
           (sum, report) => sum + (report.generalData?.cashAmount || 0),
           0
@@ -287,7 +277,7 @@ const GeneralDailyReport = () => {
       { wch: 12 }, // Цена за м³
       { wch: 15 }, // Терминал Узкард
       { wch: 15 }, // Терминал Хумо
-      { wch: 15 }, // ЭТТ (новый столбец)
+      { wch: 15 }, // ЭТТ
       { wch: 15 }, // Наличные
     ];
 
@@ -452,7 +442,6 @@ const GeneralDailyReport = () => {
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                         Хумо (сўм)
                       </th>
-                      {/* Новый столбец */}
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                         ЭТТ (сўм)
                       </th>
@@ -524,7 +513,6 @@ const GeneralDailyReport = () => {
                             ) || "0.00"}{" "}
                             сўм
                           </td>
-                          {/* Новый столбец с данными */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
                             {report.generalData?.electronicPaymentSystem?.toLocaleString(
                               "ru-RU",
@@ -645,7 +633,7 @@ const GeneralDailyReport = () => {
           station={selectedStation}
           onClose={() => setShowAddModal(false)}
           onSaved={() => {
-            setSelectedMonth(selectedMonth);
+            refreshReports(); // Используем новую функцию обновления
             setShowAddModal(false);
           }}
         />
@@ -657,7 +645,7 @@ const GeneralDailyReport = () => {
           isOpen={showUnifiedModal}
           onClose={() => setShowUnifiedModal(false)}
           station={selectedStation}
-          onSaved={refreshReports} // Добавляем callback
+          onSaved={refreshReports} // Передаем исправленную функцию
         />
       )}
 

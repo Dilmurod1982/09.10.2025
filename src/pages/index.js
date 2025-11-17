@@ -43,3 +43,5 @@ export { default as GasSettlements } from "./GasSettlements";
 export { default as ElektrSettlements } from "./ElektrSettlements";
 export { default as HomeTasischi } from "./HomeTasischi";
 export { default as JobTitle } from "./JobTitle";
+export { default as HomeElectronics } from "./HomeElectronics";
+export { default as MeterReadings } from "./MeterReadings";

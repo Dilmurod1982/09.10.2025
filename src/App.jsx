@@ -45,6 +45,8 @@ import {
   ElektrSettlements,
   HomeTasischi,
   JobTitle,
+  HomeElectronics,
+  MeterReadings,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -111,6 +113,8 @@ function App() {
       if (role === "buxgalter") return <Navigate to="/homebooker" replace />;
       if (role === "operator") return <Navigate to="/homeoperator" replace />;
       if (role === "tasischi") return <Navigate to="/hometasischi" replace />;
+      if (role === "electrengineer")
+        return <Navigate to="/homeelectronics" replace />;
       return <Navigate to="/" replace />;
     }
     return element;
@@ -420,6 +424,24 @@ function App() {
             <ProtectedLayout
               allowedRoles={["buxgalter", "admin"]}
               element={<Payments />}
+            />
+          ),
+        },
+        {
+          path: "/homeelectronics",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["electrengineer"]}
+              element={<HomeElectronics />}
+            />
+          ),
+        },
+        {
+          path: "/meterreadings",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["electrengineer", "admin"]}
+              element={<MeterReadings />}
             />
           ),
         },

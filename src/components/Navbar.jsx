@@ -56,7 +56,8 @@ import {
   Bolt as BoltIcon, // Иконка для электроэнергии
   Whatshot as GasIcon, // Иконка для газа
   Calculate as CalculateIcon, // Иконка для расчетов
-  Work as WorkIcon, // Иконка для должностей
+  Work as WorkIcon,
+  Speed as MeterIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import Collapse from "@mui/material/Collapse";
@@ -375,7 +376,12 @@ export default function Navbar() {
     { text: "Фойдаланувчилар", icon: <PeopleIcon />, path: "/users" },
     { text: "МЧЖлар", icon: <CorporateFareIcon />, path: "/ltds" },
     { text: "Банк", icon: <AccountBalanceIcon />, path: "/banks" },
-    { text: "Лавозимлар", icon: <WorkIcon />, path: "/jobtitle" }, // Добавлен пункт Должности
+    { text: "Лавозимлар", icon: <WorkIcon />, path: "/jobtitle" },
+    {
+      text: "Колонка кўрсаткичларини ўзгартириш",
+      icon: <MeterIcon />,
+      path: "/meterreadings",
+    },
   ];
 
   const partnersItems = [
@@ -477,7 +483,7 @@ export default function Navbar() {
 
   const regionsItems = [
     { text: "Вилоятлар", icon: <PublicIcon />, path: "/regions" },
-    { text: "Шаҳар ва туманлар", icon: <LocationCityIcon />, path: "/cities" },
+    { text: "Шаҳар и туманлар", icon: <LocationCityIcon />, path: "/cities" },
   ];
 
   const docsTimedItems = [
@@ -510,8 +516,24 @@ export default function Navbar() {
   const filteredMenuItems =
     role === "admin"
       ? menuItems
+      : role === "electrengineer"
+      ? menuItems.filter(
+          (item) => item.text === "Колонка кўрсаткичларини ўзгартириш"
+        )
       : role === "buxgalter"
       ? menuItems.filter((item) => item.text === "Ҳамкорлар")
+      : role === "rahbar"
+      ? menuItems.filter(
+          (item) =>
+            item.text !== "Фойдаланувчилар" &&
+            item.text !== "Колонка кўрсаткичларини ўзгартириш"
+        )
+      : role === "operator"
+      ? menuItems.filter(
+          (item) =>
+            item.text !== "Фойдаланувчилар" &&
+            item.text !== "Колонка кўрсаткичларини ўзгартириш"
+        )
       : [];
 
   const isRahbarOrBooker = role === "rahbar" || role === "buxgalter";
@@ -522,6 +544,7 @@ export default function Navbar() {
       buxgalter: { color: "#10b981", text: "Бухгалтер" },
       operator: { color: "#3b82f6", text: "Оператор" },
       rahbar: { color: "#8b5cf6", text: "Рахбар" },
+      electrengineer: { color: "#f59e0b", text: "Электр инженер" },
     };
 
     const config = roleConfig[role] || { color: "#6b7280", text: role };
@@ -555,11 +578,12 @@ export default function Navbar() {
           boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
         }}>
         <Toolbar sx={{ minHeight: { xs: "64px", md: "70px" } }}>
-          {/* Показываем кнопку меню для admin, buxgalter и operator */}
+          {/* Показываем кнопку меню для admin, buxgalter, operator, rahbar и electrengineer */}
           {role === "admin" ||
           role === "buxgalter" ||
           role === "operator" ||
-          role === "rahbar" ? (
+          role === "rahbar" ||
+          role === "electrengineer" ? (
             <IconButton
               size="large"
               edge="start"
@@ -889,7 +913,8 @@ export default function Navbar() {
       {(role === "admin" ||
         role === "buxgalter" ||
         role === "operator" ||
-        role === "rahbar") && (
+        role === "rahbar" ||
+        role === "electrengineer") && (
         <Drawer
           anchor="left"
           open={drawerOpen}
@@ -947,10 +972,11 @@ export default function Navbar() {
             {/* Содержимое меню */}
             <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
               <List sx={{ padding: "8px" }}>
-                {/* 🔹 Основные пункты (только для admin и buxgalter) */}
+                {/* 🔹 Основные пункты (для admin, buxgalter, rahbar и electrengineer) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
-                  role === "rahbar") && (
+                  role === "rahbar" ||
+                  role === "electrengineer") && (
                   <>
                     {filteredMenuItems.map((item, index) => (
                       <motion.div
@@ -989,7 +1015,7 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Расчеты по энергоносителям (для admin, buxgalter и rahbar) */}
+                {/* 🔹 Расчеты по энергоносителям (для admin, buxgalter, rahbar) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "rahbar") && (
@@ -1059,7 +1085,7 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Партнеры (только для admin и buxgalter) */}
+                {/* 🔹 Партнеры (для admin, buxgalter, rahbar, operator) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "rahbar" ||
@@ -1091,7 +1117,7 @@ export default function Navbar() {
                         {partnersItems
                           .filter((item) => {
                             if (role === "operator" || role === "rahbar") {
-                              return item.text === "Ҳамкорларни қарздорлиги";
+                              return item.text === "Ҳамкорлар қарздорлиги";
                             }
                             return true;
                           })
@@ -1133,7 +1159,7 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Ежедневные отчеты (для admin, buxgalter и operator) */}
+                {/* 🔹 Ежедневные отчеты (для admin, buxgalter, operator, rahbar) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "operator" ||
@@ -1168,7 +1194,7 @@ export default function Navbar() {
                         {dailyReportsItems
                           .filter((item) => {
                             if (role === "operator") {
-                              return item.text !== "Назорат суммалари";
+                              return item.text !== "Назорат суммалар";
                             }
                             return true;
                           })

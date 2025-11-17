@@ -12,7 +12,6 @@ import {
   doc,
   getDoc,
   deleteDoc,
-  arrayUnion,
 } from "firebase/firestore";
 import { db, auth } from "../firebase/config";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,7 +41,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   });
 
   const userData = useAppStore((state) => state.userData);
-  const userName = userData?.email || "Неизвестный пользователь";
 
   // Получаем количество шлангов
   const hosesCount = React.useMemo(() => {
@@ -64,23 +62,61 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     return date.toISOString().split("T")[0];
   }, []);
 
+  // Функция для получения данных об обнулениях счетчиков
+  const getMeterResetData = useCallback(async (stationId, reportDate) => {
+    if (!stationId || !reportDate) {
+      // console.log("Недостаточно данных для поиска обнулений:", {
+      //   stationId,
+      //   reportDate,
+      // });
+      return [];
+    }
+
+    try {
+      // Конвертируем дату отчета из YYYY-MM-DD в DD-MM-YYYY для поиска
+      const [year, month, day] = reportDate.split("-");
+      const resetDateFormatted = `${day}-${month}-${year}`;
+
+      // console.log("Поиск обнулений:", {
+      //   stationId,
+      //   reportDate,
+      //   resetDateFormatted,
+      //   stationName: station?.stationName,
+      // });
+
+      // Ищем события обнуления для этой станции на дату отчета
+      const resetQuery = query(
+        collection(db, "meterResetEvents"),
+        where("stationId", "==", stationId),
+        where("resetDate", "==", resetDateFormatted)
+      );
+
+      const snapshot = await getDocs(resetQuery);
+      const resetEvents = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      // console.log("Найдены обнуления:", resetEvents.length, resetEvents);
+
+      return resetEvents;
+    } catch (error) {
+      // console.error("Ошибка загрузки данных обнуления:", error);
+      return [];
+    }
+  }, []);
+
   // Простая функция для ввода чисел с минусом
   const formatNumberInput = (value) => {
     if (value === "" || value === null || value === undefined) return "";
 
-    // Преобразуем в строку
     const stringValue = String(value);
-
-    // Разрешаем только: минус в начале, цифры, одна точка или запятая
     const validChars = /^-?[\d,.]*$/;
 
-    // Если есть недопустимые символы, удаляем их
     if (!validChars.test(stringValue)) {
-      // Удаляем последний введенный символ если он невалидный
       return stringValue.slice(0, -1);
     }
 
-    // Убедимся, что минус только в начале
     if (stringValue.includes("-") && stringValue.indexOf("-") > 0) {
       return stringValue.replace(/-/g, "");
     }
@@ -88,22 +124,19 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     return stringValue;
   };
 
-  // Функция для отображения отформатированного числа (для display)
+  // Функция для отображения отформатированного числа
   const formatNumberForDisplay = (value) => {
     try {
       if (value === "" || value === null || value === undefined) return "";
       if (value === "-") return "-";
 
-      // Преобразуем значение в строку
       const stringValue = String(value);
       const hasMinus = stringValue.startsWith("-");
       const numberString = hasMinus ? stringValue.substring(1) : stringValue;
 
-      // Если после удаления минуса строка пустая
       if (numberString === "" || numberString === "0")
         return hasMinus ? "-0" : "0";
 
-      // Заменяем запятую на точку для парсинга
       const cleanNumberString = numberString.replace(",", ".");
       const number = parseFloat(cleanNumberString);
 
@@ -116,7 +149,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
       return hasMinus ? `-${formatted}` : formatted;
     } catch (error) {
-      console.error("Error formatting number:", error, value);
+      // console.error("Error formatting number:", error, value);
       return String(value);
     }
   };
@@ -135,7 +168,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
       return hasMinus ? -number : number;
     } catch (error) {
-      console.error("Error parsing number:", error, value);
+      // console.error("Error parsing number:", error, value);
       return 0;
     }
   };
@@ -154,137 +187,241 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       const snapshot = await getDocs(reportQuery);
 
       if (!snapshot.empty) {
-        toast.error("Отчет за эту дату уже существует!");
+        toast.error("Бу санага ҳисобот мавжуд");
         return true;
       }
 
       return false;
     } catch (error) {
-      console.error("Ошибка проверки отчетов:", error);
+      // console.error("Ошибка проверки отчетов:", error);
       return false;
     }
   }, [station?.id, reportDate]);
 
-  // Загрузка последних данных для инициализации
-  useEffect(() => {
+  // Функция для загрузки и применения данных обнулений
+  const loadAndApplyResetData = useCallback(
+    async (stationId, reportDate, hasPreviousReport, lastReportSnapshot) => {
+      if (!stationId || !reportDate) {
+        // console.log(
+        //   "Пропускаем загрузку обнулений: нет stationId или reportDate"
+        // );
+        return [];
+      }
+
+      // console.log("Загрузка обнулений для:", { stationId, reportDate });
+      const resetEvents = await getMeterResetData(stationId, reportDate);
+
+      if (resetEvents.length > 0) {
+        // console.log("Применяем обнуления к шлангам:", resetEvents);
+
+        // Обновляем данные шлангов с учетом обнулений
+        setHoseRows((prevRows) =>
+          prevRows.map((row) => {
+            // Находим обнуления для этого конкретного шланга
+            const hoseResetEvents = resetEvents.filter(
+              (event) => event.hose === row.hose
+            );
+
+            if (hoseResetEvents.length > 0) {
+              const latestReset = hoseResetEvents[0];
+              // console.log(`Применяем обнуление для ${row.hose}:`, latestReset);
+
+              return {
+                ...row,
+                prev: latestReset.newReadingAfterReset,
+                hasReset: true,
+                resetInfo: latestReset,
+              };
+            } else {
+              // Если обнулений нет, но есть предыдущий отчет - используем данные из отчета
+              if (hasPreviousReport && lastReportSnapshot) {
+                const lastReport = lastReportSnapshot.docs[0].data();
+                const lastHose = lastReport.hoseData?.find(
+                  (h) => h.hose === row.hose
+                );
+                if (lastHose) {
+                  return {
+                    ...row,
+                    prev: lastHose.current || 0,
+                    hasReset: false,
+                    resetInfo: null,
+                  };
+                }
+              }
+              return {
+                ...row,
+                hasReset: false,
+                resetInfo: null,
+              };
+            }
+          })
+        );
+      } else {
+        // console.log(
+        //   "Обнуления не найдены, используем данные из последнего отчета"
+        // );
+      }
+
+      return resetEvents;
+    },
+    [getMeterResetData]
+  );
+
+  // Полная функция initializeData
+  const initializeData = async () => {
     if (!isOpen || !station?.id) return;
 
-    const initializeData = async () => {
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
+      // console.log("Инициализация данных для станции:", station.id);
 
-        // Загружаем последний объединенный отчет для определения даты
-        const lastReportQuery = query(
-          collection(db, "unifiedDailyReports"),
-          where("stationId", "==", station.id),
-          orderBy("reportDate", "desc"),
-          limit(1)
-        );
+      // Загружаем последний объединенный отчет для определения даты
+      const lastReportQuery = query(
+        collection(db, "unifiedDailyReports"),
+        where("stationId", "==", station.id),
+        orderBy("reportDate", "desc"),
+        limit(1)
+      );
 
-        const lastReportSnapshot = await getDocs(lastReportQuery);
-        const hasPreviousReport = !lastReportSnapshot.empty;
+      const lastReportSnapshot = await getDocs(lastReportQuery);
+      const hasPreviousReport = !lastReportSnapshot.empty;
 
-        if (hasPreviousReport) {
-          const lastReport = lastReportSnapshot.docs[0].data();
-          const nextDate = addDays(lastReport.reportDate, 1);
-          setReportDate(nextDate);
-          setDateDisabled(true);
-        } else {
-          setReportDate("");
-          setDateDisabled(false);
-        }
-
-        // Загружаем договоры
-        const contractsQuery = query(
-          collection(db, "contracts"),
-          where("stationId", "==", station.id)
-        );
-
-        const contractsSnapshot = await getDocs(contractsQuery);
-        const contractsData = contractsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        setContracts(contractsData);
-
-        // Инициализируем данные партнеров с ценами из последнего отчета
-        const initializedPartnerData = contractsData.map((contract) => {
-          let pricePerM3 = 0;
-
-          if (hasPreviousReport) {
-            const lastReport = lastReportSnapshot.docs[0].data();
-            const lastPartnerData = lastReport.partnerData?.find(
-              (p) => p.partnerId === contract.id
-            );
-            if (lastPartnerData) {
-              pricePerM3 = lastPartnerData.pricePerM3 || 0;
-            }
-          }
-
-          return {
-            partnerId: contract.id,
-            partnerName: contract.partner,
-            contractNumber: contract.contractNumber,
-            pricePerM3: pricePerM3,
-            soldM3: "",
-            totalAmount: 0,
-          };
-        });
-
-        setPartnerData(initializedPartnerData);
-
-        // Инициализируем данные шлангов из последнего отчета
-        const initializedHoseRows = hoseNames.map((name, index) => {
-          let prev = 0;
-          let price = 0;
-          let prevDisabled = false;
-
-          if (hasPreviousReport) {
-            const lastReport = lastReportSnapshot.docs[0].data();
-            const lastHose = lastReport.hoseData?.find((h) => h.hose === name);
-            if (lastHose) {
-              prev = lastHose.current || 0;
-              price = lastHose.price || 0;
-              prevDisabled = true;
-            }
-          }
-
-          return {
-            hose: name,
-            prev: prev,
-            current: "",
-            price: price,
-            diff: 0,
-            sum: 0,
-            prevDisabled: prevDisabled,
-          };
-        });
-
-        setHoseRows(initializedHoseRows);
-
-        // Инициализируем общие данные из последнего отчета
-        // НЕ загружаем electronicPaymentSystem из прошлого отчета
-        if (hasPreviousReport) {
-          const lastReport = lastReportSnapshot.docs[0].data();
-          setGeneralData((prev) => ({
-            ...prev,
-            gasPrice: lastReport.generalData?.gasPrice
-              ? lastReport.generalData.gasPrice.toString()
-              : "",
-            // Убрано автоматическое заполнение electronicPaymentSystem
-          }));
-        }
-      } catch (error) {
-        console.error("Ошибка инициализации данных:", error);
-        toast.error("Ошибка при загрузке данных");
-      } finally {
-        setLoading(false);
+      let nextDate = "";
+      if (hasPreviousReport) {
+        const lastReport = lastReportSnapshot.docs[0].data();
+        nextDate = addDays(lastReport.reportDate, 1);
+        setReportDate(nextDate);
+        setDateDisabled(true);
+        // console.log("Установлена следующая дата отчета:", nextDate);
+      } else {
+        setReportDate("");
+        setDateDisabled(false);
+        // console.log("Предыдущих отчетов не найдено");
       }
-    };
 
-    initializeData();
+      // Загружаем договоры
+      const contractsQuery = query(
+        collection(db, "contracts"),
+        where("stationId", "==", station.id)
+      );
+
+      const contractsSnapshot = await getDocs(contractsQuery);
+      const contractsData = contractsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setContracts(contractsData);
+
+      // Инициализируем данные партнеров с ценами из последнего отчета
+      const initializedPartnerData = contractsData.map((contract) => {
+        let pricePerM3 = 0;
+
+        if (hasPreviousReport) {
+          const lastReport = lastReportSnapshot.docs[0].data();
+          const lastPartnerData = lastReport.partnerData?.find(
+            (p) => p.partnerId === contract.id
+          );
+          if (lastPartnerData) {
+            pricePerM3 = lastPartnerData.pricePerM3 || 0;
+          }
+        }
+
+        return {
+          partnerId: contract.id,
+          partnerName: contract.partner,
+          contractNumber: contract.contractNumber,
+          pricePerM3: pricePerM3,
+          soldM3: "",
+          totalAmount: 0,
+        };
+      });
+
+      setPartnerData(initializedPartnerData);
+
+      // Инициализируем базовые данные шлангов
+      const initializedHoseRows = hoseNames.map((name, index) => {
+        let prev = 0;
+        let price = 0;
+        let prevDisabled = false;
+
+        if (hasPreviousReport) {
+          const lastReport = lastReportSnapshot.docs[0].data();
+          const lastHose = lastReport.hoseData?.find((h) => h.hose === name);
+
+          if (lastHose) {
+            prev = lastHose.current || 0;
+            price = lastHose.price || 0;
+            prevDisabled = true;
+          }
+        }
+
+        return {
+          hose: name,
+          prev: prev,
+          current: "",
+          price: price,
+          diff: 0,
+          sum: 0,
+          prevDisabled: prevDisabled,
+          hasReset: false,
+          resetInfo: null,
+        };
+      });
+
+      setHoseRows(initializedHoseRows);
+
+      // Инициализируем общие данные из последнего отчета
+      if (hasPreviousReport) {
+        const lastReport = lastReportSnapshot.docs[0].data();
+        setGeneralData((prev) => ({
+          ...prev,
+          gasPrice: lastReport.generalData?.gasPrice
+            ? lastReport.generalData.gasPrice.toString()
+            : "",
+          // electronicPaymentSystem НЕ загружаем из прошлого отчета
+        }));
+      }
+
+      // Если есть дата отчета, загружаем обнуления
+      if (nextDate) {
+        // console.log("Загружаем обнуления для даты:", nextDate);
+        await loadAndApplyResetData(
+          station.id,
+          nextDate,
+          hasPreviousReport,
+          lastReportSnapshot
+        );
+      }
+    } catch (error) {
+      // console.error("Ошибка инициализации данных:", error);
+      toast.error("Маълумотлар юкланишида хатолик");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      initializeData();
+    }
   }, [isOpen, station?.id, hoseNames, addDays]);
+
+  // Перезагрузка данных об обнулениях при изменении даты отчета
+  useEffect(() => {
+    if (isOpen && station?.id && reportDate) {
+      // console.log("Дата отчета изменена, перезагружаем обнуления:", reportDate);
+      const reloadResetData = async () => {
+        try {
+          await loadAndApplyResetData(station.id, reportDate, true, null);
+        } catch (error) {
+          // console.error("Ошибка перезагрузки данных обнулений:", error);
+        }
+      };
+
+      reloadResetData();
+    }
+  }, [reportDate, isOpen, station?.id, loadAndApplyResetData]);
 
   // ========== ФУНКЦИИ ДЛЯ ОТЧЕТА ПО ПАРТНЕРАМ ==========
 
@@ -373,18 +510,50 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
   // ========== ФУНКЦИИ ДЛЯ ОТЧЕТА ПО ШЛАНГАМ ==========
 
-  // Расчет разницы и суммы для шланга
+  // Расчет разницы и суммы для шланга с учетом обнулений
   const calculateHoseRowDiff = useCallback((row) => {
     const prev = Number(row.prev) || 0;
     const current = row.current === "" ? 0 : parseFormattedNumber(row.current);
     const price = Number(row.price) || 0;
-    const diff = current >= prev ? current - prev : 0;
+
+    let diff = 0;
+
+    if (row.hasReset && row.resetInfo) {
+      // Если есть обнуление, используем специальную формулу:
+      // diff = (lastReadingBeforeReset - lastReadingFromReport) + (current - newReadingAfterReset)
+      const lastReadingBeforeReset = row.resetInfo.lastReadingBeforeReset;
+      const lastReadingFromReport = row.resetInfo.lastReadingFromReport;
+      const newReadingAfterReset = row.resetInfo.newReadingAfterReset;
+
+      // Расчет по вашей формуле:
+      diff =
+        lastReadingBeforeReset -
+        lastReadingFromReport +
+        (current - newReadingAfterReset);
+
+      // console.log(`Расчет diff для ${row.hose} с обнулением:`, {
+      //   lastReadingBeforeReset: lastReadingBeforeReset,
+      //   lastReadingFromReport: lastReadingFromReport,
+      //   current: current,
+      //   newReadingAfterReset: newReadingAfterReset,
+      //   diff: diff,
+      // });
+    } else {
+      // Базовая разница без обнулений
+      if (current >= prev) {
+        diff = current - prev;
+      } else {
+        // Если текущее меньше предыдущего, но нет обнуления - это ошибка
+        diff = 0;
+      }
+    }
+
     const sum = diff * price;
 
     return {
       ...row,
-      diff: isNaN(diff) ? 0 : diff,
-      sum: isNaN(sum) ? 0 : sum,
+      diff: Math.max(0, isNaN(diff) ? 0 : diff), // Не допускаем отрицательные значения
+      sum: Math.max(0, isNaN(sum) ? 0 : sum),
     };
   }, []);
 
@@ -467,7 +636,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       !hoseRows.some((row) => {
         const current = parseFormattedNumber(row.current);
         const prev = Number(row.prev);
-        return current < prev;
+        return current < prev && !row.hasReset; // Разрешаем текущее меньше предыдущего только если было обнуление
       })
     );
   };
@@ -542,8 +711,8 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       const data = await response.json();
       return data.ip;
     } catch (error) {
-      console.error("Ошибка получения IP:", error);
-      return "Неизвестно";
+      // console.error("Ошибка получения IP:", error);
+      return "Номаълум";
     }
   };
 
@@ -585,9 +754,9 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       });
 
       await Promise.all(savePromises);
-      console.log("Данные партнеров успешно сохранены в contracts");
+      // console.log("Данные партнеров успешно сохранены в contracts");
     } catch (error) {
-      console.error("Ошибка сохранения данных партнеров в contracts:", error);
+      // console.error("Ошибка сохранения данных партнеров в contracts:", error);
       throw error;
     }
   };
@@ -595,7 +764,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   // Функция для открытия модального окна подтверждения
   const handleSaveClick = () => {
     if (!isReportValid()) {
-      toast.error("Заполните все обязательные поля правильно");
+      toast.error("Мажбурий тўлдириш қаторларини тўлдиринг");
       return;
     }
     setIsConfirmModalOpen(true);
@@ -614,20 +783,84 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         return;
       }
 
+      // Конвертируем дату отчета для поиска обнулений
+      const [year, month, day] = reportDate.split("-");
+      const resetDateFormatted = `${day}-${month}-${year}`;
+
+      // Загружаем актуальные данные об обнулениях с правильным форматом даты
+      const resetQuery = query(
+        collection(db, "meterResetEvents"),
+        where("stationId", "==", station.id),
+        where("resetDate", "==", resetDateFormatted)
+      );
+
+      const resetSnapshot = await getDocs(resetQuery);
+      const resetEvents = resetSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      // console.log("Обнуления при сохранении:", resetEvents);
+
       const ip = await getClientIP();
       const userEmail = auth?.currentUser?.email || "unknown";
 
       const cashAmount = calculateCashAmount();
 
-      // Подготавливаем данные шлангов
-      const hoseData = hoseRows.map((row) => ({
-        hose: row.hose,
-        prev: Number(row.prev) || 0,
-        current: parseFormattedNumber(row.current) || 0,
-        price: Number(row.price) || 0,
-        diff: Number(row.diff) || 0,
-        sum: Number(row.sum) || 0,
-      }));
+      // Подготавливаем данные шлангов с учетом обнулений
+      const hoseData = hoseRows.map((row) => {
+        let finalDiff = Number(row.diff) || 0;
+        let resetCalculation = null;
+
+        // Проверяем, есть ли обнуления для этого шланга на дату отчета
+        const hoseResetEvents = resetEvents.filter(
+          (event) => event.hose === row.hose
+        );
+
+        if (hoseResetEvents.length > 0) {
+          const latestReset = hoseResetEvents[0];
+
+          // Применяем формулу коррекции для финального diff
+          const calculatedDiff =
+            latestReset.lastReadingBeforeReset -
+            latestReset.lastReadingFromReport +
+            (parseFormattedNumber(row.current) -
+              latestReset.newReadingAfterReset);
+
+          finalDiff = Math.max(0, calculatedDiff);
+
+          resetCalculation = {
+            lastReadingBeforeReset: latestReset.lastReadingBeforeReset,
+            lastReadingFromReport: latestReset.lastReadingFromReport,
+            newReadingAfterReset: latestReset.newReadingAfterReset,
+            calculatedDiff: calculatedDiff,
+            finalDiff: finalDiff,
+          };
+        }
+
+        return {
+          hose: row.hose,
+          prev: Number(row.prev) || 0,
+          current: parseFormattedNumber(row.current) || 0,
+          price: Number(row.price) || 0,
+          diff: finalDiff,
+          sum: finalDiff * (Number(row.price) || 0),
+          hasResetCorrection: hoseResetEvents.length > 0,
+          resetCalculation: resetCalculation,
+          resetNote: hoseResetEvents.length > 0 ? "Кўрсаткич нўлланган" : null,
+        };
+      });
+
+      // Пересчитываем итоги с учетом коррекции обнулений
+      const correctedTotals = hoseData.reduce(
+        (acc, hose) => {
+          return {
+            totalGas: acc.totalGas + (hose.diff > 0 ? hose.diff : 0),
+            totalSum: acc.totalSum + hose.sum,
+          };
+        },
+        { totalGas: 0, totalSum: 0 }
+      );
 
       // Подготавливаем данные партнеров (только тех, у кого есть данные)
       const partnerDataToSave = partnerData
@@ -662,8 +895,8 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
         // Данные шлангов
         hoseData: hoseData,
-        hoseTotalGas: hoseTotal,
-        hoseTotalSum: hoseTotalSum,
+        hoseTotalGas: correctedTotals.totalGas,
+        hoseTotalSum: correctedTotals.totalSum,
 
         // Общие данные
         generalData: {
@@ -685,6 +918,8 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         createdAt: serverTimestamp(),
         createdIp: ip,
         status: "completed",
+        hasMeterResets: resetEvents.length > 0,
+        meterResetEventsCount: resetEvents.length,
       };
 
       const docRef = await addDoc(
@@ -693,12 +928,21 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       );
       setSavedReportId(docRef.id);
 
+      // Логируем информацию об обнулениях
+      if (resetEvents.length > 0) {
+        // console.log("Отчет сохранен с учетом обнулений:", {
+        //   resetEventsCount: resetEvents.length,
+        //   correctedHoses: hoseData.filter((h) => h.hasResetCorrection).length,
+        //   correctedTotals: correctedTotals,
+        // });
+      }
+
       // Закрываем модальное окно подтверждения и открываем окно успеха
       setIsConfirmModalOpen(false);
       setIsSuccessModalOpen(true);
     } catch (error) {
-      console.error("Ошибка сохранения объединенного отчета:", error);
-      toast.error("Ошибка при сохранении отчета");
+      // console.error("Ошибка сохранения объединенного отчета:", error);
+      toast.error("Ҳисоботни сақлашда хатолик");
     } finally {
       setLoading(false);
     }
@@ -733,7 +977,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       try {
         await deleteDoc(doc(db, "unifiedDailyReports", savedReportId));
       } catch (error) {
-        console.error("Ошибка удаления отчета:", error);
+        // console.error("Ошибка удаления отчета:", error);
       }
     }
 
@@ -798,6 +1042,17 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                     disabled={dateDisabled || loading}
                     className="w-full max-w-xs border border-gray-300 rounded-xl p-3 disabled:bg-gray-100"
                   />
+                  {/* Отладочная информация */}
+                  {reportDate && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      Мазкур санага ноллашни қидириш: {reportDate}
+                      {hoseRows.some((row) => row.hasReset) && (
+                        <span className="ml-2 text-green-600">
+                          • Ноллашлар топилди
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -835,16 +1090,41 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                 );
                                 const prevNum = Number(row.prev);
                                 const isInvalid =
-                                  row.current !== "" && currentNum < prevNum;
+                                  row.current !== "" &&
+                                  currentNum < prevNum &&
+                                  !row.hasReset;
 
                                 return (
                                   <tr
                                     key={row.hose}
-                                    className="hover:bg-gray-50 transition-colors">
+                                    className={`hover:bg-gray-50 transition-colors ${
+                                      row.hasReset ? "bg-yellow-50" : ""
+                                    }`}>
                                     <td className="px-3 py-2">
-                                      <span className="font-semibold text-gray-900 text-xs md:text-sm">
-                                        {row.hose}
-                                      </span>
+                                      <div className="flex items-center">
+                                        <span className="font-semibold text-gray-900 text-xs md:text-sm">
+                                          {row.hose}
+                                        </span>
+                                        {row.hasReset && (
+                                          <span
+                                            className="ml-2 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full"
+                                            title="Кўрсаткич нўлланган">
+                                            🔄 Нўлланган
+                                          </span>
+                                        )}
+                                      </div>
+                                      {row.hasReset && row.resetInfo && (
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          Охирги:{" "}
+                                          {formatNumberForDisplay(
+                                            row.resetInfo.lastReadingBeforeReset
+                                          )}{" "}
+                                          → Хозир:{" "}
+                                          {formatNumberForDisplay(
+                                            row.resetInfo.newReadingAfterReset
+                                          )}
+                                        </div>
+                                      )}
                                     </td>
                                     <td className="px-2 py-3 md:px-3 md:w-1/6">
                                       <input
@@ -886,14 +1166,21 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                       />
                                     </td>
                                     <td className="px-2 py-3 md:px-3 md:w-1/6">
-                                      <span
-                                        className={`font-semibold text-xs md:text-sm ${
-                                          row.diff > 0
-                                            ? "text-green-600"
-                                            : "text-gray-500"
-                                        }`}>
-                                        {formatNumberForDisplay(row.diff)}
-                                      </span>
+                                      <div className="flex flex-col">
+                                        <span
+                                          className={`font-semibold text-xs md:text-sm ${
+                                            row.diff > 0
+                                              ? "text-green-600"
+                                              : "text-gray-500"
+                                          }`}>
+                                          {formatNumberForDisplay(row.diff)}
+                                        </span>
+                                        {row.hasReset && (
+                                          <span className="text-xs text-orange-600 mt-1">
+                                            Нўлланиш ҳисоби б-н
+                                          </span>
+                                        )}
+                                      </div>
                                     </td>
                                   </tr>
                                 );
@@ -1084,7 +1371,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                              1 м³ газ нарзи (сўм) *
+                              1 м³ газ нархи (сўм) *
                             </label>
                             <input
                               type="text"
@@ -1222,6 +1509,12 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
               <div className="p-6 border-t bg-gray-50 flex justify-between items-center">
                 <div className="text-sm text-gray-600">
                   Хамкорлар: {partnerData.length} • Шланглар: {hoseRows.length}
+                  {hoseRows.some((row) => row.hasReset) && (
+                    <span className="ml-2 text-yellow-600">
+                      • Нўлланиш:{" "}
+                      {hoseRows.filter((row) => row.hasReset).length}
+                    </span>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <button

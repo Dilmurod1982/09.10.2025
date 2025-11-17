@@ -574,16 +574,17 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                     onChange={handleInputChange}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="admin">Admin</option>
-                    <option value="tasischi">Tasischi</option>
-                    <option value="nazorat">Nazorat</option>
-                    <option value="rahbar">Rahbar</option>
-                    <option value="operator">Operator</option>
-                    <option value="boshmexanik">Bosh Mexanik</option>
-                    <option value="mehanik">Mehanik</option>
-                    <option value="buxgalter">Buxgalter</option>
-                    <option value="yurist">Yurist</option>
-                    <option value="partner">Partner</option>
+                    <option value="admin">Админ</option>
+                    <option value="tasischi">Таъсисчи</option>
+                    <option value="nazorat">Назорат</option>
+                    <option value="rahbar">Бошқарувчи</option>
+                    <option value="operator">Оператор</option>
+                    <option value="boshmexanik">Бош механик</option>
+                    <option value="mehanik">Механик</option>
+                    <option value="buxgalter">Бухгалтер</option>
+                    <option value="yurist">Юрист</option>
+                    <option value="partner">Хамкор</option>
+                    <option value="electrengineer">Электронщик</option>
                   </select>
                 </div>
 
