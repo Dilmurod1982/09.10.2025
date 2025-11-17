@@ -635,8 +635,8 @@ export const AnalysisDetails = ({
   const renderControlDifferenceDetails = () => {
     const [expandedStation, setExpandedStation] = useState(null);
 
-    const toggleStation = (stationId) => {
-      setExpandedStation(expandedStation === stationId ? null : stationId);
+    const toggleStation = (stationKey) => {
+      setExpandedStation(expandedStation === stationKey ? null : stationKey);
     };
 
     return (
@@ -671,398 +671,412 @@ export const AnalysisDetails = ({
           </div>
         ) : (
           <div className="space-y-3">
-            {analysisData.controlDifferenceData.map((report, index) => (
-              <div
-                key={index}
-                className="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm">
-                {/* Заголовок станции */}
+            {analysisData.controlDifferenceData.map((report, index) => {
+              const stationKey = `${report.stationId}-${report.reportDate}-${index}`;
+
+              return (
                 <div
-                  className="p-4 cursor-pointer hover:bg-purple-50 transition-colors"
-                  onClick={() => toggleStation(report.stationId)}>
-                  <div className="flex justify-between items-center">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-lg text-gray-900">
-                        {report.stationName}
-                      </h4>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {formatDate(report.reportDate)} •{" "}
-                        {report.problems.length} муаммолар
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {/* Индикаторы проблем */}
-                      <div className="flex gap-2">
-                        {report.problems.includes("cash_negative") ||
-                        report.problems.includes("cash_missing") ? (
-                          <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                            💵
-                          </span>
-                        ) : null}
-                        {report.problems.includes("humo_negative") ||
-                        report.problems.includes("humo_missing") ? (
-                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                            💳H
-                          </span>
-                        ) : null}
-                        {report.problems.includes("uzcard_negative") ||
-                        report.problems.includes("uzcard_missing") ? (
-                          <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
-                            💳U
-                          </span>
-                        ) : null}
-                        {report.problems.includes("electronic_negative") ||
-                        report.problems.includes("electronic_missing") ? (
-                          <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
-                            📱
-                          </span>
-                        ) : null}
+                  key={stationKey}
+                  className="bg-white rounded-xl border border-purple-200 overflow-hidden shadow-sm">
+                  {/* Заголовок станции */}
+                  <div
+                    className="p-4 cursor-pointer hover:bg-purple-50 transition-colors"
+                    onClick={() => toggleStation(stationKey)}>
+                    <div className="flex justify-between items-center">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-lg text-gray-900">
+                          {report.stationName}
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {formatDate(report.reportDate)} •{" "}
+                          {report.problems.length} муаммолар
+                        </p>
                       </div>
-                      <svg
-                        className={`w-5 h-5 text-gray-500 transition-transform ${
-                          expandedStation === report.stationId
-                            ? "rotate-180"
-                            : ""
-                        }`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
+                      <div className="flex items-center gap-3">
+                        {/* Индикаторы проблем */}
+                        <div className="flex gap-2">
+                          {report.problems.includes("cash_negative") ||
+                          report.problems.includes("cash_missing") ? (
+                            <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                              💵
+                            </span>
+                          ) : null}
+                          {report.problems.includes("humo_negative") ||
+                          report.problems.includes("humo_missing") ? (
+                            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                              💳H
+                            </span>
+                          ) : null}
+                          {report.problems.includes("uzcard_negative") ||
+                          report.problems.includes("uzcard_missing") ? (
+                            <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
+                              💳U
+                            </span>
+                          ) : null}
+                          {report.problems.includes("electronic_negative") ||
+                          report.problems.includes("electronic_missing") ? (
+                            <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                              📱
+                            </span>
+                          ) : null}
+                        </div>
+                        <svg
+                          className={`w-5 h-5 text-gray-500 transition-transform ${
+                            expandedStation === stationKey ? "rotate-180" : ""
+                          }`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Детали по станции */}
-                <AnimatePresence>
-                  {expandedStation === report.stationId && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="border-t border-purple-100">
-                      <div className="p-4 space-y-4 bg-gray-50">
-                        {/* Общая информация */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="text-center p-3 bg-white rounded-lg border border-green-200">
-                            <div className="font-semibold text-gray-600 text-sm">
-                              Жами тушум
+                  {/* Детали по станции */}
+                  <AnimatePresence>
+                    {expandedStation === stationKey && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="border-t border-purple-100">
+                        <div className="p-4 space-y-4 bg-gray-50">
+                          {/* Общая информация */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="text-center p-3 bg-white rounded-lg border border-green-200">
+                              <div className="font-semibold text-gray-600 text-sm">
+                                Жами тушум
+                              </div>
+                              <div className="text-green-600 font-bold text-lg">
+                                {formatCurrency(
+                                  report.amounts.cash +
+                                    report.amounts.humo +
+                                    report.amounts.uzcard +
+                                    report.amounts.electronic
+                                )}
+                              </div>
                             </div>
-                            <div className="text-green-600 font-bold text-lg">
-                              {formatCurrency(
-                                report.amounts.cash +
-                                  report.amounts.humo +
-                                  report.amounts.uzcard +
-                                  report.amounts.electronic
-                              )}
+                            <div className="text-center p-3 bg-white rounded-lg border border-blue-200">
+                              <div className="font-semibold text-gray-600 text-sm">
+                                Жами назорат
+                              </div>
+                              <div className="text-blue-600 font-bold text-lg">
+                                {formatCurrency(
+                                  report.controlAmounts.cash +
+                                    report.controlAmounts.humo +
+                                    report.controlAmounts.uzcard +
+                                    report.controlAmounts.electronic
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-center p-3 bg-white rounded-lg border border-blue-200">
-                            <div className="font-semibold text-gray-600 text-sm">
-                              Жами назорат
-                            </div>
-                            <div className="text-blue-600 font-bold text-lg">
-                              {formatCurrency(
-                                report.controlAmounts.cash +
-                                  report.controlAmounts.humo +
-                                  report.controlAmounts.uzcard +
-                                  report.controlAmounts.electronic
-                              )}
-                            </div>
+
+                          {/* Детали по типам платежей */}
+                          <div className="space-y-3">
+                            {/* НАЛИЧНЫЕ */}
+                            {(report.problems.includes("cash_negative") ||
+                              report.problems.includes("cash_missing")) && (
+                              <div className="p-3 bg-white rounded-lg border border-yellow-200">
+                                <div className="flex justify-between items-center mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xl">💵</span>
+                                    <span className="font-semibold text-base">
+                                      Нақд
+                                    </span>
+                                  </div>
+                                  {report.problems.includes("cash_missing") ? (
+                                    <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
+                                      Назорат сумма киритилмаган
+                                    </span>
+                                  ) : (
+                                    <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                                      Фарқи: +
+                                      {formatCurrency(report.differences.cash)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                  <div className="text-center p-2 bg-green-50 rounded border">
+                                    <div className="text-gray-600 font-medium">
+                                      Ҳақиқий тушум
+                                    </div>
+                                    <div className="font-semibold text-green-600 text-lg">
+                                      {formatCurrency(report.amounts.cash)}
+                                    </div>
+                                  </div>
+                                  <div className="text-center p-2 bg-blue-50 rounded border">
+                                    <div className="text-gray-600 font-medium">
+                                      Назорат сумма
+                                    </div>
+                                    <div
+                                      className={`font-semibold text-lg ${
+                                        report.controlAmounts.cash === 0
+                                          ? "text-red-600"
+                                          : "text-blue-600"
+                                      }`}>
+                                      {formatCurrency(
+                                        report.controlAmounts.cash
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* HUMO */}
+                            {(report.problems.includes("humo_negative") ||
+                              report.problems.includes("humo_missing")) && (
+                              <div className="p-3 bg-white rounded-lg border border-blue-200">
+                                <div className="flex justify-between items-center mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xl">💳</span>
+                                    <span className="font-semibold text-base">
+                                      HUMO
+                                    </span>
+                                  </div>
+                                  {report.problems.includes("humo_missing") ? (
+                                    <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
+                                      Назорат сумма киритилмаган
+                                    </span>
+                                  ) : (
+                                    <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                                      Фарқи: +
+                                      {formatCurrency(report.differences.humo)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                  <div className="text-center p-2 bg-green-50 rounded border">
+                                    <div className="text-gray-600 font-medium">
+                                      Ҳақиқий тушум
+                                    </div>
+                                    <div className="font-semibold text-green-600 text-lg">
+                                      {formatCurrency(report.amounts.humo)}
+                                    </div>
+                                  </div>
+                                  <div className="text-center p-2 bg-blue-50 rounded border">
+                                    <div className="text-gray-600 font-medium">
+                                      Назорат сумма
+                                    </div>
+                                    <div
+                                      className={`font-semibold text-lg ${
+                                        report.controlAmounts.humo === 0
+                                          ? "text-red-600"
+                                          : "text-blue-600"
+                                      }`}>
+                                      {formatCurrency(
+                                        report.controlAmounts.humo
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* UZCARD */}
+                            {(report.problems.includes("uzcard_negative") ||
+                              report.problems.includes("uzcard_missing")) && (
+                              <div className="p-3 bg-white rounded-lg border border-purple-200">
+                                <div className="flex justify-between items-center mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xl">💳</span>
+                                    <span className="font-semibold text-base">
+                                      Uzcard
+                                    </span>
+                                  </div>
+                                  {report.problems.includes(
+                                    "uzcard_missing"
+                                  ) ? (
+                                    <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
+                                      Назорат сумма киритилмаган
+                                    </span>
+                                  ) : (
+                                    <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                                      Фарқи: +
+                                      {formatCurrency(
+                                        report.differences.uzcard
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                  <div className="text-center p-2 bg-green-50 rounded border">
+                                    <div className="text-gray-600 font-medium">
+                                      Ҳақиқий тушум
+                                    </div>
+                                    <div className="font-semibold text-green-600 text-lg">
+                                      {formatCurrency(report.amounts.uzcard)}
+                                    </div>
+                                  </div>
+                                  <div className="text-center p-2 bg-blue-50 rounded border">
+                                    <div className="text-gray-600 font-medium">
+                                      Назорат сумма
+                                    </div>
+                                    <div
+                                      className={`font-semibold text-lg ${
+                                        report.controlAmounts.uzcard === 0
+                                          ? "text-red-600"
+                                          : "text-blue-600"
+                                      }`}>
+                                      {formatCurrency(
+                                        report.controlAmounts.uzcard
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ЭЛЕКТРОННЫЕ ПЛАТЕЖИ */}
+                            {(report.problems.includes("electronic_negative") ||
+                              report.problems.includes(
+                                "electronic_missing"
+                              )) && (
+                              <div className="p-3 bg-white rounded-lg border border-orange-200">
+                                <div className="flex justify-between items-center mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xl">📱</span>
+                                    <span className="font-semibold text-base">
+                                      Электрон
+                                    </span>
+                                  </div>
+                                  {report.problems.includes(
+                                    "electronic_missing"
+                                  ) ? (
+                                    <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
+                                      Назорат сумма киритилмаган
+                                    </span>
+                                  ) : (
+                                    <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                                      Фарқи: +
+                                      {formatCurrency(
+                                        report.differences.electronic
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                  <div className="text-center p-2 bg-green-50 rounded border">
+                                    <div className="text-gray-600 font-medium">
+                                      Ҳақиқий тушум
+                                    </div>
+                                    <div className="font-semibold text-green-600 text-lg">
+                                      {formatCurrency(
+                                        report.amounts.electronic
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-center p-2 bg-blue-50 rounded border">
+                                    <div className="text-gray-600 font-medium">
+                                      Назорат сумма
+                                    </div>
+                                    <div
+                                      className={`font-semibold text-lg ${
+                                        report.controlAmounts.electronic === 0
+                                          ? "text-red-600"
+                                          : "text-blue-600"
+                                      }`}>
+                                      {formatCurrency(
+                                        report.controlAmounts.electronic
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
 
-                        {/* Детали по типам платежей */}
-                        <div className="space-y-3">
-                          {/* НАЛИЧНЫЕ */}
-                          {(report.problems.includes("cash_negative") ||
-                            report.problems.includes("cash_missing")) && (
-                            <div className="p-3 bg-white rounded-lg border border-yellow-200">
-                              <div className="flex justify-between items-center mb-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xl">💵</span>
-                                  <span className="font-semibold text-base">
-                                    Нақд
-                                  </span>
-                                </div>
-                                {report.problems.includes("cash_missing") ? (
-                                  <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
-                                    Назорат сумма киритилмаган
-                                  </span>
-                                ) : (
-                                  <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                                    Фарқи: +
-                                    {formatCurrency(report.differences.cash)}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                <div className="text-center p-2 bg-green-50 rounded border">
-                                  <div className="text-gray-600 font-medium">
-                                    Ҳақиқий тушум
-                                  </div>
-                                  <div className="font-semibold text-green-600 text-lg">
-                                    {formatCurrency(report.amounts.cash)}
-                                  </div>
-                                </div>
-                                <div className="text-center p-2 bg-blue-50 rounded border">
-                                  <div className="text-gray-600 font-medium">
-                                    Назорат сумма
-                                  </div>
-                                  <div
-                                    className={`font-semibold text-lg ${
-                                      report.controlAmounts.cash === 0
-                                        ? "text-red-600"
-                                        : "text-blue-600"
-                                    }`}>
-                                    {formatCurrency(report.controlAmounts.cash)}
-                                  </div>
-                                </div>
-                              </div>
+                          {/* Сводка по расхождениям */}
+                          <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <div className="text-sm font-semibold text-yellow-800 mb-3 text-center">
+                              Фарқлар бўйича маълумот
                             </div>
-                          )}
-
-                          {/* HUMO */}
-                          {(report.problems.includes("humo_negative") ||
-                            report.problems.includes("humo_missing")) && (
-                            <div className="p-3 bg-white rounded-lg border border-blue-200">
-                              <div className="flex justify-between items-center mb-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xl">💳</span>
-                                  <span className="font-semibold text-base">
-                                    HUMO
+                            <div className="space-y-2 text-sm">
+                              {report.differences.cash > 0 && (
+                                <div className="flex justify-between items-center py-1 border-b border-yellow-200">
+                                  <span className="flex items-center gap-2">
+                                    <span>💵</span>
+                                    <span>Нақд:</span>
+                                  </span>
+                                  <span className="font-semibold text-red-600">
+                                    -{formatCurrency(report.differences.cash)}
                                   </span>
                                 </div>
-                                {report.problems.includes("humo_missing") ? (
-                                  <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
-                                    Назорат сумма киритилмаган
+                              )}
+                              {report.differences.humo > 0 && (
+                                <div className="flex justify-between items-center py-1 border-b border-yellow-200">
+                                  <span className="flex items-center gap-2">
+                                    <span>💳</span>
+                                    <span>HUMO:</span>
                                   </span>
-                                ) : (
-                                  <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                                    Фарқи: +
-                                    {formatCurrency(report.differences.humo)}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                <div className="text-center p-2 bg-green-50 rounded border">
-                                  <div className="text-gray-600 font-medium">
-                                    Ҳақиқий тушум
-                                  </div>
-                                  <div className="font-semibold text-green-600 text-lg">
-                                    {formatCurrency(report.amounts.humo)}
-                                  </div>
-                                </div>
-                                <div className="text-center p-2 bg-blue-50 rounded border">
-                                  <div className="text-gray-600 font-medium">
-                                    Назорат сумма
-                                  </div>
-                                  <div
-                                    className={`font-semibold text-lg ${
-                                      report.controlAmounts.humo === 0
-                                        ? "text-red-600"
-                                        : "text-blue-600"
-                                    }`}>
-                                    {formatCurrency(report.controlAmounts.humo)}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* UZCARD */}
-                          {(report.problems.includes("uzcard_negative") ||
-                            report.problems.includes("uzcard_missing")) && (
-                            <div className="p-3 bg-white rounded-lg border border-purple-200">
-                              <div className="flex justify-between items-center mb-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xl">💳</span>
-                                  <span className="font-semibold text-base">
-                                    Uzcard
+                                  <span className="font-semibold text-red-600">
+                                    -{formatCurrency(report.differences.humo)}
                                   </span>
                                 </div>
-                                {report.problems.includes("uzcard_missing") ? (
-                                  <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
-                                    Назорат сумма киритилмаган
+                              )}
+                              {report.differences.uzcard > 0 && (
+                                <div className="flex justify-between items-center py-1 border-b border-yellow-200">
+                                  <span className="flex items-center gap-2">
+                                    <span>💳</span>
+                                    <span>Uzcard:</span>
                                   </span>
-                                ) : (
-                                  <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                                    Фарқи: +
-                                    {formatCurrency(report.differences.uzcard)}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                <div className="text-center p-2 bg-green-50 rounded border">
-                                  <div className="text-gray-600 font-medium">
-                                    Ҳақиқий тушум
-                                  </div>
-                                  <div className="font-semibold text-green-600 text-lg">
-                                    {formatCurrency(report.amounts.uzcard)}
-                                  </div>
-                                </div>
-                                <div className="text-center p-2 bg-blue-50 rounded border">
-                                  <div className="text-gray-600 font-medium">
-                                    Назорат сумма
-                                  </div>
-                                  <div
-                                    className={`font-semibold text-lg ${
-                                      report.controlAmounts.uzcard === 0
-                                        ? "text-red-600"
-                                        : "text-blue-600"
-                                    }`}>
-                                    {formatCurrency(
-                                      report.controlAmounts.uzcard
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* ЭЛЕКТРОННЫЕ ПЛАТЕЖИ */}
-                          {(report.problems.includes("electronic_negative") ||
-                            report.problems.includes("electronic_missing")) && (
-                            <div className="p-3 bg-white rounded-lg border border-orange-200">
-                              <div className="flex justify-between items-center mb-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xl">📱</span>
-                                  <span className="font-semibold text-base">
-                                    Электрон
+                                  <span className="font-semibold text-red-600">
+                                    -{formatCurrency(report.differences.uzcard)}
                                   </span>
                                 </div>
-                                {report.problems.includes(
-                                  "electronic_missing"
-                                ) ? (
-                                  <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
-                                    Назорат сумма киритилмаган
+                              )}
+                              {report.differences.electronic > 0 && (
+                                <div className="flex justify-between items-center py-1 border-b border-yellow-200">
+                                  <span className="flex items-center gap-2">
+                                    <span>📱</span>
+                                    <span>Электрон:</span>
                                   </span>
-                                ) : (
-                                  <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
-                                    Фарқи: +
+                                  <span className="font-semibold text-red-600">
+                                    -
                                     {formatCurrency(
                                       report.differences.electronic
                                     )}
                                   </span>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                <div className="text-center p-2 bg-green-50 rounded border">
-                                  <div className="text-gray-600 font-medium">
-                                    Ҳақиқий тушум
-                                  </div>
-                                  <div className="font-semibold text-green-600 text-lg">
-                                    {formatCurrency(report.amounts.electronic)}
-                                  </div>
                                 </div>
-                                <div className="text-center p-2 bg-blue-50 rounded border">
-                                  <div className="text-gray-600 font-medium">
-                                    Назорат сумма
-                                  </div>
-                                  <div
-                                    className={`font-semibold text-lg ${
-                                      report.controlAmounts.electronic === 0
-                                        ? "text-red-600"
-                                        : "text-blue-600"
-                                    }`}>
+                              )}
+                              <div className="pt-2 mt-2 border-t border-yellow-300">
+                                <div className="flex justify-between items-center font-bold text-base">
+                                  <span>Жами фарқ:</span>
+                                  <span className="text-red-600">
+                                    -
                                     {formatCurrency(
-                                      report.controlAmounts.electronic
+                                      (report.differences.cash > 0
+                                        ? report.differences.cash
+                                        : 0) +
+                                        (report.differences.humo > 0
+                                          ? report.differences.humo
+                                          : 0) +
+                                        (report.differences.uzcard > 0
+                                          ? report.differences.uzcard
+                                          : 0) +
+                                        (report.differences.electronic > 0
+                                          ? report.differences.electronic
+                                          : 0)
                                     )}
-                                  </div>
+                                  </span>
                                 </div>
                               </div>
                             </div>
-                          )}
-                        </div>
-
-                        {/* Сводка по расхождениям */}
-                        <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                          <div className="text-sm font-semibold text-yellow-800 mb-3 text-center">
-                            Фарқлар бўйича маълумот
-                          </div>
-                          <div className="space-y-2 text-sm">
-                            {report.differences.cash > 0 && (
-                              <div className="flex justify-between items-center py-1 border-b border-yellow-200">
-                                <span className="flex items-center gap-2">
-                                  <span>💵</span>
-                                  <span>Нақд:</span>
-                                </span>
-                                <span className="font-semibold text-red-600">
-                                  -{formatCurrency(report.differences.cash)}
-                                </span>
-                              </div>
-                            )}
-                            {report.differences.humo > 0 && (
-                              <div className="flex justify-between items-center py-1 border-b border-yellow-200">
-                                <span className="flex items-center gap-2">
-                                  <span>💳</span>
-                                  <span>HUMO:</span>
-                                </span>
-                                <span className="font-semibold text-red-600">
-                                  -{formatCurrency(report.differences.humo)}
-                                </span>
-                              </div>
-                            )}
-                            {report.differences.uzcard > 0 && (
-                              <div className="flex justify-between items-center py-1 border-b border-yellow-200">
-                                <span className="flex items-center gap-2">
-                                  <span>💳</span>
-                                  <span>Uzcard:</span>
-                                </span>
-                                <span className="font-semibold text-red-600">
-                                  -{formatCurrency(report.differences.uzcard)}
-                                </span>
-                              </div>
-                            )}
-                            {report.differences.electronic > 0 && (
-                              <div className="flex justify-between items-center py-1 border-b border-yellow-200">
-                                <span className="flex items-center gap-2">
-                                  <span>📱</span>
-                                  <span>Электрон:</span>
-                                </span>
-                                <span className="font-semibold text-red-600">
-                                  -
-                                  {formatCurrency(
-                                    report.differences.electronic
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                            <div className="pt-2 mt-2 border-t border-yellow-300">
-                              <div className="flex justify-between items-center font-bold text-base">
-                                <span>Жами фарқ:</span>
-                                <span className="text-red-600">
-                                  -
-                                  {formatCurrency(
-                                    (report.differences.cash > 0
-                                      ? report.differences.cash
-                                      : 0) +
-                                      (report.differences.humo > 0
-                                        ? report.differences.humo
-                                        : 0) +
-                                      (report.differences.uzcard > 0
-                                        ? report.differences.uzcard
-                                        : 0) +
-                                      (report.differences.electronic > 0
-                                        ? report.differences.electronic
-                                        : 0)
-                                  )}
-                                </span>
-                              </div>
-                            </div>
                           </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

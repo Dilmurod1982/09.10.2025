@@ -787,7 +787,8 @@ export const useStationAnalytics = (managedStations = []) => {
         const cashAmount = generalData.cashAmount || 0;
         const humoTerminal = generalData.humoTerminal || 0;
         const uzcardTerminal = generalData.uzcardTerminal || 0;
-        const electronicPaymentSystem = generalData.eternalPaymentSystem || 0;
+        const electronicPaymentSystem =
+          generalData.electronicPaymentSystem || 0;
 
         const controlTotalSum = generalData.controlTotalSum || 0;
         const controlHumoSum = generalData.controlHumoSum || 0;
