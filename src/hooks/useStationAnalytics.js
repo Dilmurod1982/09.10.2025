@@ -745,7 +745,7 @@ export const useStationAnalytics = (managedStations = []) => {
     }
   };
 
-  // Анализ 5: Разница контрольных сумм с периодами - ДОБАВЛЕНЫ ПЕРИОДЫ
+  // Анализ 5: Разница контрольных сумм с периодами - ИСПРАВЛЕННАЯ ВЕРСИЯ
   const analyzeControlDifference = (reports, period) => {
     const filteredReports = filterReportsByPeriod(reports, period);
 
@@ -764,6 +764,12 @@ export const useStationAnalytics = (managedStations = []) => {
         const controlUzcardSum = generalData.controlUzcardSum || 0;
         const controlElectronicSum = generalData.controlElectronicSum || 0;
 
+        // Сначала определяем разницы
+        const cashDiff = cashAmount - controlTotalSum;
+        const humoDiff = humoTerminal - controlHumoSum;
+        const uzcardDiff = uzcardTerminal - controlUzcardSum;
+        const electronicDiff = electronicPaymentSystem - controlElectronicSum;
+
         const hasMissingControlSums =
           (cashAmount > 0 && controlTotalSum === 0) ||
           (humoTerminal > 0 && controlHumoSum === 0) ||
@@ -781,14 +787,14 @@ export const useStationAnalytics = (managedStations = []) => {
         const cashAmount = generalData.cashAmount || 0;
         const humoTerminal = generalData.humoTerminal || 0;
         const uzcardTerminal = generalData.uzcardTerminal || 0;
-        const electronicPaymentSystem =
-          generalData.electronicPaymentSystem || 0;
+        const electronicPaymentSystem = generalData.eternalPaymentSystem || 0;
 
         const controlTotalSum = generalData.controlTotalSum || 0;
         const controlHumoSum = generalData.controlHumoSum || 0;
         const controlUzcardSum = generalData.controlUzcardSum || 0;
         const controlElectronicSum = generalData.controlElectronicSum || 0;
 
+        // Определяем разницы для использования в маппинге
         const cashDiff = cashAmount - controlTotalSum;
         const humoDiff = humoTerminal - controlHumoSum;
         const uzcardDiff = uzcardTerminal - controlUzcardSum;

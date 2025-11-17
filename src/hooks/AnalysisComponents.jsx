@@ -8,7 +8,7 @@ import {
   getPeriodDisplayName,
 } from "./useStationAnalytics";
 
-// Карточка анализа
+// Карточка анализа (оставляем для других страниц)
 export const AnalysisCard = ({
   title,
   value,
@@ -25,27 +25,27 @@ export const AnalysisCard = ({
     orange: "bg-orange-50 border-orange-200 hover:bg-orange-100",
     purple: "bg-purple-50 border-purple-200 hover:bg-purple-100",
     yellow: "bg-yellow-50 border-yellow-200 hover:bg-yellow-100",
-    teal: "bg-teal-50 border-teal-200 hover:bg-teal-100", // НОВЫЙ ЦВЕТ
+    teal: "bg-teal-50 border-teal-200 hover:bg-teal-100",
   };
 
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${colorClasses[color]}`}
+      className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 ${colorClasses[color]}`}
       onClick={onClick}>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-        <span className="text-2xl">{icon}</span>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+        <span className="text-xl">{icon}</span>
       </div>
-      <div className="text-3xl font-bold text-gray-900 mb-2">{value}</div>
-      <div className="text-sm text-gray-600 mb-1">{subtitle}</div>
+      <div className="text-xl font-bold text-gray-900 mb-1">{value}</div>
+      <div className="text-xs text-gray-600 mb-1">{subtitle}</div>
       <div className="text-xs text-gray-500">{description}</div>
     </motion.div>
   );
 };
 
-// НОВЫЙ КОМПОНЕНТ: Детали анализа расхода газа и платежей
+// Компонент: Детали анализа расхода газа и платежей
 export const GasAndPaymentsDetails = ({
   analysisData,
   filters = {},
@@ -62,7 +62,6 @@ export const GasAndPaymentsDetails = ({
     const newDateRange = { ...dateRange, [field]: value };
     setDateRange(newDateRange);
 
-    // Если это кастомный диапазон, применяем фильтр
     if (field === "startDate" || field === "endDate") {
       onFiltersChange.setGasPaymentsDateRange?.(newDateRange);
     }
@@ -104,25 +103,25 @@ export const GasAndPaymentsDetails = ({
 
   const renderGasAndPaymentsDetails = () => {
     const data = analysisData.gasAndPaymentsData;
-
-    // Проверяем структуру данных (может быть массивом или объектом с summary)
     const isDateRangeData = data && data.summary;
     const summary = isDateRangeData ? data.summary : null;
     const stationsData = isDateRangeData ? data.stationsData : data;
     const dailyData = isDateRangeData ? data.dailyData : [];
 
     return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-semibold">
-            Анализ расхода газа и поступлений платежей
+      <div className="space-y-4">
+        {/* Заголовок и фильтры */}
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-center">
+            Расход газа и платежи
           </h3>
-          <div className="flex gap-2">
-            {/* Быстрый выбор периода */}
+
+          {/* Быстрый выбор периода */}
+          <div className="flex flex-col gap-2">
             <select
               value={dateRange.rangeType}
               onChange={(e) => handleQuickRangeSelect(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg">
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
               <option value="custom">Выберите период</option>
               <option value="today">Сегодня</option>
               <option value="yesterday">Вчера</option>
@@ -132,128 +131,96 @@ export const GasAndPaymentsDetails = ({
             </select>
 
             {/* Кастомный диапазон дат */}
-            <div className="flex gap-2">
+            <div className="grid grid-cols-3 gap-2 items-center">
               <input
                 type="date"
                 value={dateRange.startDate}
                 onChange={(e) =>
                   handleDateRangeChange("startDate", e.target.value)
                 }
-                className="px-3 py-2 border border-gray-300 rounded-lg"
+                className="px-2 py-2 border border-gray-300 rounded-lg text-sm col-span-3"
               />
-              <span className="self-center">по</span>
+              <div className="col-span-3 text-center text-xs text-gray-500">
+                по
+              </div>
               <input
                 type="date"
                 value={dateRange.endDate}
                 onChange={(e) =>
                   handleDateRangeChange("endDate", e.target.value)
                 }
-                className="px-3 py-2 border border-gray-300 rounded-lg"
+                className="px-2 py-2 border border-gray-300 rounded-lg text-sm col-span-3"
               />
             </div>
 
             <button
               onClick={onRefresh}
-              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
-              Обновить
+              className="px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm">
+              Применить
             </button>
           </div>
         </div>
 
         {/* Общая сводка */}
         {summary && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="text-2xl font-bold text-blue-600">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-2 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="text-sm font-bold text-blue-600">
                 {formatNumber(summary.totalGas)} м3
               </div>
-              <div className="text-sm text-gray-600">Всего продано газа</div>
+              <div className="text-xs text-gray-600">Продано газа</div>
             </div>
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-              <div className="text-2xl font-bold text-green-600">
+            <div className="p-2 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-sm font-bold text-green-600">
                 {formatCurrency(summary.totalPayments)}
               </div>
-              <div className="text-sm text-gray-600">Всего поступлений</div>
+              <div className="text-xs text-gray-600">Поступления</div>
             </div>
-            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <div className="text-2xl font-bold text-purple-600">
+            <div className="p-2 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="text-sm font-bold text-purple-600">
                 {summary.reportsCount}
               </div>
-              <div className="text-sm text-gray-600">Отчетов</div>
+              <div className="text-xs text-gray-600">Отчетов</div>
             </div>
-            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-              <div className="text-2xl font-bold text-orange-600">
+            <div className="p-2 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="text-sm font-bold text-orange-600">
                 {stationsData?.length || 0}
               </div>
-              <div className="text-sm text-gray-600">Станций</div>
+              <div className="text-xs text-gray-600">Станций</div>
             </div>
           </div>
         )}
 
         {/* Распределение платежей */}
         {summary && (
-          <div className="p-4 bg-white rounded-lg border mb-6">
-            <h4 className="font-semibold mb-3">Распределение платежей</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div className="text-center p-3 bg-green-50 rounded">
-                <div className="font-semibold text-green-600">
+          <div className="p-3 bg-white rounded-lg border">
+            <h4 className="font-semibold mb-2 text-sm">
+              Распределение платежей
+            </h4>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center p-2 bg-green-50 rounded">
+                <span>Наличные:</span>
+                <span className="font-semibold">
                   {formatCurrency(summary.totalCash)}
-                </div>
-                <div className="text-gray-600">Наличные</div>
-                <div className="text-xs text-gray-500">
-                  {summary.totalPayments > 0
-                    ? (
-                        (summary.totalCash / summary.totalPayments) *
-                        100
-                      ).toFixed(1)
-                    : 0}
-                  %
-                </div>
+                </span>
               </div>
-              <div className="text-center p-3 bg-blue-50 rounded">
-                <div className="font-semibold text-blue-600">
+              <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                <span>HUMO:</span>
+                <span className="font-semibold">
                   {formatCurrency(summary.totalHumo)}
-                </div>
-                <div className="text-gray-600">HUMO</div>
-                <div className="text-xs text-gray-500">
-                  {summary.totalPayments > 0
-                    ? (
-                        (summary.totalHumo / summary.totalPayments) *
-                        100
-                      ).toFixed(1)
-                    : 0}
-                  %
-                </div>
+                </span>
               </div>
-              <div className="text-center p-3 bg-purple-50 rounded">
-                <div className="font-semibold text-purple-600">
+              <div className="flex justify-between items-center p-2 bg-purple-50 rounded">
+                <span>Uzcard:</span>
+                <span className="font-semibold">
                   {formatCurrency(summary.totalUzcard)}
-                </div>
-                <div className="text-gray-600">Uzcard</div>
-                <div className="text-xs text-gray-500">
-                  {summary.totalPayments > 0
-                    ? (
-                        (summary.totalUzcard / summary.totalPayments) *
-                        100
-                      ).toFixed(1)
-                    : 0}
-                  %
-                </div>
+                </span>
               </div>
-              <div className="text-center p-3 bg-orange-50 rounded">
-                <div className="font-semibold text-orange-600">
+              <div className="flex justify-between items-center p-2 bg-orange-50 rounded">
+                <span>Электронные:</span>
+                <span className="font-semibold">
                   {formatCurrency(summary.totalElectronic)}
-                </div>
-                <div className="text-gray-600">Электронные</div>
-                <div className="text-xs text-gray-500">
-                  {summary.totalPayments > 0
-                    ? (
-                        (summary.totalElectronic / summary.totalPayments) *
-                        100
-                      ).toFixed(1)
-                    : 0}
-                  %
-                </div>
+                </span>
               </div>
             </div>
           </div>
@@ -261,104 +228,47 @@ export const GasAndPaymentsDetails = ({
 
         {/* Данные по станциям */}
         <div>
-          <h4 className="font-semibold mb-3">Данные по станциям</h4>
+          <h4 className="font-semibold mb-2 text-sm">Данные по станциям</h4>
           {!stationsData || stationsData.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-6 text-gray-500 text-sm">
               Нет данных за выбранный период
             </div>
           ) : (
-            <div className="space-y-4">
-              {stationsData.map((station, index) => (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {stationsData.slice(0, 5).map((station, index) => (
                 <div
                   key={station.stationId}
-                  className="p-4 bg-white rounded-lg border">
-                  <div className="flex justify-between items-center mb-3">
-                    <h5 className="font-semibold">{station.stationName}</h5>
+                  className="p-2 bg-white rounded-lg border text-xs">
+                  <div className="flex justify-between items-start mb-2">
+                    <h5 className="font-semibold flex-1 pr-2">
+                      {station.stationName}
+                    </h5>
                     <div className="text-right">
-                      <div className="text-lg font-bold text-blue-600">
+                      <div className="font-bold text-blue-600">
                         {formatNumber(station.totalGas)} м3
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-gray-600">
                         {formatCurrency(station.totalPayments)}
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <div className="font-semibold">Наличные</div>
-                      <div>{formatCurrency(station.totalCash)}</div>
-                      <div className="text-xs text-gray-500">
-                        {station.paymentDistribution?.cashPercentage?.toFixed(
-                          1
-                        ) || 0}
-                        %
-                      </div>
-                    </div>
-                    <div>
-                      <div className="font-semibold">HUMO</div>
-                      <div>{formatCurrency(station.totalHumo)}</div>
-                      <div className="text-xs text-gray-500">
-                        {station.paymentDistribution?.humoPercentage?.toFixed(
-                          1
-                        ) || 0}
-                        %
-                      </div>
-                    </div>
-                    <div>
-                      <div className="font-semibold">Uzcard</div>
-                      <div>{formatCurrency(station.totalUzcard)}</div>
-                      <div className="text-xs text-gray-500">
-                        {station.paymentDistribution?.uzcardPercentage?.toFixed(
-                          1
-                        ) || 0}
-                        %
-                      </div>
-                    </div>
-                    <div>
-                      <div className="font-semibold">Электронные</div>
-                      <div>{formatCurrency(station.totalElectronic)}</div>
-                      <div className="text-xs text-gray-500">
-                        {station.paymentDistribution?.electronicPercentage?.toFixed(
-                          1
-                        ) || 0}
-                        %
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 text-xs text-gray-500">
-                    {station.reportsCount} отчетов
+                  <div className="grid grid-cols-2 gap-1 text-xs">
+                    <div>Нал: {formatCurrency(station.totalCash)}</div>
+                    <div>HUMO: {formatCurrency(station.totalHumo)}</div>
+                    <div>Uzcard: {formatCurrency(station.totalUzcard)}</div>
+                    <div>Эл: {formatCurrency(station.totalElectronic)}</div>
                   </div>
                 </div>
               ))}
+              {stationsData.length > 5 && (
+                <div className="text-center text-xs text-gray-500 py-2">
+                  + еще {stationsData.length - 5} станций
+                </div>
+              )}
             </div>
           )}
         </div>
-
-        {/* Ежедневные данные (только для диапазона дат) */}
-        {dailyData && dailyData.length > 0 && (
-          <div className="mt-6">
-            <h4 className="font-semibold mb-3">Ежедневная статистика</h4>
-            <div className="space-y-2">
-              {dailyData.map((day, index) => (
-                <div key={index} className="p-3 bg-gray-50 rounded border">
-                  <div className="flex justify-between items-center">
-                    <div className="font-semibold">{formatDate(day.date)}</div>
-                    <div className="text-right">
-                      <div className="text-sm font-semibold">
-                        {formatNumber(day.totalGas)} м3
-                      </div>
-                      <div className="text-xs text-gray-600">
-                        {formatCurrency(day.totalPayments)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -367,7 +277,7 @@ export const GasAndPaymentsDetails = ({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-6 bg-white rounded-2xl shadow-lg mb-6">
+      className="p-3 bg-white rounded-xl shadow-lg">
       {renderGasAndPaymentsDetails()}
     </motion.div>
   );
@@ -384,54 +294,56 @@ export const AnalysisDetails = ({
   if (!selectedAnalysis) return null;
 
   const renderAutopilotDetails = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Данные AutoPilotPro</h3>
-        <div className="flex gap-2">
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold text-center">
+          Данные AutoPilotPro
+        </h3>
+        <div className="flex flex-col gap-2">
           <select
             value={filters.autopilotPeriod || "1day"}
             onChange={(e) =>
               onFiltersChange.setAutopilotPeriod?.(e.target.value)
             }
-            className="px-3 py-2 border border-gray-300 rounded-lg">
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option value="1day">За 1 день</option>
             <option value="7days">За 7 дней</option>
             <option value="1month">За месяц</option>
-            <option value="6months">За полгода</option>
-            <option value="1year">За год</option>
           </select>
           <button
             onClick={onRefresh}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
             Обновить
           </button>
         </div>
       </div>
 
       {analysisData.autopilotData.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-6 text-gray-500 text-sm">
           Нет данных за выбранный период
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="space-y-2 max-h-[300px] overflow-y-auto">
           {analysisData.autopilotData.map((station, index) => (
             <div
               key={station.stationId}
-              className="p-4 bg-white rounded-lg border">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="font-semibold">{station.stationName}</h4>
-                  <p className="text-sm text-gray-600">
-                    Среднее значение:{" "}
-                    {formatNumber(station.averageAutopilot.toFixed(2))} м3
+              className="p-2 bg-white rounded-lg border">
+              <div className="flex justify-between items-start">
+                <div className="flex-1 pr-2">
+                  <h4 className="font-semibold text-sm">
+                    {station.stationName}
+                  </h4>
+                  <p className="text-xs text-gray-600">
+                    Среднее: {formatNumber(station.averageAutopilot.toFixed(1))}{" "}
+                    м3
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold">
+                  <p className="text-sm font-bold">
                     {formatNumber(station.totalAutopilot)} м3
                   </p>
-                  <p className="text-sm text-gray-600">
-                    {station.reportsCount} отчетов
+                  <p className="text-xs text-gray-600">
+                    {station.reportsCount} отчет.
                   </p>
                 </div>
               </div>
@@ -443,40 +355,43 @@ export const AnalysisDetails = ({
   );
 
   const renderComparisonDetails = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Сравнительный анализ</h3>
-        <div className="flex gap-2">
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold text-center">
+          Сравнительный анализ
+        </h3>
+        <div className="flex flex-col gap-2">
           <select
             value={filters.comparisonType || "yesterday"}
             onChange={(e) =>
               onFiltersChange.setComparisonType?.(e.target.value)
             }
-            className="px-3 py-2 border border-gray-300 rounded-lg">
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option value="yesterday">С вчерашним днем</option>
             <option value="week">С прошлой неделей</option>
-            <option value="month">С прошлым месяцем</option>
           </select>
           <button
             onClick={onRefresh}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
             Обновить
           </button>
         </div>
       </div>
 
       {analysisData.comparisonData.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-6 text-gray-500 text-sm">
           Нет данных для сравнения
         </div>
       ) : (
-        <div className="grid gap-4">
-          {analysisData.comparisonData.map((station, index) => (
-            <div key={index} className="p-4 bg-white rounded-lg border">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="font-semibold">{station.stationName}</h4>
+        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+          {analysisData.comparisonData.slice(0, 10).map((station, index) => (
+            <div key={index} className="p-2 bg-white rounded-lg border">
+              <div className="flex justify-between items-start mb-1">
+                <h4 className="font-semibold text-sm flex-1 pr-2">
+                  {station.stationName}
+                </h4>
                 <span
-                  className={`px-2 py-1 rounded ${
+                  className={`px-2 py-1 rounded text-xs ${
                     station.difference >= 0
                       ? "bg-green-100 text-green-800"
                       : "bg-red-100 text-red-800"
@@ -485,18 +400,18 @@ export const AnalysisDetails = ({
                   {formatNumber(station.difference)} м3
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-1 text-xs">
                 <div>
-                  <p>Текущее: {formatNumber(station.currentValue)} м3</p>
-                  <p className="text-gray-600">
+                  <div>Текущ: {formatNumber(station.currentValue)} м3</div>
+                  <div className="text-gray-600 text-xs">
                     {formatDate(station.currentDate)}
-                  </p>
+                  </div>
                 </div>
                 <div>
-                  <p>Предыдущее: {formatNumber(station.previousValue)} м3</p>
-                  <p className="text-gray-600">
+                  <div>Пред: {formatNumber(station.previousValue)} м3</div>
+                  <div className="text-gray-600 text-xs">
                     {formatDate(station.previousDate)}
-                  </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -507,56 +422,55 @@ export const AnalysisDetails = ({
   );
 
   const renderNegativeDifferenceDetails = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Отрицательная разница</h3>
-        <div className="flex gap-2">
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold text-center">
+          Отрицательная разница
+        </h3>
+        <div className="flex flex-col gap-2">
           <select
             value={filters.negativeDiffPeriod || "1day"}
             onChange={(e) =>
               onFiltersChange.setNegativeDiffPeriod?.(e.target.value)
             }
-            className="px-3 py-2 border border-gray-300 rounded-lg">
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option value="1day">За 1 день</option>
             <option value="7days">За 7 дней</option>
-            <option value="1month">За месяц</option>
-            <option value="6months">За полгода</option>
-            <option value="1year">За год</option>
           </select>
           <button
             onClick={onRefresh}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
             Обновить
           </button>
         </div>
       </div>
 
       {analysisData.negativeDifferenceData.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-6 text-gray-500 text-sm">
           Нет станций с отрицательной разницей
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="space-y-2 max-h-[300px] overflow-y-auto">
           {analysisData.negativeDifferenceData.map((station, index) => (
             <div
               key={station.stationId}
-              className="p-4 bg-white rounded-lg border border-red-200">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="font-semibold">{station.stationName}</h4>
-                <span className="bg-red-100 text-red-800 px-2 py-1 rounded">
+              className="p-2 bg-white rounded-lg border border-red-200">
+              <div className="flex justify-between items-start mb-1">
+                <h4 className="font-semibold text-sm flex-1 pr-2">
+                  {station.stationName}
+                </h4>
+                <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
                   {formatNumber(station.difference)} м3
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-1 text-xs">
                 <div>
-                  <p>AutoPilot: {formatNumber(station.autopilotReading)} м3</p>
-                  <p>Hose Total: {formatNumber(station.hoseTotalGas)} м3</p>
+                  AutoPilot: {formatNumber(station.autopilotReading)} м3
                 </div>
-                <div className="text-right">
-                  <p className="text-gray-600">
-                    {formatDate(station.reportDate)}
-                  </p>
-                </div>
+                <div>Hose: {formatNumber(station.hoseTotalGas)} м3</div>
+              </div>
+              <div className="text-xs text-gray-600 mt-1">
+                {formatDate(station.reportDate)}
               </div>
             </div>
           ))}
@@ -566,257 +480,181 @@ export const AnalysisDetails = ({
   );
 
   const renderMissingReportsDetails = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Отсутствующие отчеты</h3>
-        <div className="flex gap-2">
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold text-center">
+          Отсутствующие отчеты
+        </h3>
+        <div className="flex flex-col gap-2">
           <select
             value={filters.missingReportsPeriod || "1day"}
             onChange={(e) =>
               onFiltersChange.setMissingReportsPeriod?.(e.target.value)
             }
-            className="px-3 py-2 border border-gray-300 rounded-lg">
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option value="1day">За 1 день</option>
             <option value="7days">За 7 дней</option>
-            <option value="1month">За месяц</option>
-            <option value="6months">За полгода</option>
-            <option value="1year">За год</option>
           </select>
           <button
             onClick={onRefresh}
-            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
+            className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm">
             Обновить
           </button>
         </div>
       </div>
 
       {analysisData.missingReportsData.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          Все отчеты сданы вовремя{" "}
-          {getPeriodDisplayName(filters.missingReportsPeriod)}
+        <div className="text-center py-6 text-gray-500 text-sm">
+          Все отчеты сданы вовремя
         </div>
       ) : (
-        <div className="grid gap-4">
-          {analysisData.missingReportsData.map((station, index) => (
-            <div
-              key={`${station.stationId}-${station.missingDate}`}
-              className="p-4 bg-white rounded-lg border border-orange-200">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="font-semibold">{station.stationName}</h4>
-                  <p className="text-sm text-gray-600">
-                    Отчет отсутствует за {formatDate(station.missingDate)}
-                  </p>
+        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+          {analysisData.missingReportsData
+            .slice(0, 10)
+            .map((station, index) => (
+              <div
+                key={`${station.stationId}-${station.missingDate}`}
+                className="p-2 bg-white rounded-lg border border-orange-200">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1 pr-2">
+                    <h4 className="font-semibold text-sm">
+                      {station.stationName}
+                    </h4>
+                    <p className="text-xs text-gray-600">
+                      Отсутствует за {formatDate(station.missingDate)}
+                    </p>
+                  </div>
+                  <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">
+                    Просрочка
+                  </span>
                 </div>
-                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-sm">
-                  Просрочка
-                </span>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       )}
     </div>
   );
 
   const renderControlDifferenceDetails = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Разница контрольных сумм</h3>
-        <div className="flex gap-2">
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold text-center">
+          Разница контрольных сумм
+        </h3>
+        <div className="flex flex-col gap-2">
           <select
             value={filters.controlDiffPeriod || "yesterday"}
             onChange={(e) =>
               onFiltersChange.setControlDiffPeriod?.(e.target.value)
             }
-            className="px-3 py-2 border border-gray-300 rounded-lg">
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option value="yesterday">Вчера</option>
             <option value="7days">7 дней</option>
-            <option value="1month">Месяц</option>
-            <option value="6months">Полгода</option>
-            <option value="1year">Год</option>
           </select>
           <button
             onClick={onRefresh}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+            className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
             Обновить
           </button>
         </div>
       </div>
 
       {analysisData.controlDifferenceData.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          Нет расхождений в контрольных суммах{" "}
-          {getPeriodDisplayName(filters.controlDiffPeriod)}
+        <div className="text-center py-6 text-gray-500 text-sm">
+          Нет расхождений
         </div>
       ) : (
-        <div className="grid gap-4">
-          {analysisData.controlDifferenceData.map((report, index) => (
-            <div
-              key={index}
-              className="p-4 bg-white rounded-lg border border-purple-200">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="font-semibold">{report.stationName}</h4>
-                <div className="text-right">
-                  <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-sm">
+        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+          {analysisData.controlDifferenceData
+            .slice(0, 5)
+            .map((report, index) => (
+              <div
+                key={index}
+                className="p-2 bg-white rounded-lg border border-purple-200">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-semibold text-sm flex-1 pr-2">
+                    {report.stationName}
+                  </h4>
+                  <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs">
                     {formatDate(report.reportDate)}
                   </span>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Период: {getPeriodDisplayName(filters.controlDiffPeriod)}
-                  </div>
+                </div>
+
+                <div className="space-y-1 text-xs">
+                  {report.problems.includes("cash_negative") && (
+                    <div className="p-1 bg-yellow-50 rounded border border-yellow-200">
+                      <p className="font-semibold">💵 Наличные</p>
+                      <p>Факт: {formatCurrency(report.amounts.cash)}</p>
+                      <p>
+                        Контроль: {formatCurrency(report.controlAmounts.cash)}
+                      </p>
+                    </div>
+                  )}
+
+                  {report.problems.includes("humo_negative") && (
+                    <div className="p-1 bg-yellow-50 rounded border border-yellow-200">
+                      <p className="font-semibold">💳 HUMO</p>
+                      <p>Факт: {formatCurrency(report.amounts.humo)}</p>
+                      <p>
+                        Контроль: {formatCurrency(report.controlAmounts.humo)}
+                      </p>
+                    </div>
+                  )}
+
+                  {report.problems.includes("uzcard_negative") && (
+                    <div className="p-1 bg-yellow-50 rounded border border-yellow-200">
+                      <p className="font-semibold">💳 Uzcard</p>
+                      <p>Факт: {formatCurrency(report.amounts.uzcard)}</p>
+                      <p>
+                        Контроль: {formatCurrency(report.controlAmounts.uzcard)}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                {report.problems.includes("cash_missing") && (
-                  <div className="col-span-2 p-2 bg-red-50 rounded border border-red-200">
-                    <p className="font-semibold text-red-800">
-                      ⚠️ Отсутствует контрольная сумма наличных
-                    </p>
-                    <p>Факт: {formatCurrency(report.amounts.cash)}</p>
-                    <p>
-                      Контроль: {formatCurrency(report.controlAmounts.cash)}
-                    </p>
-                  </div>
-                )}
-
-                {report.problems.includes("cash_negative") && (
-                  <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                    <p className="font-semibold">💵 Наличные</p>
-                    <p>Факт: {formatCurrency(report.amounts.cash)}</p>
-                    <p>
-                      Контроль: {formatCurrency(report.controlAmounts.cash)}
-                    </p>
-                    <p className="text-red-600 font-semibold">
-                      Разница: +{formatCurrency(report.differences.cash)}
-                    </p>
-                  </div>
-                )}
-
-                {report.problems.includes("humo_missing") && (
-                  <div className="col-span-2 p-2 bg-red-50 rounded border border-red-200">
-                    <p className="font-semibold text-red-800">
-                      ⚠️ Отсутствует контрольная сумма HUMO
-                    </p>
-                    <p>Факт: {formatCurrency(report.amounts.humo)}</p>
-                    <p>
-                      Контроль: {formatCurrency(report.controlAmounts.humo)}
-                    </p>
-                  </div>
-                )}
-
-                {report.problems.includes("humo_negative") && (
-                  <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                    <p className="font-semibold">💳 HUMO</p>
-                    <p>Факт: {formatCurrency(report.amounts.humo)}</p>
-                    <p>
-                      Контроль: {formatCurrency(report.controlAmounts.humo)}
-                    </p>
-                    <p className="text-red-600 font-semibold">
-                      Разница: +{formatCurrency(report.differences.humo)}
-                    </p>
-                  </div>
-                )}
-
-                {report.problems.includes("uzcard_missing") && (
-                  <div className="col-span-2 p-2 bg-red-50 rounded border border-red-200">
-                    <p className="font-semibold text-red-800">
-                      ⚠️ Отсутствует контрольная сумма Uzcard
-                    </p>
-                    <p>Факт: {formatCurrency(report.amounts.uzcard)}</p>
-                    <p>
-                      Контроль: {formatCurrency(report.controlAmounts.uzcard)}
-                    </p>
-                  </div>
-                )}
-
-                {report.problems.includes("uzcard_negative") && (
-                  <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                    <p className="font-semibold">💳 Uzcard</p>
-                    <p>Факт: {formatCurrency(report.amounts.uzcard)}</p>
-                    <p>
-                      Контроль: {formatCurrency(report.controlAmounts.uzcard)}
-                    </p>
-                    <p className="text-red-600 font-semibold">
-                      Разница: +{formatCurrency(report.differences.uzcard)}
-                    </p>
-                  </div>
-                )}
-
-                {report.problems.includes("electronic_missing") && (
-                  <div className="col-span-2 p-2 bg-red-50 rounded border border-red-200">
-                    <p className="font-semibold text-red-800">
-                      ⚠️ Отсутствует контрольная сумма электронных платежей
-                    </p>
-                    <p>Факт: {formatCurrency(report.amounts.electronic)}</p>
-                    <p>
-                      Контроль:{" "}
-                      {formatCurrency(report.controlAmounts.electronic)}
-                    </p>
-                  </div>
-                )}
-
-                {report.problems.includes("electronic_negative") && (
-                  <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                    <p className="font-semibold">📱 Электронные</p>
-                    <p>Факт: {formatCurrency(report.amounts.electronic)}</p>
-                    <p>
-                      Контроль:{" "}
-                      {formatCurrency(report.controlAmounts.electronic)}
-                    </p>
-                    <p className="text-red-600 font-semibold">
-                      Разница: +{formatCurrency(report.differences.electronic)}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+            ))}
         </div>
       )}
     </div>
   );
 
   const renderExpiredDocumentsDetails = () => (
-    <div className="space-y-4">
-      <h3 className="text-xl font-semibold mb-4">Просроченные документы</h3>
+    <div className="space-y-3">
+      <h3 className="text-lg font-semibold text-center">
+        Просроченные документы
+      </h3>
 
       {analysisData.expiredDocumentsData.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-6 text-gray-500 text-sm">
           Нет просроченных документов
         </div>
       ) : (
-        <div className="grid gap-4">
-          {analysisData.expiredDocumentsData.map((station, index) => (
-            <div
-              key={index}
-              className="p-4 bg-white rounded-lg border border-yellow-200">
-              <h4 className="font-semibold mb-3">{station.stationName}</h4>
+        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+          {analysisData.expiredDocumentsData
+            .slice(0, 5)
+            .map((station, index) => (
+              <div
+                key={index}
+                className="p-2 bg-white rounded-lg border border-yellow-200">
+                <h4 className="font-semibold mb-2 text-sm">
+                  {station.stationName}
+                </h4>
 
-              <div className="space-y-2">
-                {station.documents.map((doc, docIndex) => (
-                  <div
-                    key={docIndex}
-                    className="p-3 bg-red-50 rounded border border-red-200">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-semibold">{doc.docType}</p>
-                        <p className="text-sm">№ {doc.docNumber}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-red-600 font-semibold">
-                          Просрочено на {doc.daysOverdue} дней
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Истек: {formatDate(doc.expiryDate)}
-                        </p>
+                <div className="space-y-1">
+                  {station.documents.slice(0, 3).map((doc, docIndex) => (
+                    <div
+                      key={docIndex}
+                      className="p-1 bg-red-50 rounded border border-red-200 text-xs">
+                      <div className="font-semibold">{doc.docType}</div>
+                      <div>№ {doc.docNumber}</div>
+                      <div className="text-red-600 font-semibold">
+                        Просрочено на {doc.daysOverdue} дн.
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       )}
     </div>
@@ -845,7 +683,7 @@ export const AnalysisDetails = ({
         return renderControlDifferenceDetails();
       case "expiredDocuments":
         return renderExpiredDocumentsDetails();
-      case "gasAndPayments": // НОВЫЙ СЛУЧАЙ
+      case "gasAndPayments":
         return renderGasAndPaymentsDetails();
       default:
         return null;
@@ -856,7 +694,7 @@ export const AnalysisDetails = ({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-6 bg-white rounded-2xl shadow-lg mb-6">
+      className="p-3 bg-white rounded-xl shadow-lg">
       {renderDetails()}
     </motion.div>
   );
