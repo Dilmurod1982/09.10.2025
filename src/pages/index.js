@@ -45,3 +45,4 @@ export { default as HomeTasischi } from "./HomeTasischi";
 export { default as JobTitle } from "./JobTitle";
 export { default as HomeElectronics } from "./HomeElectronics";
 export { default as MeterReadings } from "./MeterReadings";
+export { default as HomeControlBooker } from "./HomeControlBooker";

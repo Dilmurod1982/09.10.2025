@@ -31,8 +31,9 @@ const GasSettlements = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Проверка роли пользователя
+  const isAdmin = userData?.role === "admin";
   const isRahbar = userData?.role === "rahbar";
-  const canAddGasQuantity = !isRahbar;
+  const canAddGasQuantity = isAdmin; // Только для admin
   const canAddPayment = !isRahbar;
 
   // Годы для выбора
@@ -431,6 +432,14 @@ const GasSettlements = () => {
               </p>
             </div>
           )}
+          {/* {!isAdmin && (
+            <div className="mt-2 p-2 bg-blue-100 border border-blue-300 rounded-lg">
+              <p className="text-blue-800 text-sm">
+                <strong>Информация:</strong> Добавление количества газа доступно
+                только администраторам.
+              </p>
+            </div>
+          )} */}
         </div>
 
         {/* Панель управления */}
@@ -490,7 +499,7 @@ const GasSettlements = () => {
               </select>
             </div>
 
-            {/* Кнопки действий - скрыта для rahbar */}
+            {/* Кнопки действий - только для admin */}
             {canAddGasQuantity && (
               <div className="flex items-end gap-2">
                 <button
@@ -584,7 +593,7 @@ const GasSettlements = () => {
           </div>
 
           {/* Информация о синхронизации */}
-          {settlements.length > 0 && selectedYear && selectedMonth && (
+          {/* {settlements.length > 0 && selectedYear && selectedMonth && (
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-blue-800 text-sm">
                 <strong>Синхронизация сальдо:</strong>
@@ -594,7 +603,7 @@ const GasSettlements = () => {
                 обновляет сальдо для всех месяцев с данными
               </p>
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Индикатор загрузки */}
@@ -752,7 +761,7 @@ const GasSettlements = () => {
           )}
       </div>
 
-      {/* Модальное окно добавления количества газа - скрыто для rahbar */}
+      {/* Модальное окно добавления количества газа - только для admin */}
       <AnimatePresence>
         {showAddModal && canAddGasQuantity && (
           <AddGasQuantityModal

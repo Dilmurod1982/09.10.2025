@@ -12,6 +12,8 @@ import { db } from "../firebase/config";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import AddMeterResetModal from "../components/AddMeterResetModal";
+import { useAppStore } from "../lib/zustand"; // Импортируем хранилище
+import * as XLSX from "xlsx"; // Импортируем библиотеку для Excel
 
 const MeterReadings = () => {
   const [resetEvents, setResetEvents] = useState([]);
@@ -24,6 +26,11 @@ const MeterReadings = () => {
     month: "",
     date: "",
   });
+
+  // Получаем данные пользователя из хранилища
+  const userData = useAppStore((state) => state.userData);
+  const role = userData?.role;
+  const isAdmin = role === "electrengineer";
 
   // Загрузка станций
   useEffect(() => {
@@ -105,6 +112,12 @@ const MeterReadings = () => {
   }, [filters]);
 
   const handleDelete = async (id) => {
+    // Проверяем права доступа
+    if (!isAdmin) {
+      toast.error("У вас нет прав для удаления");
+      return;
+    }
+
     if (
       !window.confirm("Вы уверены, что хотите удалить это событие обнуления?")
     ) {
@@ -140,6 +153,62 @@ const MeterReadings = () => {
     });
   };
 
+  // Функция для экспорта в Excel
+  const exportToExcel = () => {
+    if (resetEvents.length === 0) {
+      toast.error("Нет данных для экспорта");
+      return;
+    }
+
+    try {
+      // Подготавливаем данные для экспорта
+      const excelData = resetEvents.map((event, index) => ({
+        "№": index + 1,
+        "Дата обнуления": event.resetDate,
+        Станция: event.stationName,
+        Шланг: event.hose,
+        "Показание с отчета": event.lastReadingFromReport || "Нет данных",
+        "Показание перед обнулением": event.lastReadingBeforeReset,
+        "Новое показание": event.newReadingAfterReset,
+        Разница:
+          event.lastReadingBeforeReset - (event.lastReadingFromReport || 0),
+        Примечание: event.note || "",
+      }));
+
+      // Создаем новую книгу
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(excelData);
+
+      // Настраиваем ширину колонок
+      const colWidths = [
+        { wch: 5 }, // №
+        { wch: 12 }, // Дата обнуления
+        { wch: 20 }, // Станция
+        { wch: 8 }, // Шланг
+        { wch: 18 }, // Показание с отчета
+        { wch: 22 }, // Показание перед обнулением
+        { wch: 15 }, // Новое показание
+        { wch: 10 }, // Разница
+        { wch: 25 }, // Примечание
+      ];
+      ws["!cols"] = colWidths;
+
+      // Добавляем лист в книгу
+      XLSX.utils.book_append_sheet(wb, ws, "Обнуления счетчиков");
+
+      // Генерируем имя файла с текущей датой
+      const date = new Date().toISOString().split("T")[0];
+      const fileName = `Обнуления_счетчиков_${date}.xlsx`;
+
+      // Сохраняем файл
+      XLSX.writeFile(wb, fileName);
+      toast.success("Данные успешно экспортированы в Excel");
+    } catch (error) {
+      console.error("Ошибка при экспорте в Excel:", error);
+      toast.error("Ошибка при экспорте данных");
+    }
+  };
+
   // Генерация годов и месяцев для фильтров
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
@@ -169,6 +238,12 @@ const MeterReadings = () => {
           <p className="text-gray-600 mt-2">
             Учет обнулений показаний счетчиков шлангов
           </p>
+
+          {/* <div className="mt-2">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              Роль: {role}
+            </span>
+          </div> */}
         </div>
 
         {/* Фильтры */}
@@ -245,19 +320,60 @@ const MeterReadings = () => {
             </div>
 
             {/* Кнопки */}
-            <div className="flex items-end">
+            <div className="flex items-end space-x-2">
               <button
                 onClick={clearFilters}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 mr-2">
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200">
                 Сбросить
               </button>
+
+              {/* Кнопка Excel */}
               <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                + Добавить обнуление
+                onClick={exportToExcel}
+                disabled={resetEvents.length === 0}
+                className="px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="currentColor"
+                  viewBox="0 0 16 16">
+                  <path d="M5.884 6.68a.5.5 0 0 0-.772.63L8 11.154l2.888-3.844a.5.5 0 0 0-.772-.63L8 9.846l-2.116-2.166z" />
+                  <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z" />
+                </svg>
+                Excel
               </button>
+
+              {/* Кнопка добавления - только для admin */}
+              {isAdmin && (
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                  + Добавить обнуление
+                </button>
+              )}
             </div>
           </div>
+        </div>
+
+        {/* Информация о количестве записей */}
+        <div className="mb-4 flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            Найдено записей:{" "}
+            <span className="font-semibold">{resetEvents.length}</span>
+          </div>
+          {/* {resetEvents.length > 0 && (
+            <button
+              onClick={exportToExcel}
+              className="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center">
+              <svg
+                className="w-4 h-4 mr-1"
+                fill="currentColor"
+                viewBox="0 0 16 16">
+                <path d="M5.884 6.68a.5.5 0 0 0-.772.63L8 11.154l2.888-3.844a.5.5 0 0 0-.772-.63L8 9.846l-2.116-2.166z" />
+                <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z" />
+              </svg>
+              Скачать Excel
+            </button>
+          )} */}
         </div>
 
         {/* Таблица */}
@@ -292,9 +408,13 @@ const MeterReadings = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Новое показание
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Действия
-                    </th>
+
+                    {/* Столбец действий показываем только для admin */}
+                    {isAdmin && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Действия
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -322,13 +442,17 @@ const MeterReadings = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {event.newReadingAfterReset.toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleDelete(event.id)}
-                          className="text-red-600 hover:text-red-900">
-                          Удалить
-                        </button>
-                      </td>
+
+                      {/* Кнопка удаления - только для admin */}
+                      {isAdmin && (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => handleDelete(event.id)}
+                            className="text-red-600 hover:text-red-900 transition-colors duration-200">
+                            Удалить
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -346,13 +470,15 @@ const MeterReadings = () => {
         </div>
       </div>
 
-      {/* Модальное окно добавления */}
-      <AddMeterResetModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onSaved={loadResetEvents}
-        stations={stations}
-      />
+      {/* Модальное окно добавления - только для admin */}
+      {isAdmin && (
+        <AddMeterResetModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onSaved={loadResetEvents}
+          stations={stations}
+        />
+      )}
     </div>
   );
 };

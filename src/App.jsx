@@ -47,6 +47,7 @@ import {
   JobTitle,
   HomeElectronics,
   MeterReadings,
+  HomeControlBooker,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -110,6 +111,8 @@ function App() {
     if (!hasAccess(role, allowedRoles)) {
       // Перенаправляем в зависимости от роли
       if (role === "rahbar") return <Navigate to="/homechief" replace />;
+      if (role === "nazoratbux")
+        return <Navigate to="/homecontrolbooker" replace />;
       if (role === "buxgalter") return <Navigate to="/homebooker" replace />;
       if (role === "operator") return <Navigate to="/homeoperator" replace />;
       if (role === "tasischi") return <Navigate to="/hometasischi" replace />;
@@ -174,7 +177,7 @@ function App() {
           path: "/compressors",
           element: (
             <ProtectedLayout
-              allowedRoles={["admin"]}
+              allowedRoles={["admin", "nazoratbux"]}
               element={<Compressors />}
             />
           ),
@@ -183,7 +186,7 @@ function App() {
           path: "/dispensers",
           element: (
             <ProtectedLayout
-              allowedRoles={["admin"]}
+              allowedRoles={["admin", "nazoratbux"]}
               element={<Dispensers />}
             />
           ),
@@ -191,13 +194,19 @@ function App() {
         {
           path: "/osushka",
           element: (
-            <ProtectedLayout allowedRoles={["admin"]} element={<Osushka />} />
+            <ProtectedLayout
+              allowedRoles={["admin", "nazoratbux"]}
+              element={<Osushka />}
+            />
           ),
         },
         {
           path: "/chillers",
           element: (
-            <ProtectedLayout allowedRoles={["admin"]} element={<Chillers />} />
+            <ProtectedLayout
+              allowedRoles={["admin", "nazoratbux"]}
+              element={<Chillers />}
+            />
           ),
         },
         {
@@ -291,6 +300,15 @@ function App() {
           ),
         },
         {
+          path: "//homecontrolbooker",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["nazoratbux"]}
+              element={<HomeControlBooker />}
+            />
+          ),
+        },
+        {
           path: "/partnerslist",
           element: (
             <ProtectedLayout
@@ -330,7 +348,7 @@ function App() {
           path: "/stationdocs/:id",
           element: (
             <ProtectedLayout
-              allowedRoles={["admin", "rahbar", "buxgalter"]}
+              allowedRoles={["admin", "rahbar", "buxgalter", "nazoratbux"]}
               element={<StationDocs />}
             />
           ),
@@ -339,7 +357,7 @@ function App() {
           path: "/stationdocsinf/:id",
           element: (
             <ProtectedLayout
-              allowedRoles={["admin", "rahbar", "buxgalter"]}
+              allowedRoles={["admin", "rahbar", "buxgalter", "nazoratbux"]}
               element={<StationDocsInf />}
             />
           ),
@@ -413,7 +431,7 @@ function App() {
           path: "/controlpayments",
           element: (
             <ProtectedLayout
-              allowedRoles={["buxgalter"]}
+              allowedRoles={["buxgalter", "nazoratbux"]}
               element={<ControlPayments />}
             />
           ),
@@ -440,7 +458,7 @@ function App() {
           path: "/meterreadings",
           element: (
             <ProtectedLayout
-              allowedRoles={["electrengineer", "admin"]}
+              allowedRoles={["electrengineer", "admin", "nazoratbux"]}
               element={<MeterReadings />}
             />
           ),
@@ -449,7 +467,13 @@ function App() {
           path: "/reportondebtspartners",
           element: (
             <ProtectedLayout
-              allowedRoles={["buxgalter", "operator", "admin", "rahbar"]}
+              allowedRoles={[
+                "buxgalter",
+                "operator",
+                "admin",
+                "rahbar",
+                "nazoratbux",
+              ]}
               element={<ReportOnDebtsPartners />}
             />
           ),

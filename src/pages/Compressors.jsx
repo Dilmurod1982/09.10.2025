@@ -29,8 +29,10 @@ import {
   Hash,
   Clock,
 } from "lucide-react";
+import { useAppStore } from "../lib/zustand"; // Импортируем хранилище
 
 const Compressors = () => {
+  const userData = useAppStore((state) => state.userData);
   const [compressors, setCompressors] = useState([]);
   const [typeCompressors, setTypeCompressors] = useState([]);
   const [selectedCompressor, setSelectedCompressor] = useState(null);
@@ -40,6 +42,9 @@ const Compressors = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
+
+  // Проверка роли пользователя
+  const isAdmin = userData?.role === "admin";
 
   // Данные для нового компрессора
   const [newCompressor, setNewCompressor] = useState({
@@ -305,6 +310,10 @@ const Compressors = () => {
 
   // Открытие модального окна для создания компрессора
   const handleCreateCompressor = () => {
+    if (!isAdmin) {
+      alert("Сизда компрессор қўшиш учун рухсат йўқ");
+      return;
+    }
     setIsCreating(true);
     setIsModalOpen(true);
     setNewCompressor({
@@ -333,11 +342,20 @@ const Compressors = () => {
 
   // Редактирование компрессора
   const handleEdit = () => {
+    if (!isAdmin) {
+      alert("Сизда компрессорни таҳрирлаш учун рухсат йўқ");
+      return;
+    }
     setIsEditMode(true);
   };
 
   // Сохранение изменений
   const handleSave = async () => {
+    if (!isAdmin) {
+      alert("Сизда сақлаш учун рухсат йўқ");
+      return;
+    }
+
     const isValid = checkFormValidity() && isManufactureYearValid();
     if (!isValid) return;
 
@@ -373,6 +391,11 @@ const Compressors = () => {
 
   // Удаление компрессора
   const handleDelete = async (compressorId) => {
+    if (!isAdmin) {
+      alert("Сизда компрессорни ўчириш учун рухсат йўқ");
+      return;
+    }
+
     if (window.confirm("Сиз мазкур компрессорни ўчиришга аминмисиз?")) {
       try {
         await deleteDoc(doc(db, "compressors", compressorId));
@@ -447,16 +470,28 @@ const Compressors = () => {
           <p className="text-gray-600">
             Компрессорларни бошқариш ва уларни харакат тарихи
           </p>
+          {/* Информация о правах доступа */}
+          {/* {!isAdmin && (
+            <div className="mt-2 p-2 bg-blue-100 border border-blue-300 rounded-lg">
+              <p className="text-blue-800 text-sm">
+                <strong>Информация:</strong> Компрессор қўшиш, таҳрирлаш ва
+                ўчириш фақат администраторлар учун рухсат этилган.
+              </p>
+            </div>
+          )} */}
         </div>
 
-        <motion.button
-          className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 w-full lg:w-auto justify-center"
-          onClick={handleCreateCompressor}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}>
-          <Plus size={20} />
-          Компрессор қўшиш
-        </motion.button>
+        {/* Кнопка добавления - только для admin */}
+        {isAdmin && (
+          <motion.button
+            className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 w-full lg:w-auto justify-center"
+            onClick={handleCreateCompressor}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}>
+            <Plus size={20} />
+            Компрессор қўшиш
+          </motion.button>
+        )}
       </motion.div>
 
       {/* Поиск и фильтры */}
@@ -581,14 +616,17 @@ const Compressors = () => {
                         title="Кўриш">
                         <Edit size={16} />
                       </motion.button>
-                      <motion.button
-                        onClick={() => handleDelete(compressor.id)}
-                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        title="Ўчириш">
-                        <Trash2 size={16} />
-                      </motion.button>
+                      {/* Кнопка удаления - только для admin */}
+                      {isAdmin && (
+                        <motion.button
+                          onClick={() => handleDelete(compressor.id)}
+                          className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          title="Ўчириш">
+                          <Trash2 size={16} />
+                        </motion.button>
+                      )}
                     </div>
                   </td>
                 </motion.tr>
@@ -614,7 +652,7 @@ const Compressors = () => {
                 ? "Қидириш шартини ўзгартириб кўринг"
                 : "Биринчи компрессорни қўшишдан бошланг"}
             </p>
-            {!searchTerm && (
+            {!searchTerm && isAdmin && (
               <button
                 onClick={handleCreateCompressor}
                 className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors">

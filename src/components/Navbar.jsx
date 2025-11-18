@@ -512,7 +512,7 @@ export default function Navbar() {
     },
   ];
 
-  // ⚙️ Фильтрация пунктов по роли
+  // ⚙️ Фильтрация пунктов по роли - ИСПРАВЛЕННАЯ ВЕРСИЯ
   const filteredMenuItems =
     role === "admin"
       ? menuItems
@@ -528,6 +528,10 @@ export default function Navbar() {
             item.text !== "Фойдаланувчилар" &&
             item.text !== "Колонка кўрсаткичларини ўзгартириш"
         )
+      : role === "nazoratbux"
+      ? menuItems.filter(
+          (item) => item.text === "Колонка кўрсаткичларини ўзгартириш"
+        )
       : role === "operator"
       ? menuItems.filter(
           (item) =>
@@ -536,7 +540,8 @@ export default function Navbar() {
         )
       : [];
 
-  const isRahbarOrBooker = role === "rahbar" || role === "buxgalter";
+  const isRahbarOrBooker =
+    role === "rahbar" || role === "buxgalter" || role === "nazoratbux";
 
   const getRoleBadge = () => {
     const roleConfig = {
@@ -545,6 +550,7 @@ export default function Navbar() {
       operator: { color: "#3b82f6", text: "Оператор" },
       rahbar: { color: "#8b5cf6", text: "Рахбар" },
       electrengineer: { color: "#f59e0b", text: "Электр инженер" },
+      nazoratbux: { color: "#ec4899", text: "Назорат бухгалтер" },
     };
 
     const config = roleConfig[role] || { color: "#6b7280", text: role };
@@ -578,12 +584,13 @@ export default function Navbar() {
           boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
         }}>
         <Toolbar sx={{ minHeight: { xs: "64px", md: "70px" } }}>
-          {/* Показываем кнопку меню для admin, buxgalter, operator, rahbar и electrengineer */}
+          {/* Показываем кнопку меню для admin, buxgalter, operator, rahbar, electrengineer и nazoratbux */}
           {role === "admin" ||
           role === "buxgalter" ||
           role === "operator" ||
           role === "rahbar" ||
-          role === "electrengineer" ? (
+          role === "electrengineer" ||
+          role === "nazoratbux" ? (
             <IconButton
               size="large"
               edge="start"
@@ -914,7 +921,8 @@ export default function Navbar() {
         role === "buxgalter" ||
         role === "operator" ||
         role === "rahbar" ||
-        role === "electrengineer") && (
+        role === "electrengineer" ||
+        role === "nazoratbux") && (
         <Drawer
           anchor="left"
           open={drawerOpen}
@@ -972,11 +980,12 @@ export default function Navbar() {
             {/* Содержимое меню */}
             <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
               <List sx={{ padding: "8px" }}>
-                {/* 🔹 Основные пункты (для admin, buxgalter, rahbar и electrengineer) */}
+                {/* 🔹 Основные пункты (для admin, buxgalter, rahbar, electrengineer и nazoratbux) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "rahbar" ||
-                  role === "electrengineer") && (
+                  role === "electrengineer" ||
+                  role === "nazoratbux") && (
                   <>
                     {filteredMenuItems.map((item, index) => (
                       <motion.div
@@ -1015,10 +1024,11 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Расчеты по энергоносителям (для admin, buxgalter, rahbar) */}
+                {/* 🔹 Расчеты по энергоносителям (для admin, buxgalter, rahbar, nazoratbux) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
-                  role === "rahbar") && (
+                  role === "rahbar" ||
+                  role === "nazoratbux") && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
                       <ListItemButton
@@ -1085,11 +1095,12 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Партнеры (для admin, buxgalter, rahbar, operator) */}
+                {/* 🔹 Партнеры (для admin, buxgalter, rahbar, operator, nazoratbux) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "rahbar" ||
-                  role === "operator") && (
+                  role === "operator" ||
+                  role === "nazoratbux") && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
                       <ListItemButton
@@ -1116,9 +1127,15 @@ export default function Navbar() {
                       <List component="div" disablePadding>
                         {partnersItems
                           .filter((item) => {
+                            // Для nazoratbux показываем только "Ҳамкорлар қарздорлиги"
+                            if (role === "nazoratbux") {
+                              return item.text === "Ҳамкорлар қарздорлиги";
+                            }
+                            // Для operator и rahbar показываем только "Ҳамкорлар қарздорлиги"
                             if (role === "operator" || role === "rahbar") {
                               return item.text === "Ҳамкорлар қарздорлиги";
                             }
+                            // Для admin и buxgalter показываем все
                             return true;
                           })
                           .map((item) => (
@@ -1159,11 +1176,12 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Ежедневные отчеты (для admin, buxgalter, operator, rahbar) */}
+                {/* 🔹 Ежедневные отчеты (для admin, buxgalter, operator, rahbar, nazoratbux) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "operator" ||
-                  role === "rahbar") && (
+                  role === "rahbar" ||
+                  role === "nazoratbux") && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
                       <ListItemButton
@@ -1193,9 +1211,15 @@ export default function Navbar() {
                       <List component="div" disablePadding>
                         {dailyReportsItems
                           .filter((item) => {
+                            // Для nazoratbux показываем ВСЕ пункты (включая "Назорат суммалар")
+                            if (role === "nazoratbux") {
+                              return true;
+                            }
+                            // Для operator показываем только "Кундалик ҳисобот"
                             if (role === "operator") {
                               return item.text !== "Назорат суммалар";
                             }
+                            // Для остальных показываем все
                             return true;
                           })
                           .map((item) => (
@@ -1236,7 +1260,7 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Документы (для admin и buxgalter) */}
+                {/* 🔹 Документы (для admin и nazoratbux) */}
                 {role === "admin" && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
@@ -1426,67 +1450,9 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Остальные меню только для admin */}
-                {role === "admin" && (
+                {/* 🔹 Оборудование (для admin и nazoratbux) */}
+                {(role === "admin" || role === "nazoratbux") && (
                   <>
-                    {/* Регионы */}
-                    <ListItem disablePadding sx={{ mb: 1 }}>
-                      <ListItemButton
-                        onClick={handleRegionsClick}
-                        sx={{
-                          borderRadius: "12px",
-                          py: 1.5,
-                          transition: "all 0.3s ease",
-                          "&:hover": {
-                            backgroundColor: "rgba(255,255,255,0.1)",
-                          },
-                        }}>
-                        <ListItemIcon sx={{ color: "white" }}>
-                          <MapIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="🗺️ Худудлар"
-                          primaryTypographyProps={{ fontWeight: "500" }}
-                        />
-                        {regionsOpen ? <ExpandLess /> : <ExpandMore />}
-                      </ListItemButton>
-                    </ListItem>
-                    <Collapse in={regionsOpen} timeout="auto" unmountOnExit>
-                      <List component="div" disablePadding>
-                        {regionsItems.map((item) => (
-                          <ListItem
-                            key={item.text}
-                            disablePadding
-                            sx={{ pl: 2 }}>
-                            <ListItemButton
-                              onClick={() => handleMenuClick(item.path)}
-                              sx={{
-                                borderRadius: "8px",
-                                py: 1.2,
-                                transition: "all 0.3s ease",
-                                "&:hover": {
-                                  backgroundColor: "rgba(255,255,255,0.08)",
-                                  transform: "translateX(5px)",
-                                },
-                              }}>
-                              <ListItemIcon
-                                sx={{ color: "rgba(255,255,255,0.8)" }}>
-                                {item.icon}
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={item.text}
-                                primaryTypographyProps={{
-                                  fontSize: "14px",
-                                  color: "rgba(255,255,255,0.9)",
-                                }}
-                              />
-                            </ListItemButton>
-                          </ListItem>
-                        ))}
-                      </List>
-                    </Collapse>
-
-                    {/* Оборудование */}
                     <ListItem disablePadding sx={{ mb: 1 }}>
                       <ListItemButton
                         onClick={handleEquipmentClick}
