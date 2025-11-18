@@ -1106,7 +1106,7 @@ export default function Navbar() {
                           <HandshakeIcon />
                         </ListItemIcon>
                         <ListItemText
-                          primary="🤝 Партнёры"
+                          primary="🤝 Ҳамкорлар"
                           primaryTypographyProps={{ fontWeight: "500" }}
                         />
                         {partnersOpen ? <ExpandLess /> : <ExpandMore />}
