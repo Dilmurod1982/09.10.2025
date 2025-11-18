@@ -103,7 +103,7 @@ export const useAppStore = create((set, get) => ({
     state.clearLogoutTimer();
     const SESSION_TIMEOUT = 10 * 60 * 1000; // 🔹 10 минут
     const timer = setTimeout(() => {
-      state.performLogout("Сеанс завершен из-за неактивности");
+      state.performLogout("Актив бўлмаганингиз учун сеанс тугатилди!");
     }, SESSION_TIMEOUT);
     set({ logoutTimer: timer });
   },
