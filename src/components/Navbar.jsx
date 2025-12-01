@@ -160,7 +160,7 @@ export default function Navbar() {
   const signOutProfile = async () => {
     await signOut(auth);
     setUser(null);
-    toast.success("До свидания!");
+    toast.success("Қўришганда кўришгунча хайр!");
   };
 
   const toggleDrawer = (open) => (event) => {
