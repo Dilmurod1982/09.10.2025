@@ -397,7 +397,9 @@ const ReportOnDebtsPartners = () => {
 
     ws["!cols"] = colWidths;
 
-    const fileName = `Задолженности_партнеров_${selectedPeriod}_${selectedYear}`;
+    // ФИКС: Используем let вместо const для fileName
+    let fileName = `Задолженности_партнеров_${selectedPeriod}_${selectedYear}`;
+
     if (selectedMonth) fileName += `_${selectedMonth}`;
     if (selectedQuarter) fileName += `_${selectedQuarter}`;
 
