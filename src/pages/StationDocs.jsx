@@ -275,10 +275,24 @@ const StationDocs = () => {
           {filteredDocs.map((d) => (
             <div
               key={d.id}
-              className={`rounded-lg p-4 shadow hover:shadow-md transition border ${d.color} bg-white`}>
+              className={`rounded-lg p-4 shadow hover:shadow-md transition border ${d.color}`}>
               <div className="flex justify-between items-center mb-3">
                 <h2 className="font-medium text-lg text-gray-800">{d.name}</h2>
-                <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+                <div className="flex items-center gap-2">
+                  {/* Цветной индикатор статуса */}
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      d.diffDays < 0
+                        ? "bg-red-500"
+                        : d.diffDays <= 5
+                        ? "bg-yellow-500"
+                        : d.diffDays <= 15
+                        ? "bg-orange-500"
+                        : d.diffDays <= 30
+                        ? "bg-green-500"
+                        : "bg-gray-300"
+                    }`}></div>
+                </div>
               </div>
               <p className="text-sm text-gray-600">
                 <b>Выдан:</b> {d.issueDate}
