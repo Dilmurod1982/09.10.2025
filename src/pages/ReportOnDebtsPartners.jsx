@@ -28,7 +28,7 @@ const ReportOnDebtsPartners = () => {
   const yearOptions = useMemo(() => {
     const options = [];
     const currentYear = new Date().getFullYear();
-    const startYear = 2025; // Начальный год
+    const startYear = 2025;
 
     for (let year = startYear; year <= currentYear; year++) {
       options.push({ value: year.toString(), label: year.toString() });
@@ -61,6 +61,55 @@ const ReportOnDebtsPartners = () => {
     { value: "IV", label: "IV квартал (октябрь-декабрь)" },
   ];
 
+  // Рассчет итоговых значений
+  const calculateTotals = useMemo(() => {
+    if (!reportData.length) {
+      return {
+        totalStartBalance: 0,
+        totalSoldAmount: 0,
+        totalPaid: 0,
+        totalEndBalance: 0,
+        totalDebtStart: 0,
+        totalDebtEnd: 0,
+        totalPrepaymentStart: 0,
+        totalPrepaymentEnd: 0,
+      };
+    }
+
+    return reportData.reduce(
+      (acc, partner) => {
+        const startBalance = parseFloat(partner.startBalance) || 0;
+        const soldAmount = parseFloat(partner.totalSoldAmount) || 0;
+        const paid = parseFloat(partner.totalPaid) || 0;
+        const endBalance = parseFloat(partner.endBalance) || 0;
+
+        acc.totalStartBalance += startBalance;
+        acc.totalSoldAmount += soldAmount;
+        acc.totalPaid += paid;
+        acc.totalEndBalance += endBalance;
+
+        if (startBalance > 0) acc.totalDebtStart += startBalance;
+        if (endBalance > 0) acc.totalDebtEnd += endBalance;
+
+        if (startBalance < 0)
+          acc.totalPrepaymentStart += Math.abs(startBalance);
+        if (endBalance < 0) acc.totalPrepaymentEnd += Math.abs(endBalance);
+
+        return acc;
+      },
+      {
+        totalStartBalance: 0,
+        totalSoldAmount: 0,
+        totalPaid: 0,
+        totalEndBalance: 0,
+        totalDebtStart: 0,
+        totalDebtEnd: 0,
+        totalPrepaymentStart: 0,
+        totalPrepaymentEnd: 0,
+      }
+    );
+  }, [reportData]);
+
   // Загрузка станций
   useEffect(() => {
     const fetchStations = async () => {
@@ -74,22 +123,24 @@ const ReportOnDebtsPartners = () => {
 
         setStations(matched);
       } catch (error) {
-        toast.error(error);
+        toast.error(error.message || "Ошибка загрузки станций");
       }
     };
 
     fetchStations();
   }, [userData]);
 
-  // Загрузка контрактов
+  // Загрузка контрактов с обработкой ошибок индекса
   useEffect(() => {
     const fetchContracts = async () => {
       if (!userData?.stations?.length) return;
 
       try {
+        // Пробуем запрос с where и orderBy
         const contractsQuery = query(
           collection(db, "contracts"),
-          where("stationId", "in", userData.stations)
+          where("stationId", "in", userData.stations),
+          orderBy("autoId")
         );
 
         const snapshot = await getDocs(contractsQuery);
@@ -100,7 +151,44 @@ const ReportOnDebtsPartners = () => {
 
         setContracts(contractsData);
       } catch (error) {
-        toast.error(error);
+        if (
+          error.code === "failed-precondition" ||
+          error.message.includes("index")
+        ) {
+          // console.log(
+          //   "Индекс не найден, загружаем без фильтрации на сервере..."
+          // );
+
+          try {
+            // Загружаем все контракты без фильтрации
+            const contractsQuery = query(collection(db, "contracts"));
+            const snapshot = await getDocs(contractsQuery);
+
+            // Фильтруем и сортируем на клиенте
+            const contractsData = snapshot.docs
+              .map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+              }))
+              .filter((contract) =>
+                userData.stations.includes(contract.stationId)
+              )
+              .sort((a, b) => {
+                const autoIdA = a.autoId || 0;
+                const autoIdB = b.autoId || 0;
+                return autoIdA - autoIdB;
+              });
+
+            setContracts(contractsData);
+
+            // Показываем информационное сообщение
+            // toast.success("Данные загружены (фильтрация на клиенте)");
+          } catch (clientError) {
+            toast.error("Ошибка загрузки контрактов: " + clientError.message);
+          }
+        } else {
+          toast.error("Ошибка загрузки контрактов: " + error.message);
+        }
       }
     };
 
@@ -119,7 +207,7 @@ const ReportOnDebtsPartners = () => {
         if (!month) return { startDate: "", endDate: "" };
         const monthNum = parseInt(month);
         startDate = new Date(yearNum, monthNum - 1, 1);
-        endDate = new Date(yearNum, monthNum, 0); // Последний день месяца
+        endDate = new Date(yearNum, monthNum, 0);
         break;
 
       case "quarter":
@@ -128,20 +216,20 @@ const ReportOnDebtsPartners = () => {
 
         switch (quarter) {
           case "I":
-            quarterStartMonth = 0; // Январь
-            quarterEndMonth = 3; // Апрель
+            quarterStartMonth = 0;
+            quarterEndMonth = 3;
             break;
           case "II":
-            quarterStartMonth = 3; // Апрель
-            quarterEndMonth = 6; // Июль
+            quarterStartMonth = 3;
+            quarterEndMonth = 6;
             break;
           case "III":
-            quarterStartMonth = 6; // Июль
-            quarterEndMonth = 9; // Октябрь
+            quarterStartMonth = 6;
+            quarterEndMonth = 9;
             break;
           case "IV":
-            quarterStartMonth = 9; // Октябрь
-            quarterEndMonth = 12; // Январь следующего года
+            quarterStartMonth = 9;
+            quarterEndMonth = 12;
             break;
           default:
             quarterStartMonth = 0;
@@ -167,7 +255,7 @@ const ReportOnDebtsPartners = () => {
     };
   };
 
-  // Расчет данных отчета
+  // Расчет данных отчета с сортировкой по autoId
   useEffect(() => {
     if (!selectedPeriod || !selectedYear) {
       setReportData([]);
@@ -192,7 +280,6 @@ const ReportOnDebtsPartners = () => {
           selectedQuarter
         );
 
-        // Определяем ID станций для запроса
         let stationIds = [];
         if (selectedStation) {
           stationIds = [selectedStation];
@@ -205,15 +292,12 @@ const ReportOnDebtsPartners = () => {
           return;
         }
 
-        // Фильтруем контракты по выбранным станциям
         const filteredContracts = contracts.filter((contract) =>
           stationIds.includes(contract.stationId)
         );
 
-        // Собираем данные по партнерам
         const partnerReportData = {};
 
-        // Обрабатываем каждый контракт
         filteredContracts.forEach((contract) => {
           const {
             id: contractId,
@@ -222,28 +306,24 @@ const ReportOnDebtsPartners = () => {
             startBalance,
             startBalanceDate,
             transactions = [],
+            autoId = 0,
           } = contract;
 
-          // Пропускаем контракты без startBalanceDate
           if (!startBalanceDate) return;
 
           const startBalanceDateObj = new Date(startBalanceDate);
           const periodStartDateObj = new Date(startDate);
           const periodEndDateObj = new Date(endDate);
 
-          // Если startBalanceDate позже конца периода, пропускаем
           if (startBalanceDateObj > periodEndDateObj) return;
 
-          // Рассчитываем начальное сальдо на начало периода
           let currentBalance = parseFloat(startBalance) || 0;
           let totalSoldAmount = 0;
           let totalPaid = 0;
 
-          // Обрабатываем транзакции до начала периода (для накопления сальдо)
           transactions.forEach((transaction) => {
             const transactionDate = new Date(transaction.reportDate);
 
-            // Если транзакция до начала периода, добавляем к начальному сальдо
             if (transactionDate < periodStartDateObj) {
               const soldAmount = parseFloat(transaction.totalAmount) || 0;
               const payment = parseFloat(transaction.paymentSum) || 0;
@@ -252,11 +332,9 @@ const ReportOnDebtsPartners = () => {
             }
           });
 
-          // Теперь обрабатываем транзакции в пределах периода
           transactions.forEach((transaction) => {
             const transactionDate = new Date(transaction.reportDate);
 
-            // Если транзакция в пределах периода
             if (
               transactionDate >= periodStartDateObj &&
               transactionDate <= periodEndDateObj
@@ -270,26 +348,31 @@ const ReportOnDebtsPartners = () => {
             }
           });
 
-          // Добавляем данные в отчет
           if (!partnerReportData[contractId]) {
             partnerReportData[contractId] = {
               contractId,
               partnerName: partner,
               contractNumber,
-              startBalance: currentBalance - totalSoldAmount + totalPaid, // Сальдо на начало периода
+              startBalance: currentBalance - totalSoldAmount + totalPaid,
               totalSoldAmount,
               totalPaid,
               endBalance: currentBalance,
+              autoId: autoId || 0,
             };
           }
         });
 
-        // Преобразуем в массив
-        const reportArray = Object.values(partnerReportData);
+        // Преобразуем в массив и сортируем по autoId
+        const reportArray = Object.values(partnerReportData).sort((a, b) => {
+          const autoIdComparison = (a.autoId || 0) - (b.autoId || 0);
+          if (autoIdComparison !== 0) return autoIdComparison;
+
+          return (a.partnerName || "").localeCompare(b.partnerName || "");
+        });
 
         setReportData(reportArray);
       } catch (error) {
-        toast.error("Ошибка при генерации отчета");
+        toast.error(error.message || "Ошибка при генерации отчета");
         setReportData([]);
       } finally {
         setLoading(false);
@@ -307,13 +390,11 @@ const ReportOnDebtsPartners = () => {
     contracts,
   ]);
 
-  // Сброс зависимых фильтров при изменении периода
   useEffect(() => {
     setSelectedMonth("");
     setSelectedQuarter("");
   }, [selectedPeriod]);
 
-  // Форматирование чисел
   const formatNumber = (number) => {
     const num = parseFloat(number) || 0;
     return num.toLocaleString("ru-RU", {
@@ -322,7 +403,6 @@ const ReportOnDebtsPartners = () => {
     });
   };
 
-  // Экспорт в Excel
   const exportToExcel = () => {
     if (!reportData.length) return;
 
@@ -365,6 +445,7 @@ const ReportOnDebtsPartners = () => {
       [`Даты: ${startDate} - ${endDate}`],
       [],
       [
+        "№",
         "Партнер",
         "Договор",
         "Сальдо на начало периода",
@@ -372,7 +453,8 @@ const ReportOnDebtsPartners = () => {
         "Оплачено",
         "Сальдо на конец периода",
       ],
-      ...reportData.map((partner) => [
+      ...reportData.map((partner, index) => [
+        index + 1,
         partner.partnerName,
         partner.contractNumber,
         partner.startBalance,
@@ -380,6 +462,34 @@ const ReportOnDebtsPartners = () => {
         partner.totalPaid,
         partner.endBalance,
       ]),
+      [],
+      [
+        "",
+        "ВСЕГО",
+        "",
+        calculateTotals.totalStartBalance,
+        calculateTotals.totalSoldAmount,
+        calculateTotals.totalPaid,
+        calculateTotals.totalEndBalance,
+      ],
+      [
+        "",
+        "Всего задолженность",
+        "",
+        calculateTotals.totalDebtStart,
+        "",
+        "",
+        calculateTotals.totalDebtEnd,
+      ],
+      [
+        "",
+        "Всего предоплата",
+        "",
+        calculateTotals.totalPrepaymentStart,
+        "",
+        "",
+        calculateTotals.totalPrepaymentEnd,
+      ],
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
@@ -387,48 +497,44 @@ const ReportOnDebtsPartners = () => {
     XLSX.utils.book_append_sheet(wb, ws, "Задолженности партнеров");
 
     const colWidths = [
-      { wch: 25 }, // Партнер
-      { wch: 15 }, // Договор
-      { wch: 20 }, // Сальдо на начало
-      { wch: 20 }, // Продано сумма
-      { wch: 15 }, // Оплачено
-      { wch: 20 }, // Сальдо на конец
+      { wch: 5 },
+      { wch: 40 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 20 },
     ];
 
     ws["!cols"] = colWidths;
 
-    // ФИКС: Используем let вместо const для fileName
-    let fileName = `Задолженности_партнеров_${selectedPeriod}_${selectedYear}`;
-
-    if (selectedMonth) fileName += `_${selectedMonth}`;
-    if (selectedQuarter) fileName += `_${selectedQuarter}`;
+    const fileName = `Задолженности_партнеров_${selectedPeriod}_${selectedYear}${
+      selectedMonth ? `_${selectedMonth}` : ""
+    }${selectedQuarter ? `_${selectedQuarter}` : ""}`;
 
     XLSX.writeFile(wb, `${fileName}.xlsx`);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Заголовок */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+      <div className="max-w-[100vw] mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
             Отчет по задолженностям партнеров
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 text-sm md:text-base">
             Анализ задолженностей партнеров за поставленный газ
           </p>
         </div>
 
-        {/* Панель управления */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            {/* Выбор станции */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
                 Станция
               </label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={selectedStation}
                 onChange={(e) => setSelectedStation(e.target.value)}>
                 <option value="">Все станции</option>
@@ -440,13 +546,12 @@ const ReportOnDebtsPartners = () => {
               </select>
             </div>
 
-            {/* Выбор периода */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
                 Период *
               </label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}>
                 <option value="">Выберите период...</option>
@@ -458,13 +563,12 @@ const ReportOnDebtsPartners = () => {
               </select>
             </div>
 
-            {/* Выбор года */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
                 Год *
               </label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}>
                 <option value="">Выберите год...</option>
@@ -476,14 +580,13 @@ const ReportOnDebtsPartners = () => {
               </select>
             </div>
 
-            {/* Дополнительные фильтры в зависимости от периода */}
             {selectedPeriod === "month" && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
                   Месяц *
                 </label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}>
                   <option value="">Выберите месяц...</option>
@@ -498,11 +601,11 @@ const ReportOnDebtsPartners = () => {
 
             {selectedPeriod === "quarter" && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
                   Квартал *
                 </label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={selectedQuarter}
                   onChange={(e) => setSelectedQuarter(e.target.value)}>
                   <option value="">Выберите квартал...</option>
@@ -516,59 +619,76 @@ const ReportOnDebtsPartners = () => {
             )}
           </div>
 
-          {/* Кнопка экспорта */}
           <div className="flex justify-end">
             <button
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm md:text-base"
               onClick={exportToExcel}
               disabled={!reportData.length}>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
               Экспорт в Excel
             </button>
           </div>
         </div>
 
-        {/* Индикатор загрузки */}
         {loading && (
           <div className="flex justify-center items-center py-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         )}
 
-        {/* Таблица отчета */}
         {!loading && selectedPeriod && selectedYear && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             {reportData.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        №
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[200px] max-w-[300px]">
                         Партнер
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         Договор
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         Сальдо на начало
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         Продано газа (сумма)
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         Оплачено
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         Сальдо на конец
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {reportData.map((partner) => (
+                    {reportData.map((partner, index) => (
                       <tr
                         key={partner.contractId}
                         className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {partner.partnerName}
+                          {index + 1}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 max-w-[300px] break-words">
+                          <div className="truncate" title={partner.partnerName}>
+                            {partner.partnerName}
+                          </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                           {partner.contractNumber}
@@ -597,6 +717,67 @@ const ReportOnDebtsPartners = () => {
                         </td>
                       </tr>
                     ))}
+
+                    <tr className="bg-gray-50 font-semibold">
+                      <td className="px-4 py-3 text-sm text-gray-900"></td>
+                      <td className="px-4 py-3 text-sm text-gray-500">ВСЕГО</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500"></td>
+                      <td
+                        className={`px-4 py-3 whitespace-nowrap text-sm ${
+                          calculateTotals.totalStartBalance >= 0
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }`}>
+                        {formatNumber(calculateTotals.totalStartBalance)} сўм
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600">
+                        {formatNumber(calculateTotals.totalSoldAmount)} сўм
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600">
+                        {formatNumber(calculateTotals.totalPaid)} сўм
+                      </td>
+                      <td
+                        className={`px-4 py-3 whitespace-nowrap text-sm ${
+                          calculateTotals.totalEndBalance >= 0
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }`}>
+                        {formatNumber(calculateTotals.totalEndBalance)} сўм
+                      </td>
+                    </tr>
+
+                    <tr className="bg-red-50 font-semibold">
+                      <td className="px-4 py-3 text-sm text-gray-900"></td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {" "}
+                        Всего задолженность
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500"></td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-red-600">
+                        {formatNumber(calculateTotals.totalDebtStart)} сўм
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm"></td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm"></td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-red-600">
+                        {formatNumber(calculateTotals.totalDebtEnd)} сўм
+                      </td>
+                    </tr>
+
+                    <tr className="bg-green-50 font-semibold">
+                      <td className="px-4 py-3 text-sm text-gray-900"></td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        Всего предоплата
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500"></td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600">
+                        {formatNumber(calculateTotals.totalPrepaymentStart)} сўм
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm"></td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm"></td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600">
+                        {formatNumber(calculateTotals.totalPrepaymentEnd)} сўм
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -625,7 +806,6 @@ const ReportOnDebtsPartners = () => {
           </div>
         )}
 
-        {/* Сообщение о выборе параметров */}
         {(!selectedPeriod || !selectedYear) && !loading && (
           <div className="text-center py-12">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md mx-auto">

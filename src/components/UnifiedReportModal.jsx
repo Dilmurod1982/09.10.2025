@@ -65,10 +65,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   // Функция для получения данных об обнулениях счетчиков
   const getMeterResetData = useCallback(async (stationId, reportDate) => {
     if (!stationId || !reportDate) {
-      // console.log("Недостаточно данных для поиска обнулений:", {
-      //   stationId,
-      //   reportDate,
-      // });
       return [];
     }
 
@@ -76,13 +72,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       // Конвертируем дату отчета из YYYY-MM-DD в DD-MM-YYYY для поиска
       const [year, month, day] = reportDate.split("-");
       const resetDateFormatted = `${day}-${month}-${year}`;
-
-      // console.log("Поиск обнулений:", {
-      //   stationId,
-      //   reportDate,
-      //   resetDateFormatted,
-      //   stationName: station?.stationName,
-      // });
 
       // Ищем события обнуления для этой станции на дату отчета
       const resetQuery = query(
@@ -97,11 +86,8 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         ...doc.data(),
       }));
 
-      // console.log("Найдены обнуления:", resetEvents.length, resetEvents);
-
       return resetEvents;
     } catch (error) {
-      // console.error("Ошибка загрузки данных обнуления:", error);
       return [];
     }
   }, []);
@@ -149,7 +135,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
       return hasMinus ? `-${formatted}` : formatted;
     } catch (error) {
-      // console.error("Error formatting number:", error, value);
       return String(value);
     }
   };
@@ -168,7 +153,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
       return hasMinus ? -number : number;
     } catch (error) {
-      // console.error("Error parsing number:", error, value);
       return 0;
     }
   };
@@ -193,7 +177,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
       return false;
     } catch (error) {
-      // console.error("Ошибка проверки отчетов:", error);
       return false;
     }
   }, [station?.id, reportDate]);
@@ -202,18 +185,12 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   const loadAndApplyResetData = useCallback(
     async (stationId, reportDate, hasPreviousReport, lastReportSnapshot) => {
       if (!stationId || !reportDate) {
-        // console.log(
-        //   "Пропускаем загрузку обнулений: нет stationId или reportDate"
-        // );
         return [];
       }
 
-      // console.log("Загрузка обнулений для:", { stationId, reportDate });
       const resetEvents = await getMeterResetData(stationId, reportDate);
 
       if (resetEvents.length > 0) {
-        // console.log("Применяем обнуления к шлангам:", resetEvents);
-
         // Обновляем данные шлангов с учетом обнулений
         setHoseRows((prevRows) =>
           prevRows.map((row) => {
@@ -224,7 +201,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
             if (hoseResetEvents.length > 0) {
               const latestReset = hoseResetEvents[0];
-              // console.log(`Применяем обнуление для ${row.hose}:`, latestReset);
 
               return {
                 ...row,
@@ -256,10 +232,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
             }
           })
         );
-      } else {
-        // console.log(
-        //   "Обнуления не найдены, используем данные из последнего отчета"
-        // );
       }
 
       return resetEvents;
@@ -267,13 +239,12 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     [getMeterResetData]
   );
 
-  // Полная функция initializeData
+  // Полная функция initializeData с загрузкой контрактов и сортировкой по autoId
   const initializeData = async () => {
     if (!isOpen || !station?.id) return;
 
     try {
       setLoading(true);
-      // console.log("Инициализация данных для станции:", station.id);
 
       // Загружаем последний объединенный отчет для определения даты
       const lastReportQuery = query(
@@ -292,14 +263,12 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         nextDate = addDays(lastReport.reportDate, 1);
         setReportDate(nextDate);
         setDateDisabled(true);
-        // console.log("Установлена следующая дата отчета:", nextDate);
       } else {
         setReportDate("");
         setDateDisabled(false);
-        // console.log("Предыдущих отчетов не найдено");
       }
 
-      // Загружаем договоры
+      // Загружаем договоры с сортировкой по autoId
       const contractsQuery = query(
         collection(db, "contracts"),
         where("stationId", "==", station.id)
@@ -311,10 +280,26 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         ...doc.data(),
       }));
 
-      setContracts(contractsData);
+      // СОРТИРОВКА контрактов по autoId
+      const sortedContracts = [...contractsData].sort((a, b) => {
+        // Получаем autoId, если нет - используем 0
+        const autoIdA = a.autoId || 0;
+        const autoIdB = b.autoId || 0;
+
+        // Сортировка по возрастанию autoId
+        if (autoIdA !== autoIdB) {
+          return autoIdA - autoIdB;
+        }
+
+        // Если autoId одинаковые, сортируем по названию партнера
+        return (a.partner || "").localeCompare(b.partner || "");
+      });
+
+      setContracts(sortedContracts);
 
       // Инициализируем данные партнеров с ценами из последнего отчета
-      const initializedPartnerData = contractsData.map((contract) => {
+      // Партнеры будут отображаться в том же порядке, что и в sortedContracts
+      const initializedPartnerData = sortedContracts.map((contract) => {
         let pricePerM3 = 0;
 
         if (hasPreviousReport) {
@@ -334,6 +319,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           pricePerM3: pricePerM3,
           soldM3: "",
           totalAmount: 0,
+          autoId: contract.autoId || 0, // Сохраняем autoId для отображения
         };
       });
 
@@ -379,13 +365,11 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           gasPrice: lastReport.generalData?.gasPrice
             ? lastReport.generalData.gasPrice.toString()
             : "",
-          // electronicPaymentSystem НЕ загружаем из прошлого отчета
         }));
       }
 
       // Если есть дата отчета, загружаем обнуления
       if (nextDate) {
-        // console.log("Загружаем обнуления для даты:", nextDate);
         await loadAndApplyResetData(
           station.id,
           nextDate,
@@ -394,7 +378,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         );
       }
     } catch (error) {
-      // console.error("Ошибка инициализации данных:", error);
       toast.error("Маълумотлар юкланишида хатолик");
     } finally {
       setLoading(false);
@@ -410,12 +393,11 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   // Перезагрузка данных об обнулениях при изменении даты отчета
   useEffect(() => {
     if (isOpen && station?.id && reportDate) {
-      // console.log("Дата отчета изменена, перезагружаем обнуления:", reportDate);
       const reloadResetData = async () => {
         try {
           await loadAndApplyResetData(station.id, reportDate, true, null);
         } catch (error) {
-          // console.error("Ошибка перезагрузки данных обнулений:", error);
+          // Ошибка перезагрузки данных обнулений
         }
       };
 
@@ -530,14 +512,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         lastReadingBeforeReset -
         lastReadingFromReport +
         (current - newReadingAfterReset);
-
-      // console.log(`Расчет diff для ${row.hose} с обнулением:`, {
-      //   lastReadingBeforeReset: lastReadingBeforeReset,
-      //   lastReadingFromReport: lastReadingFromReport,
-      //   current: current,
-      //   newReadingAfterReset: newReadingAfterReset,
-      //   diff: diff,
-      // });
     } else {
       // Базовая разница без обнулений
       if (current >= prev) {
@@ -711,7 +685,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       const data = await response.json();
       return data.ip;
     } catch (error) {
-      // console.error("Ошибка получения IP:", error);
       return "Номаълум";
     }
   };
@@ -754,9 +727,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       });
 
       await Promise.all(savePromises);
-      // console.log("Данные партнеров успешно сохранены в contracts");
     } catch (error) {
-      // console.error("Ошибка сохранения данных партнеров в contracts:", error);
       throw error;
     }
   };
@@ -799,8 +770,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         id: doc.id,
         ...doc.data(),
       }));
-
-      // console.log("Обнуления при сохранении:", resetEvents);
 
       const ip = await getClientIP();
       const userEmail = auth?.currentUser?.email || "unknown";
@@ -873,6 +842,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           ...partner,
           soldM3: parseFormattedNumber(partner.soldM3),
           paymentSum: 0, // Добавляем поле для оплаты
+          autoId: partner.autoId, // Сохраняем autoId для сохранения порядка
         }));
 
       // Сохраняем данные партнеров в коллекцию contracts
@@ -886,11 +856,11 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         stationId: station.id,
         stationName: station.stationName || "Неизвестная станция",
 
-        // Данные партнеров
+        // Данные партнеров (уже отсортированы по autoId)
         partnerData: partnerDataToSave,
         partnerTotalM3: partnerTotals.totalM3,
         partnerTotalAmount: partnerTotals.totalAmount,
-        partnerTotalPaymentSum: 0, // Добавляем общую сумму оплат
+        partnerTotalPaymentSum: 0,
         hasPartnerData: hasPartnerData(),
 
         // Данные шлангов
@@ -928,20 +898,10 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       );
       setSavedReportId(docRef.id);
 
-      // Логируем информацию об обнулениях
-      if (resetEvents.length > 0) {
-        // console.log("Отчет сохранен с учетом обнулений:", {
-        //   resetEventsCount: resetEvents.length,
-        //   correctedHoses: hoseData.filter((h) => h.hasResetCorrection).length,
-        //   correctedTotals: correctedTotals,
-        // });
-      }
-
       // Закрываем модальное окно подтверждения и открываем окно успеха
       setIsConfirmModalOpen(false);
       setIsSuccessModalOpen(true);
     } catch (error) {
-      // console.error("Ошибка сохранения объединенного отчета:", error);
       toast.error("Ҳисоботни сақлашда хатолик");
     } finally {
       setLoading(false);
@@ -977,7 +937,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       try {
         await deleteDoc(doc(db, "unifiedDailyReports", savedReportId));
       } catch (error) {
-        // console.error("Ошибка удаления отчета:", error);
+        // Ошибка удаления отчета
       }
     }
 
@@ -1042,17 +1002,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                     disabled={dateDisabled || loading}
                     className="w-full max-w-xs border border-gray-300 rounded-xl p-3 disabled:bg-gray-100"
                   />
-                  {/* Отладочная информация */}
-                  {reportDate && (
-                    <div className="mt-2 text-xs text-gray-500">
-                      Мазкур санага ноллашни қидириш: {reportDate}
-                      {hoseRows.some((row) => row.hasReset) && (
-                        <span className="ml-2 text-green-600">
-                          • Ноллашлар топилди
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -1113,18 +1062,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                           </span>
                                         )}
                                       </div>
-                                      {row.hasReset && row.resetInfo && (
-                                        <div className="text-xs text-gray-500 mt-1">
-                                          Охирги:{" "}
-                                          {formatNumberForDisplay(
-                                            row.resetInfo.lastReadingBeforeReset
-                                          )}{" "}
-                                          → Хозир:{" "}
-                                          {formatNumberForDisplay(
-                                            row.resetInfo.newReadingAfterReset
-                                          )}
-                                        </div>
-                                      )}
                                     </td>
                                     <td className="px-2 py-3 md:px-3 md:w-1/6">
                                       <input
@@ -1215,7 +1152,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
 
                   {/* Левая колонка: Партнеры и Общий отчет */}
                   <div className="space-y-6">
-                    {/* Отчет по партнерам */}
+                    {/* Отчет по партнерам с отображением номера */}
                     <div className="bg-white border border-gray-200 rounded-xl">
                       <div className="p-4 border-b bg-gray-50">
                         <h4 className="text-lg font-semibold">
@@ -1237,6 +1174,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                             <table className="w-full border-collapse text-sm">
                               <thead className="bg-gray-100">
                                 <tr>
+                                  <th className="p-2 text-left w-10">№</th>
                                   <th className="p-2 text-left">Партнер</th>
                                   <th className="p-2 text-right w-24">
                                     1м³ нарх (сўм)
@@ -1254,14 +1192,18 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                   <tr
                                     key={partner.partnerId}
                                     className="border-t hover:bg-gray-50">
+                                    <td className="p-2 text-center text-gray-500 font-medium">
+                                      {/* Отображаем autoId или порядковый номер */}
+                                      {partner.autoId || idx + 1}
+                                    </td>
                                     <td className="p-2">
                                       <div>
                                         <div className="font-medium">
                                           {partner.partnerName}
                                         </div>
-                                        <div className="text-xs text-gray-500">
+                                        {/* <div className="text-xs text-gray-500">
                                           {partner.contractNumber}
-                                        </div>
+                                        </div> */}
                                       </div>
                                     </td>
                                     <td className="p-2">
@@ -1315,7 +1257,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                   <tr>
                                     <td
                                       className="p-2 font-semibold"
-                                      colSpan="2">
+                                      colSpan="3">
                                       Жами:
                                     </td>
                                     <td className="p-2 text-right font-semibold text-sm">
