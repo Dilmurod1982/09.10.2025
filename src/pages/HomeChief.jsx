@@ -43,10 +43,10 @@ const HomeChief = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="text-2xl font-bold text-gray-900 mb-4">
-            Нет управляемых станций
+            Бошқарувингизда заправка мавжуд эмас.
           </div>
           <div className="text-gray-600 mb-4">
-            Обратитесь к администратору для назначения станций
+            Заправкани бириктириш бўйича админга мурожаат этинг
           </div>
         </div>
       </div>
@@ -58,13 +58,13 @@ const HomeChief = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="text-xl text-gray-600 mb-2">
-            Загрузка данных анализа...
+            Анализ маълумотлари юкланмоқда...
           </div>
           <div className="text-sm text-gray-500 mb-4">
-            Управляю {managedStations.length} станциями
+            {managedStations.length} та заправка бошқармоқдасиз
           </div>
           <div className="text-sm text-gray-500">
-            Отчетов: {debugInfo.reportsCount} | Документов:{" "}
+            Ҳисоботлар: {debugInfo.reportsCount} | Хужжатлар:{" "}
             {debugInfo.documentsCount}
           </div>
         </div>
@@ -77,17 +77,17 @@ const HomeChief = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md">
           <div className="text-xl text-red-600 mb-2">
-            Ошибка загрузки данных
+            Маълумотлар юклашда хатолик
           </div>
           <div className="text-sm text-gray-500 mb-4">{error}</div>
           <div className="text-xs text-gray-400 mb-4">
-            Отчетов: {debugInfo.reportsCount} | Документов:{" "}
+            Ҳисоботлар: {debugInfo.reportsCount} | Хужжатлар:{" "}
             {debugInfo.documentsCount}
           </div>
           <button
             onClick={() => loadAnalysisData()}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-            Попробовать снова
+            Қайта уриниб кўриш
           </button>
         </div>
       </div>
@@ -100,19 +100,19 @@ const HomeChief = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md">
           <div className="text-xl text-gray-600 mb-2">
-            Нет данных для анализа
+            Тахлил учун маълумот мавжуд эмас
           </div>
           <div className="text-sm text-gray-500 mb-4">
-            На управляемых станциях пока нет отчетов. Данные появятся после
-            добавления отчетов.
+            Бошқариладиган заправкаларда ҳисобот мавжуд эмас. Ҳисобот
+            киритилгандан сўнг маълумотлар чиқади
           </div>
           <div className="text-xs text-gray-400 mb-4">
-            Управляемых станций: {debugInfo.managedStationsCount}
+            Бошқариладиган заправкалар: {debugInfo.managedStationsCount}
           </div>
           <button
             onClick={() => loadAnalysisData()}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-            Проверить снова
+            Қайта уриниш
           </button>
         </div>
       </div>
@@ -125,24 +125,22 @@ const HomeChief = () => {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Анализ управляемых станций
+              Бошқариладиган заправкалар таҳлили
             </h1>
-            <p className="text-gray-600">
-              Панель управления для управляющего станциями
-            </p>
+            <p className="text-gray-600">Бошқарувчи панели</p>
           </div>
           <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg">
-            Управляю: {managedStations.length} станциями
+            {managedStations.length} та заправка бошқараман
           </div>
         </div>
 
         {/* Карточки с анализом */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <AnalysisCard
-            title="Принято газа через AutoPilotPro"
+            title="AutoPilotPro қабул қилинган газ"
             value={analysisData.autopilotData.length}
-            subtitle="станций с данными"
-            description={`Сумма показаний (${getPeriodDisplayName(
+            subtitle="маълумотлари мавжуд заправкалар"
+            description={`Жами кўрсаткич (${getPeriodDisplayName(
               autopilotPeriod
             )})`}
             onClick={() => setSelectedAnalysis({ type: "autopilot" })}
@@ -151,19 +149,19 @@ const HomeChief = () => {
           />
 
           <AnalysisCard
-            title="Сравнительный анализ"
+            title="Солиштирма таҳлил"
             value={analysisData.comparisonData.length}
-            subtitle="станций для сравнения"
-            description="Динамика продаж по периодам"
+            subtitle="солиштирилаётган заправкалар"
+            description="Даврлар бўйича сотиш динамикаси"
             onClick={() => setSelectedAnalysis({ type: "comparison" })}
             color="green"
             icon="📈"
           />
 
           <AnalysisCard
-            title="Отрицательная разница"
+            title="Манфий фарқ (минус)"
             value={analysisData.negativeDifferenceData.length}
-            subtitle="проблемных станций"
+            subtitle="муаммоли заправкалар"
             description={`hoseTotalGas - autopilotReading < 0 (${getPeriodDisplayName(
               negativeDiffPeriod
             )})`}
@@ -173,10 +171,10 @@ const HomeChief = () => {
           />
 
           <AnalysisCard
-            title="Отсутствующие отчеты"
+            title="Топширилмаган ҳисоботлар"
             value={analysisData.missingReportsData.length}
-            subtitle="станций без отчета"
-            description={`Отчеты не сданы вовремя (${getPeriodDisplayName(
+            subtitle="ҳисоботи киритилмаган заправкалар"
+            description={`Вақтида топиширилмаган ҳисоботлар (${getPeriodDisplayName(
               missingReportsPeriod
             )})`}
             onClick={() => setSelectedAnalysis({ type: "missingReports" })}
@@ -185,10 +183,10 @@ const HomeChief = () => {
           />
 
           <AnalysisCard
-            title="Разница контрольных сумм"
+            title="Назорат суммаси билан фарқлар"
             value={analysisData.controlDifferenceData.length}
-            subtitle="проблемных отчетов"
-            description={`Расхождения в финансовых данных (${getPeriodDisplayName(
+            subtitle="Муаммоли ҳисоботлар"
+            description={`Суммада фарқ бераётганлар (${getPeriodDisplayName(
               controlDiffPeriod
             )})`}
             onClick={() => setSelectedAnalysis({ type: "controlDifference" })}
@@ -197,10 +195,10 @@ const HomeChief = () => {
           />
 
           <AnalysisCard
-            title="Просроченные документы"
+            title="Муддати ўтган хужжатлар"
             value={analysisData.expiredDocumentsData.length}
-            subtitle="станций с просрочкой"
-            description="Документы с истекшим сроком"
+            subtitle="муддат ўтган хужжатлар мавжуд заправкалар"
+            description="Муддати ўтган хужжатлар"
             onClick={() => setSelectedAnalysis({ type: "expiredDocuments" })}
             color="yellow"
             icon="📄"
@@ -208,18 +206,18 @@ const HomeChief = () => {
 
           {/* НОВАЯ КАРТОЧКА: Расход газа и платежи */}
           <AnalysisCard
-            title="Расход газа и платежи"
+            title="Сотилган газ ва тўловлар"
             value={
               analysisData.gasAndPaymentsData?.summary
-                ? "Сводка"
+                ? "Ҳисобот"
                 : analysisData.gasAndPaymentsData.length
             }
             subtitle={
               analysisData.gasAndPaymentsData?.summary
-                ? "за период"
-                : "станций с данными"
+                ? "давр"
+                : "маълумоти мавжуд заправкалар"
             }
-            description="Анализ продаж и поступлений"
+            description="Сотиш ва тўловлар таҳлили"
             onClick={() => setSelectedAnalysis({ type: "gasAndPayments" })}
             color="teal"
             icon="⛽"
@@ -253,40 +251,40 @@ const HomeChief = () => {
 
         {/* Статистика по данным */}
         <div className="mt-8 p-6 bg-white rounded-2xl shadow-lg">
-          <h3 className="text-lg font-semibold mb-4">Общая статистика</h3>
+          <h3 className="text-lg font-semibold mb-4">Умумий статистика</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div className="text-center p-3 bg-blue-50 rounded-lg">
               <div className="font-semibold text-blue-600">
                 {analysisData.autopilotData.length}
               </div>
-              <div className="text-gray-600">Станций с AutoPilot</div>
+              <div className="text-gray-600">AutoPilot мавжуд заправкалар</div>
             </div>
             <div className="text-center p-3 bg-green-50 rounded-lg">
               <div className="font-semibold text-green-600">
                 {analysisData.comparisonData.length}
               </div>
-              <div className="text-gray-600">Для сравнения</div>
+              <div className="text-gray-600">Солитштириш учун</div>
             </div>
             <div className="text-center p-3 bg-red-50 rounded-lg">
               <div className="font-semibold text-red-600">
                 {analysisData.negativeDifferenceData.length}
               </div>
-              <div className="text-gray-600">Проблемных</div>
+              <div className="text-gray-600">Муаммоли</div>
             </div>
             <div className="text-center p-3 bg-purple-50 rounded-lg">
               <div className="font-semibold text-purple-600">
                 {analysisData.controlDifferenceData.length}
               </div>
-              <div className="text-gray-600">Финансовых расхождений</div>
+              <div className="text-gray-600">Суммаларда фарқ</div>
             </div>
           </div>
 
           {/* Отладочная информация */}
           <div className="mt-4 p-3 bg-gray-50 rounded-lg">
             <div className="text-xs text-gray-500">
-              Отладочная информация: {debugInfo.reportsCount} отчетов,{" "}
-              {debugInfo.documentsCount} документов,{" "}
-              {debugInfo.managedStationsCount} управляемых станций
+              Маълумот: {debugInfo.reportsCount} , {debugInfo.documentsCount}{" "}
+              хужжатлар, {debugInfo.managedStationsCount} бошқариладиган
+              заправкалар
             </div>
           </div>
         </div>

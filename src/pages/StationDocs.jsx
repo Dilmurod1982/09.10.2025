@@ -151,10 +151,10 @@ const StationDocs = () => {
     if (expiryFilter !== "Все") {
       filtered = filtered.filter((d) => {
         const days = d.diffDays;
-        if (expiryFilter === "30 дней") return days <= 30 && days > 15;
-        if (expiryFilter === "15 дней") return days <= 15 && days > 5;
-        if (expiryFilter === "5 дней") return days <= 5 && days >= 0;
-        if (expiryFilter === "Просрочено") return days < 0;
+        if (expiryFilter === "30 кун") return days <= 30 && days > 15;
+        if (expiryFilter === "15 кун") return days <= 15 && days > 5;
+        if (expiryFilter === "5 кун") return days <= 5 && days >= 0;
+        if (expiryFilter === "Муддати ўтган") return days < 0;
         return true;
       });
     }
@@ -188,14 +188,14 @@ const StationDocs = () => {
     }));
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Документы");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Хужжатлар");
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
       type: "array",
     });
     saveAs(
       new Blob([excelBuffer], { type: "application/octet-stream" }),
-      `${stationName || "Станция"}_Документы.xlsx`
+      `${stationName || "Станция"}_Хужжатлар.xlsx`
     );
   };
 
@@ -211,7 +211,7 @@ const StationDocs = () => {
       {/* Заголовок */}
       <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
         <h1 className="text-2xl font-semibold text-gray-800">
-          Документы станции: {stationName}
+          {stationName} заправка муддатли хужжатлари
         </h1>
         <div className="flex flex-wrap gap-3">
           {/* Кнопка "Добавить документ" показывается только для определенных ролей */}
@@ -219,18 +219,18 @@ const StationDocs = () => {
             <button
               onClick={() => setIsModalOpen(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
-              + Добавить документ
+              + Янги хужжат қўшиш
             </button>
           )}
           <button
             onClick={exportToExcel}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
-            Экспорт в Excel
+            Excel га экспорт
           </button>
           <button
             onClick={() => navigate(-1)}
             className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition">
-            Назад
+            Орқага
           </button>
         </div>
       </div>
@@ -238,18 +238,18 @@ const StationDocs = () => {
       {/* Фильтры */}
       <div className="flex flex-wrap gap-4 mb-8">
         <select
-          value={showLatestOnly ? "latest" : "all"}
+          value={showLatestOnly ? "all" : "latest"}
           onChange={(e) => setShowLatestOnly(e.target.value === "latest")}
           className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700">
-          <option value="all">Все документы</option>
-          <option value="latest">Только последние</option>
+          <option value="all">Барча хужжатлар</option>
+          <option value="latest">Охирги хужжатлар</option>
         </select>
 
         <select
           value={selectedType}
           onChange={(e) => setSelectedType(e.target.value)}
           className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700">
-          <option value="Все">Все типы</option>
+          <option value="Все">Барчаси</option>
           {Object.values(typesMap).map((type) => (
             <option key={type}>{type}</option>
           ))}
@@ -259,17 +259,17 @@ const StationDocs = () => {
           value={expiryFilter}
           onChange={(e) => setExpiryFilter(e.target.value)}
           className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700">
-          <option value="Все">Все по сроку</option>
-          <option value="30 дней">До 30 дней</option>
-          <option value="15 дней">До 15 дней</option>
-          <option value="5 дней">До 5 дней</option>
-          <option value="Просрочено">Просрочено</option>
+          <option value="Все">Муддат бўйича</option>
+          <option value="30 кун">30 кунгача</option>
+          <option value="15 кун">15 кунгача</option>
+          <option value="5 кун">5 кунгача</option>
+          <option value="Муддати ўтган">Муддати ўтган</option>
         </select>
       </div>
 
       {/* Карточки документов */}
       {filteredDocs.length === 0 ? (
-        <p className="text-center text-gray-500 mt-10">Документы не найдены.</p>
+        <p className="text-center text-gray-500 mt-10">Хужжатлар топилмади</p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {filteredDocs.map((d) => (
@@ -295,10 +295,10 @@ const StationDocs = () => {
                 </div>
               </div>
               <p className="text-sm text-gray-600">
-                <b>Выдан:</b> {d.issueDate}
+                <b>Берилган сана:</b> {d.issueDate}
               </p>
               <p className="text-sm text-gray-600">
-                <b>Истекает:</b> {d.expiryDate}
+                <b>Тугаш санаси:</b> {d.expiryDate}
               </p>
               <p className="mt-2 text-sm font-medium">{d.daysLeft}</p>
               {d.fileUrl && (
@@ -307,7 +307,7 @@ const StationDocs = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-3 inline-block text-blue-600 hover:underline text-sm">
-                  📄 Открыть файл
+                  📄 Файлни очиш
                 </a>
               )}
             </div>
@@ -318,7 +318,7 @@ const StationDocs = () => {
       {missingDocs.length > 0 && (
         <div className="mt-10">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">
-            Не введены в базу:
+            Базага киритилмаган:
           </h2>
           <ul className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {missingDocs.map((m) => (

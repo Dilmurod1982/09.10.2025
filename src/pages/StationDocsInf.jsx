@@ -174,11 +174,11 @@ const StationDocsInf = () => {
   const exportToExcel = () => {
     const dataForExcel = filteredDocs.map((d) => ({
       "№": d.index,
-      "Название документа": d.name,
-      "Дата выдачи": d.issueDate,
-      "Дата окончания": d.expiryDate,
+      "Хужжат номи": d.name,
+      "Берилган вақти": d.issueDate,
+      // "Дата окончания": d.expiryDate,
       Статус: d.daysLeft,
-      "Ссылка на файл": d.fileUrl || "—",
+      файл: d.fileUrl || "—",
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
@@ -187,7 +187,7 @@ const StationDocsInf = () => {
     }));
 
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Документы");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "хужжатлар");
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
       type: "array",
@@ -210,25 +210,25 @@ const StationDocsInf = () => {
       {/* Заголовок */}
       <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
         <h1 className="text-2xl font-semibold text-gray-800">
-          Документы станции: {stationName}
+          {stationName} заправка хужжатлари
         </h1>
         <div className="flex flex-wrap gap-3">
           {canAddDocuments && (
             <button
               onClick={() => setIsModalOpen(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
-              + Добавить документ
+              + Янги хужжат қўшиш
             </button>
           )}
           <button
             onClick={exportToExcel}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
-            Экспорт в Excel
+            Excel га экспорт
           </button>
           <button
             onClick={() => navigate(-1)}
             className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition">
-            Назад
+            Орқага
           </button>
         </div>
       </div>
@@ -239,21 +239,21 @@ const StationDocsInf = () => {
           value={showLatestOnly ? "latest" : "all"}
           onChange={(e) => setShowLatestOnly(e.target.value === "latest")}
           className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700">
-          <option value="all">Все документы</option>
-          <option value="latest">Только последние</option>
+          <option value="all">Барча хужжатлар</option>
+          <option value="latest">Охирги хужжатлар</option>
         </select>
 
         <select
           value={selectedType}
           onChange={(e) => setSelectedType(e.target.value)}
           className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700">
-          <option value="Все">Все типы</option>
+          <option value="Все">Барчаси</option>
           {Object.values(typesMap).map((type) => (
             <option key={type}>{type}</option>
           ))}
         </select>
 
-        <select
+        {/* <select
           value={expiryFilter}
           onChange={(e) => setExpiryFilter(e.target.value)}
           className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700">
@@ -262,7 +262,7 @@ const StationDocsInf = () => {
           <option value="15 дней">До 15 дней</option>
           <option value="5 дней">До 5 дней</option>
           <option value="Просрочено">Просрочено</option>
-        </select>
+        </select> */}
       </div>
 
       {/* Карточки документов */}
@@ -279,7 +279,7 @@ const StationDocsInf = () => {
                 <div className="w-4 h-4 rounded-full bg-blue-500"></div>
               </div>
               <p className="text-sm text-gray-600">
-                <b>Выдан:</b> {d.issueDate}
+                <b>Берилган сана:</b> {d.issueDate}
               </p>
 
               {d.fileUrl && (
@@ -288,7 +288,7 @@ const StationDocsInf = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-3 inline-block text-blue-600 hover:underline text-sm">
-                  📄 Открыть файл
+                  📄 Файлни очиш
                 </a>
               )}
             </div>
@@ -299,7 +299,7 @@ const StationDocsInf = () => {
       {missingDocs.length > 0 && (
         <div className="mt-10">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">
-            Не введены в базу:
+            Базага киритилмаган:
           </h2>
           <ul className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {missingDocs.map((m) => (
