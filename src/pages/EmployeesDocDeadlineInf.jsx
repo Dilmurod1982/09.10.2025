@@ -98,7 +98,9 @@ const EmployeesDocDeadlineInf = () => {
   if (!userData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-600 text-lg">Пользователь не авторизован</div>
+        <div className="text-red-600 text-lg">
+          Фойдаланувчи рўйхатдан ўтмаган
+        </div>
       </div>
     );
   }
@@ -107,10 +109,10 @@ const EmployeesDocDeadlineInf = () => {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-semibold mb-6">
-          Бессрочные документы по станциям
+          Заправкалар бўйича муддатсиз хужжатлар
         </h1>
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-          У вас нет прикрепленных станций. Обратитесь к администратору.
+          Сизга бириктирилган заправкалар мавжуд. Админга мурожаат этинг
         </div>
       </div>
     );
@@ -119,11 +121,11 @@ const EmployeesDocDeadlineInf = () => {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold mb-6">
-        Бессрочные документы по станциям
+        Заправкалар бўйича муддатсиз хужжатлар
       </h1>
 
       <div className="mb-4 text-gray-600">
-        Показаны бессрочные документы только для ваших прикрепленных станций
+        Фақат Сизга бириктирилган заправкалар хужжатлари кўрсатилмоқда
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -144,10 +146,10 @@ const EmployeesDocDeadlineInf = () => {
 
               <div className="space-y-1 text-sm">
                 <p className="text-green-600 font-semibold">
-                  Бессрочные документы: {s.perpetual || 0}
+                  Муддатсиз хужжатлар: {s.perpetual || 0}
                 </p>
                 <p className="text-gray-500 text-xs">
-                  Всего документов на станции
+                  Жами заправка бўйича хужжатлар
                 </p>
               </div>
             </Link>
@@ -157,7 +159,7 @@ const EmployeesDocDeadlineInf = () => {
 
       {stations.length === 0 && !loading && (
         <div className="text-center py-8 text-gray-500">
-          Нет данных по вашим станциям
+          Сизга бириктирилган заправкалар бўйича хужжатлар мавжуд эмас
         </div>
       )}
     </div>

@@ -222,6 +222,12 @@ function HomeOperator() {
                       latestReport.generalData?.humoTerminal || 0
                     )}
                   </Typography>
+                  <Typography variant="h6" fontWeight="bold">
+                    ЭТ:{" "}
+                    {formatCurrency(
+                      latestReport.generalData?.electronicPaymentSystem || 0
+                    )}
+                  </Typography>
                 </Box>
               </Box>
             </CardContent>

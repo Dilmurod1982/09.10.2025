@@ -92,7 +92,9 @@ const EmployeesDocDeadline = () => {
   if (!userData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-600 text-lg">Пользователь не авторизован</div>
+        <div className="text-red-600 text-lg">
+          Фойдаланувчи рўйхатдан ўтмаган
+        </div>
       </div>
     );
   }
@@ -100,9 +102,11 @@ const EmployeesDocDeadline = () => {
   if (!userData.stations || userData.stations.length === 0) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-semibold mb-6">Документы по станциям</h1>
+        <h1 className="text-2xl font-semibold mb-6">
+          Заправкалар бўйича хужжатлар
+        </h1>
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-          У вас нет прикрепленных станций. Обратитесь к администратору.
+          Сизга бириктирилган заправка мавжуд эмас. Админга мурожаат этинг
         </div>
       </div>
     );
@@ -110,10 +114,12 @@ const EmployeesDocDeadline = () => {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-semibold mb-6">Документы по станциям</h1>
+      <h1 className="text-2xl font-semibold mb-6">
+        Заправкалар бўйича хужжатлар
+      </h1>
 
       <div className="mb-4 text-gray-600">
-        Показаны документы только для ваших прикрепленных станций
+        Фақат Сизга бириктирилган заправкалар хужжатлари кўрсатилмоқда
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -142,15 +148,13 @@ const EmployeesDocDeadline = () => {
               </div>
 
               <div className="space-y-1 text-sm">
-                <p className="text-green-600">
-                  Меньше 30 дней: {s.less30 || 0}
-                </p>
+                <p className="text-green-600">30 кундан кам: {s.less30 || 0}</p>
                 <p className="text-yellow-500">
-                  Меньше 15 дней: {s.less15 || 0}
+                  15 кундан кам: {s.less15 || 0}
                 </p>
-                <p className="text-orange-500">Меньше 5 дней: {s.less5 || 0}</p>
+                <p className="text-orange-500">5 кундан кам: {s.less5 || 0}</p>
                 <p className="text-red-600 font-semibold">
-                  Просрочено: {s.expired || 0}
+                  Муддати ўтган: {s.expired || 0}
                 </p>
               </div>
             </Link>
@@ -160,7 +164,7 @@ const EmployeesDocDeadline = () => {
 
       {stations.length === 0 && !loading && (
         <div className="text-center py-8 text-gray-500">
-          Нет данных по вашим станциям
+          Сизга бириктирилган заправкалар бўйича маълумот мавжуд эмас
         </div>
       )}
     </div>

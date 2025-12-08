@@ -19,9 +19,9 @@ const ReportOnDebtsPartners = () => {
 
   // Периоды для выбора
   const periodOptions = [
-    { value: "month", label: "Месячный" },
-    { value: "quarter", label: "Квартальный" },
-    { value: "year", label: "Годовой" },
+    { value: "month", label: "Ойлик" },
+    { value: "quarter", label: "Чорак" },
+    { value: "year", label: "Йиллик" },
   ];
 
   // Годы для выбора
@@ -55,10 +55,10 @@ const ReportOnDebtsPartners = () => {
 
   // Кварталы для выбора
   const quarterOptions = [
-    { value: "I", label: "I квартал (январь-март)" },
-    { value: "II", label: "II квартал (апрель-июнь)" },
-    { value: "III", label: "III квартал (июль-сентябрь)" },
-    { value: "IV", label: "IV квартал (октябрь-декабрь)" },
+    { value: "I", label: "I чорак (январь-март)" },
+    { value: "II", label: "II чорак (апрель-июнь)" },
+    { value: "III", label: "III чорак (июль-сентябрь)" },
+    { value: "IV", label: "IV чорак (октябрь-декабрь)" },
   ];
 
   // Рассчет итоговых значений
@@ -123,7 +123,7 @@ const ReportOnDebtsPartners = () => {
 
         setStations(matched);
       } catch (error) {
-        toast.error(error.message || "Ошибка загрузки станций");
+        toast.error(error.message || "Заправка маълумотини юклашда хатолик");
       }
     };
 
@@ -184,10 +184,10 @@ const ReportOnDebtsPartners = () => {
             // Показываем информационное сообщение
             // toast.success("Данные загружены (фильтрация на клиенте)");
           } catch (clientError) {
-            toast.error("Ошибка загрузки контрактов: " + clientError.message);
+            toast.error("Шартномалар юклашда хатолик: " + clientError.message);
           }
         } else {
-          toast.error("Ошибка загрузки контрактов: " + error.message);
+          toast.error("Шартномалар юклашда хатолик: " + error.message);
         }
       }
     };
@@ -372,7 +372,7 @@ const ReportOnDebtsPartners = () => {
 
         setReportData(reportArray);
       } catch (error) {
-        toast.error(error.message || "Ошибка при генерации отчета");
+        toast.error(error.message || "Ҳисобот яратишда хатолик");
         setReportData([]);
       } finally {
         setLoading(false);
@@ -435,23 +435,23 @@ const ReportOnDebtsPartners = () => {
     }
 
     const worksheetData = [
-      ["Отчет по задолженностям партнеров"],
+      ["Хамкорларни қарздорлиги бўйича ҳисобот"],
       [
         selectedStation
-          ? `Станция: ${selectedStationData?.stationName || selectedStation}`
-          : `Все станции`,
+          ? `Заправка: ${selectedStationData?.stationName || selectedStation}`
+          : `Барча заправкалар`,
       ],
-      [`Период: ${periodLabel} (${periodDetail})`],
-      [`Даты: ${startDate} - ${endDate}`],
+      [`Давр: ${periodLabel} (${periodDetail})`],
+      [`Саналар: ${startDate} - ${endDate}`],
       [],
       [
         "№",
-        "Партнер",
-        "Договор",
-        "Сальдо на начало периода",
-        "Продано газа (сумма)",
-        "Оплачено",
-        "Сальдо на конец периода",
+        "Хамкор",
+        "Шартнома",
+        "Давр бошига сальдо",
+        "Сотилган газ (сум)",
+        "Тўланди",
+        "Давр охирига сальдо",
       ],
       ...reportData.map((partner, index) => [
         index + 1,
@@ -465,7 +465,7 @@ const ReportOnDebtsPartners = () => {
       [],
       [
         "",
-        "ВСЕГО",
+        "Жами",
         "",
         calculateTotals.totalStartBalance,
         calculateTotals.totalSoldAmount,
@@ -474,7 +474,7 @@ const ReportOnDebtsPartners = () => {
       ],
       [
         "",
-        "Всего задолженность",
+        "Жами қарздорлик",
         "",
         calculateTotals.totalDebtStart,
         "",
@@ -483,7 +483,7 @@ const ReportOnDebtsPartners = () => {
       ],
       [
         "",
-        "Всего предоплата",
+        "Жами олдидан тўлов",
         "",
         calculateTotals.totalPrepaymentStart,
         "",
@@ -494,7 +494,7 @@ const ReportOnDebtsPartners = () => {
 
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Задолженности партнеров");
+    XLSX.utils.book_append_sheet(wb, ws, "Хамкорлар карздорлиги");
 
     const colWidths = [
       { wch: 5 },
@@ -520,10 +520,10 @@ const ReportOnDebtsPartners = () => {
       <div className="max-w-[100vw] mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-            Отчет по задолженностям партнеров
+            Хамкорларни қарздорлиги/ҳақдорлиги ҳисоботи
           </h1>
           <p className="text-gray-600 text-sm md:text-base">
-            Анализ задолженностей партнеров за поставленный газ
+            Етказиб берилган сиқилган газ учун қарздорликни тахлили
           </p>
         </div>
 
@@ -531,13 +531,13 @@ const ReportOnDebtsPartners = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
-                Станция
+                Заправка
               </label>
               <select
                 className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={selectedStation}
                 onChange={(e) => setSelectedStation(e.target.value)}>
-                <option value="">Все станции</option>
+                <option value="">Барчаси заправка</option>
                 {stations.map((station) => (
                   <option key={station.id} value={station.id}>
                     {station.stationName}
@@ -548,13 +548,13 @@ const ReportOnDebtsPartners = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
-                Период *
+                Давр *
               </label>
               <select
                 className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}>
-                <option value="">Выберите период...</option>
+                <option value="">Даврни танланг...</option>
                 {periodOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -565,13 +565,13 @@ const ReportOnDebtsPartners = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
-                Год *
+                Йил *
               </label>
               <select
                 className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}>
-                <option value="">Выберите год...</option>
+                <option value="">Йилни танланг...</option>
                 {yearOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -583,13 +583,13 @@ const ReportOnDebtsPartners = () => {
             {selectedPeriod === "month" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
-                  Месяц *
+                  Ой *
                 </label>
                 <select
                   className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}>
-                  <option value="">Выберите месяц...</option>
+                  <option value="">Ойни танланг...</option>
                   {monthOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -602,13 +602,13 @@ const ReportOnDebtsPartners = () => {
             {selectedPeriod === "quarter" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 md:mb-2">
-                  Квартал *
+                  Чорак *
                 </label>
                 <select
                   className="w-full px-3 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={selectedQuarter}
                   onChange={(e) => setSelectedQuarter(e.target.value)}>
-                  <option value="">Выберите квартал...</option>
+                  <option value="">Чоракни танланг...</option>
                   {quarterOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -636,7 +636,7 @@ const ReportOnDebtsPartners = () => {
                   d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              Экспорт в Excel
+              Excel га экспорт
             </button>
           </div>
         </div>
@@ -658,22 +658,22 @@ const ReportOnDebtsPartners = () => {
                         №
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[200px] max-w-[300px]">
-                        Партнер
+                        Хамкор
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Договор
+                        Шартнома
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Сальдо на начало
+                        Давр бошига сальдо
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Продано газа (сумма)
+                        Сотилган газ (сум)
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Оплачено
+                        Тўланди
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                        Сальдо на конец
+                        Давр охирига сальдо
                       </th>
                     </tr>
                   </thead>
@@ -720,7 +720,9 @@ const ReportOnDebtsPartners = () => {
 
                     <tr className="bg-gray-50 font-semibold">
                       <td className="px-4 py-3 text-sm text-gray-900"></td>
-                      <td className="px-4 py-3 text-sm text-gray-500">ВСЕГО</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        УМУМИЙСИ
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500"></td>
                       <td
                         className={`px-4 py-3 whitespace-nowrap text-sm ${
@@ -750,7 +752,7 @@ const ReportOnDebtsPartners = () => {
                       <td className="px-4 py-3 text-sm text-gray-900"></td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {" "}
-                        Всего задолженность
+                        Жами қарздорлик
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500"></td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-red-600">
@@ -766,7 +768,7 @@ const ReportOnDebtsPartners = () => {
                     <tr className="bg-green-50 font-semibold">
                       <td className="px-4 py-3 text-sm text-gray-900"></td>
                       <td className="px-4 py-3 text-sm text-gray-500">
-                        Всего предоплата
+                        Жами хақдорлик
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500"></td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600">
@@ -796,10 +798,10 @@ const ReportOnDebtsPartners = () => {
                   />
                 </svg>
                 <h3 className="mt-2 text-sm font-medium text-gray-900">
-                  Данные не найдены
+                  Маълумотлар топилмади
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Для выбранных параметров данные отсутствуют
+                  Танланган фильтрлар бўйича маълумот топилмади.
                 </p>
               </div>
             )}
@@ -822,10 +824,10 @@ const ReportOnDebtsPartners = () => {
                 />
               </svg>
               <h3 className="mt-4 text-lg font-medium text-gray-900">
-                Выберите параметры
+                Филтрларни танланг
               </h3>
               <p className="mt-2 text-sm text-gray-500">
-                Выберите период и год для генерации отчета
+                Ҳисобот яратиш учун давр ва йилни танланг
               </p>
             </div>
           </div>
