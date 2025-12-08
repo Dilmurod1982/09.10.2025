@@ -603,8 +603,8 @@ export const AnalysisDetails = ({
 
       {analysisData.missingReportsData.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          Барча ҳисоботлар топширилган{" "}
-          {getPeriodDisplayName(filters.missingReportsPeriod)}
+          {getPeriodDisplayName(filters.missingReportsPeriod)} Барча ҳисоботлар
+          топширилган{" "}
         </div>
       ) : (
         <div className="grid gap-3 lg:gap-4">

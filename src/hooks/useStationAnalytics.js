@@ -920,12 +920,12 @@ export const useStationAnalytics = (managedStations = []) => {
 // Хелпер функция для отображения периодов - ОБНОВЛЕНА
 export const getPeriodDisplayName = (period) => {
   const periodNames = {
-    "1day": "за 1 день",
-    "7days": "за 7 дней",
-    "1month": "за месяц",
-    "6months": "за полгода",
-    "1year": "за год",
-    yesterday: "за вчерашний день",
+    "1day": "1 кунликда",
+    "7days": "7 кунликда",
+    "1month": "Бир ойда",
+    "6months": "Ярим йилликда",
+    "1year": "Бир йилликда",
+    yesterday: "Кечаги кунга",
   };
   return periodNames[period] || period;
 };
