@@ -153,10 +153,10 @@ function HomeOperator() {
     <Box p={3}>
       {/* Заголовок */}
       <Typography variant="h4" gutterBottom fontWeight="bold">
-        Статистика АЗС
+        Заправка статистикаси
       </Typography>
       <Typography variant="h6" color="textSecondary" gutterBottom>
-        {latestReport.stationName} - Последний отчет:{" "}
+        {latestReport.stationName} - Охирги ҳисобот:{" "}
         {formatDate(latestReport.reportDate)}
       </Typography>
 
@@ -189,7 +189,7 @@ function HomeOperator() {
                 <AttachMoney color="primary" sx={{ fontSize: 40, mr: 2 }} />
                 <Box>
                   <Typography color="textSecondary" variant="body2">
-                    Наличные
+                    Нақд
                   </Typography>
                   <Typography variant="h5" fontWeight="bold">
                     {formatCurrency(latestReport.generalData?.cashAmount || 0)}
@@ -208,7 +208,7 @@ function HomeOperator() {
                 <CreditCard color="secondary" sx={{ fontSize: 40, mr: 2 }} />
                 <Box>
                   <Typography color="textSecondary" variant="body2">
-                    Терминалы
+                    Терминаллар
                   </Typography>
                   <Typography variant="h6" fontWeight="bold">
                     Uzcard:{" "}
@@ -236,13 +236,14 @@ function HomeOperator() {
                 <LocalGasStation color="success" sx={{ fontSize: 40, mr: 2 }} />
                 <Box>
                   <Typography color="textSecondary" variant="body2">
-                    Продажи по шлангам
+                    Шланглар бўйича сотув
                   </Typography>
                   <Typography variant="h5" fontWeight="bold">
-                    {formatCurrency(latestReport.hoseTotalSum || 0)}
+                    {/* {formatCurrency(latestReport.hoseTotalSum || 0)} */}
+                    {formatNumber(latestReport.hoseTotalGas || 0)} м³
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
-                    {formatNumber(latestReport.hoseTotalGas || 0)} м³
+                    {/* {formatNumber(latestReport.hoseTotalGas || 0)} м³ */}
                   </Typography>
                 </Box>
               </Box>
@@ -258,7 +259,7 @@ function HomeOperator() {
                 <People color="info" sx={{ fontSize: 40, mr: 2 }} />
                 <Box>
                   <Typography color="textSecondary" variant="body2">
-                    Партнеры
+                    Хамкорлар
                   </Typography>
                   <Typography variant="h5" fontWeight="bold">
                     {formatCurrency(latestReport.partnerTotalAmount || 0)}
@@ -278,16 +279,16 @@ function HomeOperator() {
         <Grid item xs={12} md={6}>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom fontWeight="bold">
-              Продажи по шлангам
+              Шланглар бўйича сотув
             </Typography>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
                     <TableCell>Шланг</TableCell>
-                    <TableCell align="right">Текущие</TableCell>
-                    <TableCell align="right">Предыдущие</TableCell>
-                    <TableCell align="right">Разница</TableCell>
+                    <TableCell align="right">Жорий</TableCell>
+                    <TableCell align="right">Олдинги</TableCell>
+                    <TableCell align="right">Фарқи</TableCell>
                     <TableCell align="right">Сумма</TableCell>
                   </TableRow>
                 </TableHead>
@@ -323,16 +324,16 @@ function HomeOperator() {
         <Grid item xs={12} md={6}>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom fontWeight="bold">
-              Продажи партнерам
+              Хамкорлар бўйича сотув
             </Typography>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Партнер</TableCell>
-                    <TableCell>Договор</TableCell>
+                    <TableCell>Хамкор</TableCell>
+                    <TableCell>Шартнома</TableCell>
                     <TableCell align="right">м³</TableCell>
-                    <TableCell align="right">Цена</TableCell>
+                    <TableCell align="right">Нархи</TableCell>
                     <TableCell align="right">Сумма</TableCell>
                   </TableRow>
                 </TableHead>
@@ -362,18 +363,18 @@ function HomeOperator() {
         <Grid item xs={12}>
           <Paper elevation={3} sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom fontWeight="bold">
-              История отчетов (последние 7 дней)
+              Ҳисоботлар тарихи (Охирги 7 кун)
             </Typography>
             <TableContainer>
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Дата</TableCell>
-                    <TableCell align="right">Наличные</TableCell>
-                    <TableCell align="right">Терминалы</TableCell>
-                    <TableCell align="right">Продажи по шлангам</TableCell>
-                    <TableCell align="right">Партнеры</TableCell>
-                    <TableCell align="center">Статус</TableCell>
+                    <TableCell>Сана</TableCell>
+                    <TableCell align="right">Нақд</TableCell>
+                    <TableCell align="right">Терминаллар</TableCell>
+                    <TableCell align="right">Шлангар бўйича</TableCell>
+                    <TableCell align="right">Хамкорлар</TableCell>
+                    <TableCell align="center">Холати</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -399,8 +400,8 @@ function HomeOperator() {
                         <Chip
                           label={
                             report.status === "completed"
-                              ? "Завершен"
-                              : "В процессе"
+                              ? "Тугаган"
+                              : "Процессда"
                           }
                           color={
                             report.status === "completed"

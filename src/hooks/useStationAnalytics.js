@@ -271,7 +271,7 @@ export const useStationAnalytics = (managedStations = []) => {
 
         return reportDate >= start && reportDate <= end;
       });
-
+      console.log(filteredReports);
       if (filteredReports.length === 0) {
         return {
           summary: {
@@ -528,6 +528,7 @@ export const useStationAnalytics = (managedStations = []) => {
 
       // НОВЫЙ АНАЛИЗ: Расход газа и поступления платежей
       let gasAndPaymentsData = [];
+      console.log(gasAndPaymentsData);
       if (gasPaymentsDateRange) {
         gasAndPaymentsData = analyzeGasAndPaymentsByDateRange(
           allReports,
