@@ -528,7 +528,7 @@ export const useStationAnalytics = (managedStations = []) => {
 
       // НОВЫЙ АНАЛИЗ: Расход газа и поступления платежей
       let gasAndPaymentsData = [];
-      console.log(gasAndPaymentsData);
+      // console.log(gasAndPaymentsData);
       if (gasPaymentsDateRange) {
         gasAndPaymentsData = analyzeGasAndPaymentsByDateRange(
           allReports,

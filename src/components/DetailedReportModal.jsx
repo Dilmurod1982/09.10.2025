@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 const DetailedReportModal = ({ isOpen, onClose, report }) => {
   if (!isOpen || !report) return null;
 
+  console.log(report);
   // Форматирование даты
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -291,7 +292,7 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
               <span><strong>${
                 report.generalData?.humoTerminal?.toLocaleString() || "0"
               } сўм</strong></span>
-            </div>
+            </div>           
             <div class="data-row">
               <span>Z ҳисобот:</span>
               <span><strong>${
@@ -589,6 +590,16 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                             </span>
                             <span className="font-semibold text-purple-600">
                               {report.generalData?.humoTerminal?.toLocaleString() ||
+                                "0"}{" "}
+                              сўм
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium text-gray-700">
+                              Электрон тўловлар:
+                            </span>
+                            <span className="font-semibold text-purple-600">
+                              {report.generalData?.electronicPaymentSystem?.toLocaleString() ||
                                 "0"}{" "}
                               сўм
                             </span>
