@@ -53,12 +53,13 @@ import {
   Dashboard as DashboardIcon,
   Visibility,
   VisibilityOff,
-  Bolt as BoltIcon, // Иконка для электроэнергии
-  Whatshot as GasIcon, // Иконка для газа
-  Calculate as CalculateIcon, // Иконка для расчетов
+  Bolt as BoltIcon,
+  Whatshot as GasIcon,
+  Calculate as CalculateIcon,
   Work as WorkIcon,
   Speed as MeterIcon,
 } from "@mui/icons-material";
+
 import { useNavigate } from "react-router-dom";
 import Collapse from "@mui/material/Collapse";
 import UserModal from "./UserModal";
@@ -215,7 +216,6 @@ export default function Navbar() {
   const handleEnergySettlementsClick = () =>
     setEnergySettlementsOpen(!energySettlementsOpen);
 
-  // Функции для управления паролем
   const handlePasswordChange = () => {
     setPasswordModalOpen(true);
     setPasswordData({
@@ -369,7 +369,6 @@ export default function Navbar() {
     }
   };
 
-  // 🔹 Меню
   const menuItems = [
     { text: "Заправкалар", icon: <LocalGasStationIcon />, path: "/stations" },
     { text: "Ходимлар", icon: <BadgeIcon />, path: "/employees" },
@@ -405,9 +404,14 @@ export default function Navbar() {
       icon: <MoneyOffIcon />,
       path: "/reportondebtspartners",
     },
+    {
+      text: "Тўлов турлари",
+      icon: <AccountBalanceWalletIcon />,
+      path: "/paymentmethods",
+      roles: ["admin"],
+    },
   ];
 
-  // 🔹 Ежедневные отчеты
   const dailyReportsItems = [
     {
       text: "Кундалик ҳисобот",
@@ -421,7 +425,6 @@ export default function Navbar() {
     },
   ];
 
-  // 🔹 Расчеты по энергоносителям
   const energySettlementsItems = [
     {
       text: "Газ бўйича ҳисоб-китоб",
@@ -512,33 +515,53 @@ export default function Navbar() {
     },
   ];
 
-  // ⚙️ Фильтрация пунктов по роли - ИСПРАВЛЕННАЯ ВЕРСИЯ
-  const filteredMenuItems =
-    role === "admin"
-      ? menuItems
-      : role === "electrengineer"
-      ? menuItems.filter(
+  // ⚙️ ФИЛЬТРАЦИЯ ПУНКТОВ ПО РОЛИ - ИСПРАВЛЕННЫЙ КОД
+  const getFilteredMenuItems = () => {
+    if (!role) return [];
+
+    switch (role) {
+      case "admin":
+        return menuItems;
+
+      case "electrengineer":
+        return menuItems.filter(
           (item) => item.text === "Колонка кўрсаткичларини ўзгартириш"
-        )
-      : role === "buxgalter"
-      ? menuItems.filter((item) => item.text === "Ҳамкорлар")
-      : role === "rahbar"
-      ? menuItems.filter(
+        );
+
+      case "buxgalter":
+        return menuItems.filter((item) => item.text === "Ҳамкорлар");
+
+      case "rahbar":
+        // Для rahbar исключаем указанные пункты
+        return menuItems.filter(
+          (item) =>
+            item.text !== "Заправкалар" &&
+            item.text !== "Ходимлар" &&
+            item.text !== "МЧЖлар" &&
+            item.text !== "Банк" &&
+            item.text !== "Лавозимлар" &&
+            item.text !== "Фойдаланувчилар" &&
+            item.text !== "Колонка кўрсаткичларини ўзгартириш"
+        );
+
+      case "nazoratbux":
+        return menuItems.filter(
+          (item) => item.text === "Колонка кўрсаткичларини ўзгартириш"
+        );
+
+      case "operator":
+        return menuItems.filter(
           (item) =>
             item.text !== "Фойдаланувчилар" &&
             item.text !== "Колонка кўрсаткичларини ўзгартириш"
-        )
-      : role === "nazoratbux"
-      ? menuItems.filter(
-          (item) => item.text === "Колонка кўрсаткичларини ўзгартириш"
-        )
-      : role === "operator"
-      ? menuItems.filter(
-          (item) =>
-            item.text !== "Фойдаланувчилар" &&
-            item.text !== "Колонка кўрсаткичларини ўзгартириш"
-        )
-      : [];
+        );
+
+      default:
+        return [];
+    }
+  };
+
+  const filteredMenuItems = getFilteredMenuItems();
 
   const isRahbarOrBooker =
     role === "rahbar" || role === "buxgalter" || role === "nazoratbux";
@@ -569,7 +592,8 @@ export default function Navbar() {
           fontSize: "0.75rem",
           fontWeight: "600",
           ml: 1,
-        }}>
+        }}
+      >
         {config.text}
       </Box>
     );
@@ -582,7 +606,8 @@ export default function Navbar() {
         sx={{
           background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
           boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-        }}>
+        }}
+      >
         <Toolbar sx={{ minHeight: { xs: "64px", md: "70px" } }}>
           {/* Показываем кнопку меню для admin, buxgalter, operator, rahbar, electrengineer и nazoratbux */}
           {role === "admin" ||
@@ -604,7 +629,8 @@ export default function Navbar() {
                   backgroundColor: "rgba(255,255,255,0.1)",
                 },
               }}
-              onClick={toggleDrawer(true)}>
+              onClick={toggleDrawer(true)}
+            >
               <MenuIcon />
             </IconButton>
           ) : null}
@@ -629,7 +655,8 @@ export default function Navbar() {
                 display: "flex",
                 alignItems: "center",
                 gap: 1,
-              }}>
+              }}
+            >
               <DashboardIcon
                 sx={{ fontSize: { xs: "1.2rem", md: "1.5rem" } }}
               />
@@ -660,7 +687,8 @@ export default function Navbar() {
                   },
                   fontSize: "0.9rem",
                   fontWeight: "500",
-                }}>
+                }}
+              >
                 📄 Муддалар бўйича хужжатлар
               </Button>
               <Button
@@ -681,7 +709,8 @@ export default function Navbar() {
                   },
                   fontSize: "0.9rem",
                   fontWeight: "500",
-                }}>
+                }}
+              >
                 ∞ Муддатсиз хужжатлар
               </Button>
             </Box>
@@ -698,12 +727,14 @@ export default function Navbar() {
                 className="flex items-center gap-2 mr-4 text-white rounded-full px-3 py-2 md:px-4 md:py-2 transition-all duration-300 hover:bg-white/20 hover:translate-y-[-2px] hover:shadow-lg backdrop-blur-sm border border-white/20 min-w-0"
                 style={{
                   background: "rgba(255,255,255,0.1)",
-                }}>
+                }}
+              >
                 <PersonIcon className="w-4 h-4 md:w-5 md:h-5" />
                 <span
                   className={`font-medium text-sm md:text-base ${
                     isMobile ? "hidden sm:block" : "block"
-                  } truncate max-w-[80px] sm:max-w-[120px] md:max-w-[150px]`}>
+                  } truncate max-w-[80px] sm:max-w-[120px] md:max-w-[150px]`}
+                >
                   {isMobile ? getShortName() : getUserFullName()}
                 </span>
                 {/* Бейдж роли на мобильных */}
@@ -719,7 +750,8 @@ export default function Navbar() {
                         setUserMenuOpen(false);
                         handleUserButtonClick();
                       }}
-                      className="flex items-center w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors duration-200 border-b border-gray-100">
+                      className="flex items-center w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors duration-200 border-b border-gray-100"
+                    >
                       <PersonIcon className="w-5 h-5 text-blue-600 mr-3" />
                       <span className="text-sm font-medium text-gray-900">
                         Профиль
@@ -731,7 +763,8 @@ export default function Navbar() {
                         setUserMenuOpen(false);
                         handlePasswordChange();
                       }}
-                      className="flex items-center w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors duration-200">
+                      className="flex items-center w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors duration-200"
+                    >
                       <Visibility className="w-5 h-5 text-blue-600 mr-3" />
                       <span className="text-sm font-medium text-gray-900">
                         Паролни ўзгартириш
@@ -763,7 +796,8 @@ export default function Navbar() {
               display: "flex",
               alignItems: "center",
               gap: 1,
-            }}>
+            }}
+          >
             {!isMobile && <LogoutIcon sx={{ fontSize: 18 }} />}
             {isMobile ? "Чиқиш" : "ЧИҚИШ"}
           </Button>
@@ -829,7 +863,8 @@ export default function Navbar() {
                     <button
                       type="button"
                       onClick={() => togglePasswordVisibility("current")}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
                       {showPasswords.current ? (
                         <VisibilityOff className="w-5 h-5" />
                       ) : (
@@ -855,7 +890,8 @@ export default function Navbar() {
                     <button
                       type="button"
                       onClick={() => togglePasswordVisibility("new")}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
                       {showPasswords.new ? (
                         <VisibilityOff className="w-5 h-5" />
                       ) : (
@@ -885,7 +921,8 @@ export default function Navbar() {
                     <button
                       type="button"
                       onClick={() => togglePasswordVisibility("confirm")}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
                       {showPasswords.confirm ? (
                         <VisibilityOff className="w-5 h-5" />
                       ) : (
@@ -902,13 +939,15 @@ export default function Navbar() {
               <button
                 onClick={handlePasswordClose}
                 disabled={passwordLoading}
-                className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium">
+                className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium"
+              >
                 Отмена
               </button>
               <button
                 onClick={handleUpdatePassword}
                 disabled={passwordLoading}
-                className="flex-1 px-4 py-2 text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg hover:shadow-xl">
+                className="flex-1 px-4 py-2 text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg hover:shadow-xl"
+              >
                 {passwordLoading ? "Ўзгартирилмоқда..." : "Паролни ўзгартириш"}
               </button>
             </div>
@@ -935,7 +974,8 @@ export default function Navbar() {
               background: "linear-gradient(180deg, #2d3748 0%, #4a5568 100%)",
               color: "white",
             },
-          }}>
+          }}
+        >
           <Paper
             sx={{
               width: "100%",
@@ -943,7 +983,8 @@ export default function Navbar() {
               display: "flex",
               flexDirection: "column",
               background: "transparent",
-            }}>
+            }}
+          >
             {/* Заголовок меню */}
             <Box
               sx={{
@@ -955,10 +996,12 @@ export default function Navbar() {
                   "linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%)",
                 color: "white",
                 backdropFilter: "blur(10px)",
-              }}>
+              }}
+            >
               <Typography
                 variant="h6"
-                sx={{ fontWeight: "700", fontSize: "1.1rem" }}>
+                sx={{ fontWeight: "700", fontSize: "1.1rem" }}
+              >
                 🗂️ Навигация менюси
               </Typography>
               <IconButton
@@ -970,7 +1013,8 @@ export default function Navbar() {
                     backgroundColor: "rgba(255,255,255,0.1)",
                     transform: "rotate(90deg)",
                   },
-                }}>
+                }}
+              >
                 <CloseIcon />
               </IconButton>
             </Box>
@@ -992,7 +1036,8 @@ export default function Navbar() {
                         key={item.text}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}>
+                        transition={{ delay: index * 0.1 }}
+                      >
                         <ListItem disablePadding sx={{ mb: 1 }}>
                           <ListItemButton
                             onClick={() => handleMenuClick(item.path)}
@@ -1004,9 +1049,11 @@ export default function Navbar() {
                                 backgroundColor: "rgba(255,255,255,0.1)",
                                 transform: "translateX(5px)",
                               },
-                            }}>
+                            }}
+                          >
                             <ListItemIcon
-                              sx={{ minWidth: "45px", color: "white" }}>
+                              sx={{ minWidth: "45px", color: "white" }}
+                            >
                               {item.icon}
                             </ListItemIcon>
                             <ListItemText
@@ -1040,7 +1087,8 @@ export default function Navbar() {
                           "&:hover": {
                             backgroundColor: "rgba(255,255,255,0.1)",
                           },
-                        }}>
+                        }}
+                      >
                         <ListItemIcon sx={{ color: "white" }}>
                           <CalculateIcon />
                         </ListItemIcon>
@@ -1058,13 +1106,15 @@ export default function Navbar() {
                     <Collapse
                       in={energySettlementsOpen}
                       timeout="auto"
-                      unmountOnExit>
+                      unmountOnExit
+                    >
                       <List component="div" disablePadding>
                         {energySettlementsItems.map((item) => (
                           <ListItem
                             key={item.text}
                             disablePadding
-                            sx={{ pl: 2 }}>
+                            sx={{ pl: 2 }}
+                          >
                             <ListItemButton
                               onClick={() => handleMenuClick(item.path)}
                               sx={{
@@ -1075,9 +1125,11 @@ export default function Navbar() {
                                   backgroundColor: "rgba(255,255,255,0.08)",
                                   transform: "translateX(5px)",
                                 },
-                              }}>
+                              }}
+                            >
                               <ListItemIcon
-                                sx={{ color: "rgba(255,255,255,0.8)" }}>
+                                sx={{ color: "rgba(255,255,255,0.8)" }}
+                              >
                                 {item.icon}
                               </ListItemIcon>
                               <ListItemText
@@ -1112,7 +1164,8 @@ export default function Navbar() {
                           "&:hover": {
                             backgroundColor: "rgba(255,255,255,0.1)",
                           },
-                        }}>
+                        }}
+                      >
                         <ListItemIcon sx={{ color: "white" }}>
                           <HandshakeIcon />
                         </ListItemIcon>
@@ -1135,14 +1188,25 @@ export default function Navbar() {
                             if (role === "operator" || role === "rahbar") {
                               return item.text === "Ҳамкорлар қарздорлиги";
                             }
-                            // Для admin и buxgalter показываем все
-                            return true;
+                            // Для buxgalter показываем все, кроме "Тўлов турлари"
+                            if (role === "buxgalter") {
+                              return (
+                                !item.roles || !item.roles.includes("admin")
+                              );
+                            }
+                            // Для admin показываем все
+                            if (role === "admin") {
+                              return true;
+                            }
+                            // Для остальных ролей (если есть) - фильтруем по roles
+                            return !item.roles || item.roles.includes(role);
                           })
                           .map((item) => (
                             <ListItem
                               key={item.text}
                               disablePadding
-                              sx={{ pl: 2 }}>
+                              sx={{ pl: 2 }}
+                            >
                               <ListItemButton
                                 onClick={() => handleMenuClick(item.path)}
                                 sx={{
@@ -1153,12 +1217,14 @@ export default function Navbar() {
                                     backgroundColor: "rgba(255,255,255,0.08)",
                                     transform: "translateX(5px)",
                                   },
-                                }}>
+                                }}
+                              >
                                 <ListItemIcon
                                   sx={{
                                     minWidth: "40px",
                                     color: "rgba(255,255,255,0.8)",
-                                  }}>
+                                  }}
+                                >
                                   {item.icon}
                                 </ListItemIcon>
                                 <ListItemText
@@ -1193,7 +1259,8 @@ export default function Navbar() {
                           "&:hover": {
                             backgroundColor: "rgba(255,255,255,0.1)",
                           },
-                        }}>
+                        }}
+                      >
                         <ListItemIcon sx={{ color: "white" }}>
                           <SummarizeIcon />
                         </ListItemIcon>
@@ -1207,7 +1274,8 @@ export default function Navbar() {
                     <Collapse
                       in={dailyReportsOpen}
                       timeout="auto"
-                      unmountOnExit>
+                      unmountOnExit
+                    >
                       <List component="div" disablePadding>
                         {dailyReportsItems
                           .filter((item) => {
@@ -1226,7 +1294,8 @@ export default function Navbar() {
                             <ListItem
                               key={item.text}
                               disablePadding
-                              sx={{ pl: 2 }}>
+                              sx={{ pl: 2 }}
+                            >
                               <ListItemButton
                                 onClick={() => handleMenuClick(item.path)}
                                 sx={{
@@ -1237,12 +1306,14 @@ export default function Navbar() {
                                     backgroundColor: "rgba(255,255,255,0.08)",
                                     transform: "translateX(5px)",
                                   },
-                                }}>
+                                }}
+                              >
                                 <ListItemIcon
                                   sx={{
                                     minWidth: "40px",
                                     color: "rgba(255,255,255,0.8)",
-                                  }}>
+                                  }}
+                                >
                                   {item.icon}
                                 </ListItemIcon>
                                 <ListItemText
@@ -1273,7 +1344,8 @@ export default function Navbar() {
                           "&:hover": {
                             backgroundColor: "rgba(255,255,255,0.1)",
                           },
-                        }}>
+                        }}
+                      >
                         <ListItemIcon sx={{ color: "white" }}>
                           <DescriptionIcon />
                         </ListItemIcon>
@@ -1297,9 +1369,11 @@ export default function Navbar() {
                                 backgroundColor: "rgba(255,255,255,0.08)",
                                 transform: "translateX(5px)",
                               },
-                            }}>
+                            }}
+                          >
                             <ListItemIcon
-                              sx={{ color: "rgba(255,255,255,0.8)" }}>
+                              sx={{ color: "rgba(255,255,255,0.8)" }}
+                            >
                               <CategoryIcon />
                             </ListItemIcon>
                             <ListItemText
@@ -1326,9 +1400,11 @@ export default function Navbar() {
                               "&:hover": {
                                 backgroundColor: "rgba(255,255,255,0.08)",
                               },
-                            }}>
+                            }}
+                          >
                             <ListItemIcon
-                              sx={{ color: "rgba(255,255,255,0.8)" }}>
+                              sx={{ color: "rgba(255,255,255,0.8)" }}
+                            >
                               <ScheduleIcon />
                             </ListItemIcon>
                             <ListItemText
@@ -1344,13 +1420,15 @@ export default function Navbar() {
                         <Collapse
                           in={docsTimedOpen}
                           timeout="auto"
-                          unmountOnExit>
+                          unmountOnExit
+                        >
                           <List component="div" disablePadding>
                             {docsTimedItems.map((item) => (
                               <ListItem
                                 key={item.text}
                                 disablePadding
-                                sx={{ pl: 4 }}>
+                                sx={{ pl: 4 }}
+                              >
                                 <ListItemButton
                                   onClick={() => handleMenuClick(item.path)}
                                   sx={{
@@ -1361,9 +1439,11 @@ export default function Navbar() {
                                       backgroundColor: "rgba(255,255,255,0.06)",
                                       transform: "translateX(5px)",
                                     },
-                                  }}>
+                                  }}
+                                >
                                   <ListItemIcon
-                                    sx={{ color: "rgba(255,255,255,0.7)" }}>
+                                    sx={{ color: "rgba(255,255,255,0.7)" }}
+                                  >
                                     {item.icon}
                                   </ListItemIcon>
                                   <ListItemText
@@ -1393,9 +1473,11 @@ export default function Navbar() {
                               "&:hover": {
                                 backgroundColor: "rgba(255,255,255,0.08)",
                               },
-                            }}>
+                            }}
+                          >
                             <ListItemIcon
-                              sx={{ color: "rgba(255,255,255,0.8)" }}>
+                              sx={{ color: "rgba(255,255,255,0.8)" }}
+                            >
                               <AllInclusiveIcon />
                             </ListItemIcon>
                             <ListItemText
@@ -1411,13 +1493,15 @@ export default function Navbar() {
                         <Collapse
                           in={docsPerpOpen}
                           timeout="auto"
-                          unmountOnExit>
+                          unmountOnExit
+                        >
                           <List component="div" disablePadding>
                             {docsPerpItems.map((item) => (
                               <ListItem
                                 key={item.text}
                                 disablePadding
-                                sx={{ pl: 4 }}>
+                                sx={{ pl: 4 }}
+                              >
                                 <ListItemButton
                                   onClick={() => handleMenuClick(item.path)}
                                   sx={{
@@ -1428,9 +1512,11 @@ export default function Navbar() {
                                       backgroundColor: "rgba(255,255,255,0.06)",
                                       transform: "translateX(5px)",
                                     },
-                                  }}>
+                                  }}
+                                >
                                   <ListItemIcon
-                                    sx={{ color: "rgba(255,255,255,0.7)" }}>
+                                    sx={{ color: "rgba(255,255,255,0.7)" }}
+                                  >
                                     {item.icon}
                                   </ListItemIcon>
                                   <ListItemText
@@ -1463,7 +1549,8 @@ export default function Navbar() {
                           "&:hover": {
                             backgroundColor: "rgba(255,255,255,0.1)",
                           },
-                        }}>
+                        }}
+                      >
                         <ListItemIcon sx={{ color: "white" }}>
                           <BuildIcon />
                         </ListItemIcon>
@@ -1486,9 +1573,11 @@ export default function Navbar() {
                               "&:hover": {
                                 backgroundColor: "rgba(255,255,255,0.08)",
                               },
-                            }}>
+                            }}
+                          >
                             <ListItemIcon
-                              sx={{ color: "rgba(255,255,255,0.8)" }}>
+                              sx={{ color: "rgba(255,255,255,0.8)" }}
+                            >
                               <SettingsInputComponentIcon />
                             </ListItemIcon>
                             <ListItemText
@@ -1508,13 +1597,15 @@ export default function Navbar() {
                         <Collapse
                           in={equipmentDetailsOpen}
                           timeout="auto"
-                          unmountOnExit>
+                          unmountOnExit
+                        >
                           <List component="div" disablePadding>
                             {equipmentDetailsItems.map((item) => (
                               <ListItem
                                 key={item.text}
                                 disablePadding
-                                sx={{ pl: 4 }}>
+                                sx={{ pl: 4 }}
+                              >
                                 <ListItemButton
                                   onClick={() => handleMenuClick(item.path)}
                                   sx={{
@@ -1525,9 +1616,11 @@ export default function Navbar() {
                                       backgroundColor: "rgba(255,255,255,0.06)",
                                       transform: "translateX(5px)",
                                     },
-                                  }}>
+                                  }}
+                                >
                                   <ListItemIcon
-                                    sx={{ color: "rgba(255,255,255,0.7)" }}>
+                                    sx={{ color: "rgba(255,255,255,0.7)" }}
+                                  >
                                     {item.icon}
                                   </ListItemIcon>
                                   <ListItemText
@@ -1554,9 +1647,11 @@ export default function Navbar() {
                               "&:hover": {
                                 backgroundColor: "rgba(255,255,255,0.08)",
                               },
-                            }}>
+                            }}
+                          >
                             <ListItemIcon
-                              sx={{ color: "rgba(255,255,255,0.8)" }}>
+                              sx={{ color: "rgba(255,255,255,0.8)" }}
+                            >
                               <CategoryIcon />
                             </ListItemIcon>
                             <ListItemText
@@ -1576,13 +1671,15 @@ export default function Navbar() {
                         <Collapse
                           in={equipmentTypesOpen}
                           timeout="auto"
-                          unmountOnExit>
+                          unmountOnExit
+                        >
                           <List component="div" disablePadding>
                             {equipmentTypesItems.map((item) => (
                               <ListItem
                                 key={item.text}
                                 disablePadding
-                                sx={{ pl: 4 }}>
+                                sx={{ pl: 4 }}
+                              >
                                 <ListItemButton
                                   onClick={() => handleMenuClick(item.path)}
                                   sx={{
@@ -1593,9 +1690,11 @@ export default function Navbar() {
                                       backgroundColor: "rgba(255,255,255,0.06)",
                                       transform: "translateX(5px)",
                                     },
-                                  }}>
+                                  }}
+                                >
                                   <ListItemIcon
-                                    sx={{ color: "rgba(255,255,255,0.7)" }}>
+                                    sx={{ color: "rgba(255,255,255,0.7)" }}
+                                  >
                                     {item.icon}
                                   </ListItemIcon>
                                   <ListItemText

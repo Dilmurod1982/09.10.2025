@@ -1,5 +1,5 @@
 // pages/HomeChief.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAppStore } from "../lib/zustand";
 import {
   useStationAnalytics,
@@ -16,12 +16,29 @@ const HomeChief = () => {
   const [autopilotPeriod, setAutopilotPeriod] = useState("1day");
   const [gasPaymentsPeriod, setGasPaymentsPeriod] = useState("1day");
   const [gasPaymentsDateRange, setGasPaymentsDateRange] = useState(null);
+  const [hasData, setHasData] = useState(false);
 
   const userData = useAppStore((state) => state.userData);
   const managedStations = userData?.stations || [];
 
   const { analysisData, loading, error, loadAnalysisData, debugInfo } =
     useStationAnalytics(managedStations);
+
+  // Отслеживаем наличие данных
+  useEffect(() => {
+    const totalData =
+      analysisData.autopilotData.length +
+      analysisData.comparisonData.length +
+      analysisData.negativeDifferenceData.length +
+      analysisData.missingReportsData.length +
+      analysisData.controlDifferenceData.length +
+      analysisData.expiredDocumentsData.length +
+      (Array.isArray(analysisData.gasAndPaymentsData)
+        ? analysisData.gasAndPaymentsData.length
+        : 0);
+
+    setHasData(totalData > 0 || loading);
+  }, [analysisData, loading]);
 
   // Функция для применения фильтров
   const applyFilters = () => {
@@ -64,8 +81,10 @@ const HomeChief = () => {
             {managedStations.length} та заправка бошқармоқдасиз
           </div>
           <div className="text-sm text-gray-500">
-            Ҳисоботлар: {debugInfo.reportsCount} | Хужжатлар:{" "}
-            {debugInfo.documentsCount}
+            {debugInfo.reportsCount !== undefined &&
+              `Ҳисоботлар: ${debugInfo.reportsCount}`}
+            {debugInfo.documentsCount !== undefined &&
+              ` | Хужжатлар: ${debugInfo.documentsCount}`}
           </div>
         </div>
       </div>
@@ -81,12 +100,15 @@ const HomeChief = () => {
           </div>
           <div className="text-sm text-gray-500 mb-4">{error}</div>
           <div className="text-xs text-gray-400 mb-4">
-            Ҳисоботлар: {debugInfo.reportsCount} | Хужжатлар:{" "}
-            {debugInfo.documentsCount}
+            {debugInfo.reportsCount !== undefined &&
+              `Ҳисоботлар: ${debugInfo.reportsCount}`}
+            {debugInfo.documentsCount !== undefined &&
+              ` | Хужжатлар: ${debugInfo.documentsCount}`}
           </div>
           <button
             onClick={() => loadAnalysisData()}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
             Қайта уриниб кўриш
           </button>
         </div>
@@ -94,8 +116,8 @@ const HomeChief = () => {
     );
   }
 
-  // Если нет данных
-  if (debugInfo.reportsCount === 0) {
+  // Изменяем проверку наличия данных
+  if (!loading && !hasData && debugInfo.reportsCount === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md">
@@ -107,11 +129,13 @@ const HomeChief = () => {
             киритилгандан сўнг маълумотлар чиқади
           </div>
           <div className="text-xs text-gray-400 mb-4">
-            Бошқариладиган заправкалар: {debugInfo.managedStationsCount}
+            Бошқариладиган заправкалар:{" "}
+            {debugInfo.managedStationsCount || managedStations.length}
           </div>
           <button
             onClick={() => loadAnalysisData()}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
             Қайта уриниш
           </button>
         </div>
@@ -204,13 +228,14 @@ const HomeChief = () => {
             icon="📄"
           />
 
-          {/* НОВАЯ КАРТОЧКА: Расход газа и платежи */}
           <AnalysisCard
             title="Сотилган газ ва тўловлар"
             value={
               analysisData.gasAndPaymentsData?.summary
                 ? "Ҳисобот"
-                : analysisData.gasAndPaymentsData.length
+                : Array.isArray(analysisData.gasAndPaymentsData)
+                ? analysisData.gasAndPaymentsData.length
+                : 0
             }
             subtitle={
               analysisData.gasAndPaymentsData?.summary
@@ -280,13 +305,22 @@ const HomeChief = () => {
           </div>
 
           {/* Отладочная информация */}
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-            <div className="text-xs text-gray-500">
-              Маълумот: {debugInfo.reportsCount} , {debugInfo.documentsCount}{" "}
-              хужжатлар, {debugInfo.managedStationsCount} бошқариладиган
-              заправкалар
+          {debugInfo && (
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <div className="text-xs text-gray-500">
+                Маълумот: {debugInfo.reportsCount || 0} ҳисобот,{" "}
+                {debugInfo.documentsCount || 0} хужжатлар,{" "}
+                {debugInfo.managedStationsCount || managedStations.length}{" "}
+                бошқариладиган заправкалар
+                {debugInfo.loadedCollections &&
+                  debugInfo.loadedCollections.length > 0 && (
+                    <div className="mt-1">
+                      Коллекции: {debugInfo.loadedCollections.join(", ")}
+                    </div>
+                  )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

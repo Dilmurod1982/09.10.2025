@@ -5,8 +5,8 @@ import {
   where,
   orderBy,
   getDocs,
-  updateDoc,
   doc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { useAppStore } from "../lib/zustand";
@@ -20,6 +20,7 @@ const ControlPayments = () => {
   const [selectedStation, setSelectedStation] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState("");
   const [reports, setReports] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalType, setModalType] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -52,6 +53,22 @@ const ControlPayments = () => {
     return options.reverse();
   }, []);
 
+  // Определение квартала по месяцу
+  const getQuarterFromMonth = (year, month) => {
+    const monthNum = parseInt(month);
+    if (monthNum >= 1 && monthNum <= 3) return "I";
+    if (monthNum >= 4 && monthNum <= 6) return "II";
+    if (monthNum >= 7 && monthNum <= 9) return "III";
+    if (monthNum >= 10 && monthNum <= 12) return "IV";
+    return "I";
+  };
+
+  // Формирование названия коллекции
+  const getCollectionName = (year, month) => {
+    const quarter = getQuarterFromMonth(year, month);
+    return `unifiedDailyReports_${quarter}_${year}`;
+  };
+
   // Загрузка станций
   useEffect(() => {
     const fetchStations = async () => {
@@ -72,6 +89,25 @@ const ControlPayments = () => {
     fetchStations();
   }, [userData]);
 
+  // Загрузка методов платежей
+  useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, "paymentMethods"));
+        const methods = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        console.log("Загруженные методы платежей:", methods);
+        setPaymentMethods(methods);
+      } catch (error) {
+        console.error("Ошибка при загрузке методов платежей:", error);
+      }
+    };
+
+    fetchPaymentMethods();
+  }, []);
+
   // Загрузка отчетов
   useEffect(() => {
     if (!selectedMonth) {
@@ -86,12 +122,15 @@ const ControlPayments = () => {
         const startDate = `${year}-${month}-01`;
         const endDate = `${year}-${month}-31`;
 
+        // Определяем коллекцию на основе месяца
+        const collectionName = getCollectionName(year, month);
+
         let q;
 
         if (selectedStation) {
           // Загрузка для конкретной станции
           q = query(
-            collection(db, "unifiedDailyReports"),
+            collection(db, collectionName),
             where("stationId", "==", selectedStation.id),
             where("reportDate", ">=", startDate),
             where("reportDate", "<=", endDate),
@@ -106,7 +145,7 @@ const ControlPayments = () => {
           }
 
           q = query(
-            collection(db, "unifiedDailyReports"),
+            collection(db, collectionName),
             where("stationId", "in", stationIds),
             where("reportDate", ">=", startDate),
             where("reportDate", "<=", endDate),
@@ -148,7 +187,7 @@ const ControlPayments = () => {
   // Функция для получения информации о станции
   const getStationInfo = async (stationId) => {
     try {
-      const stationDoc = await getDocs(doc(db, "stations", stationId));
+      const stationDoc = await getDoc(doc(db, "stations", stationId));
       return stationDoc.exists()
         ? { id: stationId, ...stationDoc.data() }
         : null;
@@ -174,8 +213,56 @@ const ControlPayments = () => {
     return Math.round(percentage * 100) / 100;
   };
 
+  // Получение названия платежной системы по dbFieldName
+  const getPaymentMethodName = (dbFieldName) => {
+    const method = paymentMethods.find(
+      (method) => method.dbFieldName === dbFieldName
+    );
+    return method ? method.name : dbFieldName;
+  };
+
+  // Получение данных о платеже из paymentData
+  const getPaymentData = (report, paymentMethod) => {
+    const paymentData = report.paymentData || {};
+    return paymentData[paymentMethod.dbFieldName] || 0;
+  };
+
+  // Получение контрольной суммы для платежного метода
+  const getControlSumForPayment = (generalData, paymentMethod) => {
+    const dbFieldName = paymentMethod.dbFieldName;
+
+    // Специальные поля для наличных, Humo и Uzcard
+    if (dbFieldName === "zhisobot" && generalData.controlTotalSum) {
+      return generalData.controlTotalSum;
+    }
+    if (dbFieldName === "humo" && generalData.controlHumoSum) {
+      return generalData.controlHumoSum;
+    }
+    if (dbFieldName === "uzcard" && generalData.controlUzcardSum) {
+      return generalData.controlUzcardSum;
+    }
+
+    // Для электронных платежей используем префикс controlElectronic или индивидуальные поля
+    if (dbFieldName === "click" && generalData.controlClickSum) {
+      return generalData.controlClickSum;
+    }
+    if (dbFieldName === "payme" && generalData.controlPaymeSum) {
+      return generalData.controlPaymeSum;
+    }
+    if (dbFieldName === "paynet" && generalData.controlPaynetSum) {
+      return generalData.controlPaynetSum;
+    }
+
+    // Для других электронных платежей
+    const controlField = `control${
+      dbFieldName.charAt(0).toUpperCase() + dbFieldName.slice(1)
+    }Sum`;
+    return generalData[controlField] || 0;
+  };
+
   // Открытие модального окна
   const handleOpenModal = (type) => {
+    console.log("Открытие модального окна с типом:", type);
     setModalType(type);
     setShowModal(true);
   };
@@ -185,9 +272,25 @@ const ControlPayments = () => {
     setRefreshTrigger((prev) => prev + 1);
   };
 
-  // Экспорт в Excel
-  const exportToExcel = () => {
-    if (!reports.length) return;
+  // Получение электронных платежей (исключая наличные, Humo, Uzcard)
+  const getElectronicPaymentMethods = () => {
+    return paymentMethods.filter(
+      (method) =>
+        method.isActive === 1 &&
+        method.dbFieldName !== "zhisobot" &&
+        method.dbFieldName !== "humo" &&
+        method.dbFieldName !== "uzcard"
+    );
+  };
+
+  // Подготовка данных для экспорта
+  const prepareExportData = () => {
+    if (!reports.length || !paymentMethods.length) return [];
+
+    // Активные методы платежей
+    const activePaymentMethods = paymentMethods.filter(
+      (method) => method.isActive === 1
+    );
 
     const worksheetData = [
       ["Тўловлар назорати"],
@@ -203,84 +306,66 @@ const ControlPayments = () => {
         })}`,
       ],
       [],
-      [
-        "Заправка",
-        "Сана",
-        "Z-отчет",
-        "Жами назорат суммаси",
-        "Фоиз",
-        "Humo",
-        "Humo назорат суммаси",
-        "Humo фоизи",
-        "Uzcard",
-        "Uzcard назорат суммаси",
-        "Uzcard фоизи",
-        "Электрон тўловлар",
-        "Электрон тўловлар назорат суммаси",
-        "Электрон тўловлар фоизи",
-      ],
-      ...reports.map((report) => {
-        const generalData = report.generalData || {};
-
-        const totalPercentage = calculatePercentage(
-          generalData.controlTotalSum || 0,
-          generalData.cashAmount || 0
-        );
-
-        const humoPercentage = calculatePercentage(
-          generalData.controlHumoSum || 0,
-          generalData.humoTerminal || 0
-        );
-
-        const uzcardPercentage = calculatePercentage(
-          generalData.controlUzcardSum || 0,
-          generalData.uzcardTerminal || 0
-        );
-
-        const electronicPercentage = calculatePercentage(
-          generalData.controlElectronicSum || 0,
-          generalData.electronicPaymentSystem || 0
-        );
-
-        return [
-          report.stationName,
-          formatDate(report.reportDate),
-          generalData.cashAmount || 0,
-          generalData.controlTotalSum || 0,
-          totalPercentage,
-          generalData.humoTerminal || 0,
-          generalData.controlHumoSum || 0,
-          humoPercentage,
-          generalData.uzcardTerminal || 0,
-          generalData.controlUzcardSum || 0,
-          uzcardPercentage,
-          generalData.electronicPaymentSystem || 0,
-          generalData.controlElectronicSum || 0,
-          electronicPercentage,
-        ];
-      }),
     ];
+
+    // Заголовки таблицы
+    const headers = [
+      "Заправка",
+      "Сана",
+      ...activePaymentMethods
+        .map((method) => [
+          getPaymentMethodName(method.dbFieldName),
+          `${getPaymentMethodName(method.dbFieldName)} назорат суммаси`,
+          `${getPaymentMethodName(method.dbFieldName)} фоизи`,
+        ])
+        .flat(),
+    ];
+
+    worksheetData.push(headers);
+
+    // Данные по каждому отчету
+    reports.forEach((report) => {
+      const generalData = report.generalData || {};
+      const paymentData = report.paymentData || {};
+
+      const rowData = [report.stationName, formatDate(report.reportDate)];
+
+      // Данные по каждому методу платежа
+      activePaymentMethods.forEach((method) => {
+        const actualAmount = getPaymentData(report, method);
+        const controlAmount = getControlSumForPayment(generalData, method);
+        const percentage = calculatePercentage(controlAmount, actualAmount);
+
+        rowData.push(actualAmount, controlAmount, percentage.toFixed(2) + "%");
+      });
+
+      worksheetData.push(rowData);
+    });
+
+    return worksheetData;
+  };
+
+  // Экспорт в Excel
+  const exportToExcel = () => {
+    const worksheetData = prepareExportData();
+    if (!worksheetData.length) return;
 
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Назорат суммалар");
 
+    // Расчет ширины колонок
     const colWidths = [
-      { wch: 20 },
-      { wch: 12 },
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 12 },
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 12 },
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 12 },
-      { wch: 20 },
-      { wch: 25 },
-      { wch: 20 },
+      { wch: 20 }, // Заправка
+      { wch: 12 }, // Сана
     ];
+
+    // Добавляем ширину для каждой платежной системы (3 колонки на каждую)
+    paymentMethods.forEach(() => {
+      colWidths.push({ wch: 15 }); // Сумма
+      colWidths.push({ wch: 20 }); // Назорат суммаси
+      colWidths.push({ wch: 12 }); // Фоизи
+    });
 
     ws["!cols"] = colWidths;
 
@@ -289,6 +374,27 @@ const ControlPayments = () => {
       : `Барча_заправкалар_назорат_суммалар_${selectedMonth}`;
 
     XLSX.writeFile(wb, `${fileName}.xlsx`);
+  };
+
+  // Функция для получения цвета кнопки на основе типа
+  const getButtonColor = (dbFieldName = "") => {
+    if (dbFieldName === "zhisobot" || dbFieldName === "total")
+      return "from-green-500 to-green-600 hover:from-green-600 hover:to-green-700";
+    if (dbFieldName === "humo")
+      return "from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700";
+    if (dbFieldName === "uzcard")
+      return "from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700";
+
+    // Цвета для электронных платежей
+    if (dbFieldName === "click")
+      return "from-red-500 to-red-600 hover:from-red-600 hover:to-red-700";
+    if (dbFieldName === "payme")
+      return "from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700";
+    if (dbFieldName === "paynet")
+      return "from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700";
+
+    // По умолчанию для других электронных платежей
+    return "from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700";
   };
 
   return (
@@ -303,11 +409,11 @@ const ControlPayments = () => {
             <p className="text-gray-600 text-sm sm:text-base">
               Назорат ва нақд ҳамда пул ўтказиш суммаларини солиштириш
             </p>
-            {isBuxgalter && (
+            {/* {isBuxgalter && (
               <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 mt-2">
                 👑 Бухгалтер режими
               </div>
-            )}
+            )} */}
           </div>
         </div>
 
@@ -329,7 +435,8 @@ const ControlPayments = () => {
                       (s) => s.id === e.target.value
                     );
                     setSelectedStation(station || null);
-                  }}>
+                  }}
+                >
                   <option value="">Барча заправка</option>
                   {stations.map((station) => (
                     <option key={station.id} value={station.id}>
@@ -347,7 +454,8 @@ const ControlPayments = () => {
                 <select
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/50 backdrop-blur-sm transition-all duration-200 hover:border-gray-300"
                   value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}>
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                >
                   <option value="">Ойни танланг...</option>
                   {monthOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -366,55 +474,90 @@ const ControlPayments = () => {
 
               {/* Кнопки добавления контрольных сумм - только для бухгалтера */}
               {isBuxgalter && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <button
-                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
-                    onClick={() => handleOpenModal("total")}
-                    disabled={!selectedStation}>
-                    <span className="text-lg">💰</span>
-                    <span className="text-sm font-medium">Жами сумма</span>
-                  </button>
+                <>
+                  {/* Базовые кнопки */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* Кнопка Жами сумма (наличные) */}
+                    <button
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
+                      onClick={() => handleOpenModal("total")}
+                      disabled={!selectedStation}
+                    >
+                      <span className="text-lg">💰</span>
+                      <span className="text-sm font-medium">Жами сумма</span>
+                    </button>
 
-                  <button
-                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
-                    onClick={() => handleOpenModal("humo")}
-                    disabled={!selectedStation}>
-                    <span className="text-lg">💳</span>
-                    <span className="text-sm font-medium">Humo</span>
-                  </button>
+                    {/* Кнопка Humo */}
+                    <button
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
+                      onClick={() => handleOpenModal("humo")}
+                      disabled={!selectedStation}
+                    >
+                      <span className="text-lg">💳</span>
+                      <span className="text-sm font-medium">Humo</span>
+                    </button>
 
-                  <button
-                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
-                    onClick={() => handleOpenModal("uzcard")}
-                    disabled={!selectedStation}>
-                    <span className="text-lg">💳</span>
-                    <span className="text-sm font-medium">Uzcard</span>
-                  </button>
+                    {/* Кнопка Uzcard */}
+                    <button
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
+                      onClick={() => handleOpenModal("uzcard")}
+                      disabled={!selectedStation}
+                    >
+                      <span className="text-lg">💳</span>
+                      <span className="text-sm font-medium">Uzcard</span>
+                    </button>
 
-                  <button
-                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl hover:from-teal-600 hover:to-teal-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
-                    onClick={() => handleOpenModal("electronic")}
-                    disabled={!selectedStation}>
-                    <span className="text-lg">⚡</span>
-                    <span className="text-sm font-medium">Элек тўлов</span>
-                  </button>
-                </div>
+                    {/* Динамические кнопки для электронных платежей */}
+                    {getElectronicPaymentMethods().map((method) => (
+                      <button
+                        key={method.id}
+                        className={`flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r ${getButtonColor(
+                          method.dbFieldName
+                        )} text-white rounded-xl transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale`}
+                        onClick={() => handleOpenModal(method.dbFieldName)}
+                        disabled={!selectedStation}
+                      >
+                        <span className="text-lg">⚡</span>
+                        <span className="text-sm font-medium">
+                          {method.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Отладочная информация (можно удалить после тестирования) */}
+                  {/* <div className="mt-2 text-xs text-gray-500">
+                    <p>Всего методов: {paymentMethods.length}</p>
+                    <p>
+                      Электронных платежей:{" "}
+                      {getElectronicPaymentMethods().length}
+                    </p>
+                    {getElectronicPaymentMethods().map((method) => (
+                      <span key={method.id} className="mr-2">
+                        {method.name} ({method.dbFieldName})
+                      </span>
+                    ))}
+                  </div> */}
+                </>
               )}
 
               {/* Кнопка экспорта - для всех пользователей */}
               <div
                 className={`${
                   isBuxgalter ? "pt-3 border-t border-gray-200" : ""
-                }`}>
+                }`}
+              >
                 <button
                   className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale font-medium"
                   onClick={exportToExcel}
-                  disabled={!reports.length || !selectedMonth}>
+                  disabled={!reports.length || !selectedMonth}
+                >
                   <svg
                     className="w-5 h-5"
                     fill="none"
                     stroke="currentColor"
-                    viewBox="0 0 24 24">
+                    viewBox="0 0 24 24"
+                  >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -442,183 +585,111 @@ const ControlPayments = () => {
         {/* Таблица */}
         {!loading && selectedMonth && (
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 overflow-hidden">
-            {reports.length > 0 ? (
+            {reports.length > 0 && paymentMethods.length > 0 ? (
               <div className="overflow-x-auto">
                 <div className="min-w-full">
                   <table className="w-full">
                     <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
                       <tr>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                        <th
+                          className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200"
+                          rowSpan="2"
+                        >
                           Заправка
                         </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                        <th
+                          className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200"
+                          rowSpan="2"
+                        >
                           Сана
                         </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Z-отчет
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Назорат. сумма
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          %
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Humo
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Humo назорат
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          %
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Uzcard
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Uzcard назорат
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          %
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Элек.тўлов
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          Элек тўлов назорат
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
-                          %
-                        </th>
+                        {paymentMethods
+                          .filter((method) => method.isActive === 1)
+                          .map((method) => (
+                            <th
+                              key={method.id}
+                              colSpan="3"
+                              className="px-4 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200 text-center"
+                            >
+                              {getPaymentMethodName(method.dbFieldName)}
+                            </th>
+                          ))}
+                      </tr>
+                      <tr>
+                        {paymentMethods
+                          .filter((method) => method.isActive === 1)
+                          .map((method) => (
+                            <React.Fragment key={method.id}>
+                              <th className="px-2 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                                Сумма
+                              </th>
+                              <th className="px-2 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                                Назорат
+                              </th>
+                              <th className="px-2 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                                %
+                              </th>
+                            </React.Fragment>
+                          ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {reports.map((report) => {
                         const generalData = report.generalData || {};
-
-                        const totalPercentage = calculatePercentage(
-                          generalData.controlTotalSum || 0,
-                          generalData.cashAmount || 0
-                        );
-
-                        const humoPercentage = calculatePercentage(
-                          generalData.controlHumoSum || 0,
-                          generalData.humoTerminal || 0
-                        );
-
-                        const uzcardPercentage = calculatePercentage(
-                          generalData.controlUzcardSum || 0,
-                          generalData.uzcardTerminal || 0
-                        );
-
-                        const electronicPercentage = calculatePercentage(
-                          generalData.controlElectronicSum || 0,
-                          generalData.electronicPaymentSystem || 0
-                        );
+                        const paymentData = report.paymentData || {};
 
                         return (
                           <tr
                             key={report.id}
-                            className="hover:bg-blue-50/50 transition-colors duration-150">
+                            className="hover:bg-blue-50/50 transition-colors duration-150"
+                          >
                             <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {report.stationName}
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                               {formatDate(report.reportDate)}
                             </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                              {generalData.cashAmount?.toLocaleString("ru-RU", {
-                                minimumFractionDigits: 2,
-                              }) || "0.00"}
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
-                              {generalData.controlTotalSum?.toLocaleString(
-                                "ru-RU",
-                                {
-                                  minimumFractionDigits: 2,
-                                }
-                              ) || "0.00"}
-                            </td>
-                            <td
-                              className={`px-4 py-4 whitespace-nowrap text-sm font-bold ${
-                                totalPercentage >= 100
-                                  ? "text-green-600"
-                                  : "text-orange-600"
-                              }`}>
-                              {totalPercentage.toFixed(2)}%
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600">
-                              {generalData.humoTerminal?.toLocaleString(
-                                "ru-RU",
-                                {
-                                  minimumFractionDigits: 2,
-                                }
-                              ) || "0.00"}
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
-                              {generalData.controlHumoSum?.toLocaleString(
-                                "ru-RU",
-                                {
-                                  minimumFractionDigits: 2,
-                                }
-                              ) || "0.00"}
-                            </td>
-                            <td
-                              className={`px-4 py-4 whitespace-nowrap text-sm font-bold ${
-                                humoPercentage >= 100
-                                  ? "text-green-600"
-                                  : "text-orange-600"
-                              }`}>
-                              {humoPercentage.toFixed(2)}%
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600">
-                              {generalData.uzcardTerminal?.toLocaleString(
-                                "ru-RU",
-                                {
-                                  minimumFractionDigits: 2,
-                                }
-                              ) || "0.00"}
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
-                              {generalData.controlUzcardSum?.toLocaleString(
-                                "ru-RU",
-                                {
-                                  minimumFractionDigits: 2,
-                                }
-                              ) || "0.00"}
-                            </td>
-                            <td
-                              className={`px-4 py-4 whitespace-nowrap text-sm font-bold ${
-                                uzcardPercentage >= 100
-                                  ? "text-green-600"
-                                  : "text-orange-600"
-                              }`}>
-                              {uzcardPercentage.toFixed(2)}%
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-teal-600">
-                              {generalData.electronicPaymentSystem?.toLocaleString(
-                                "ru-RU",
-                                {
-                                  minimumFractionDigits: 2,
-                                }
-                              ) || "0.00"}
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
-                              {generalData.controlElectronicSum?.toLocaleString(
-                                "ru-RU",
-                                {
-                                  minimumFractionDigits: 2,
-                                }
-                              ) || "0.00"}
-                            </td>
-                            <td
-                              className={`px-4 py-4 whitespace-nowrap text-sm font-bold ${
-                                electronicPercentage >= 100
-                                  ? "text-green-600"
-                                  : "text-orange-600"
-                              }`}>
-                              {electronicPercentage.toFixed(2)}%
-                            </td>
+
+                            {paymentMethods
+                              .filter((method) => method.isActive === 1)
+                              .map((method) => {
+                                const actualAmount = getPaymentData(
+                                  report,
+                                  method
+                                );
+                                const controlAmount = getControlSumForPayment(
+                                  generalData,
+                                  method
+                                );
+                                const percentage = calculatePercentage(
+                                  controlAmount,
+                                  actualAmount
+                                );
+
+                                return (
+                                  <React.Fragment key={method.id}>
+                                    <td className="px-2 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                                      {actualAmount.toLocaleString("ru-RU", {
+                                        minimumFractionDigits: 2,
+                                      })}
+                                    </td>
+                                    <td className="px-2 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">
+                                      {controlAmount.toLocaleString("ru-RU", {
+                                        minimumFractionDigits: 2,
+                                      })}
+                                    </td>
+                                    <td
+                                      className={`px-2 py-4 whitespace-nowrap text-sm font-bold ${
+                                        percentage >= 100
+                                          ? "text-green-600"
+                                          : "text-orange-600"
+                                      }`}
+                                    >
+                                      {percentage.toFixed(2)}%
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              })}
                           </tr>
                         );
                       })}
@@ -634,7 +705,8 @@ const ControlPayments = () => {
                       className="w-8 h-8 text-blue-600"
                       fill="none"
                       stroke="currentColor"
-                      viewBox="0 0 24 24">
+                      viewBox="0 0 24 24"
+                    >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -644,10 +716,14 @@ const ControlPayments = () => {
                     </svg>
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Ҳисоботлар топилмади
+                    {paymentMethods.length === 0
+                      ? "Тўлов методлари юкланмокда..."
+                      : "Ҳисоботлар топилмади"}
                   </h3>
                   <p className="text-gray-600 text-sm">
-                    Танланган параметлар бўйича ҳисобот мавжуд эмас
+                    {paymentMethods.length === 0
+                      ? "Илтимос кутганг..."
+                      : "Танланган параметлар бўйича ҳисобот мавжуд эмас"}
                   </p>
                 </div>
               </div>
@@ -664,7 +740,8 @@ const ControlPayments = () => {
                   className="w-8 h-8 text-orange-600"
                   fill="none"
                   stroke="currentColor"
-                  viewBox="0 0 24 24">
+                  viewBox="0 0 24 24"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"

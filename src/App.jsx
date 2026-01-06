@@ -48,6 +48,7 @@ import {
   HomeElectronics,
   MeterReadings,
   HomeControlBooker,
+  PaymentMethods,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -314,6 +315,15 @@ function App() {
             <ProtectedLayout
               allowedRoles={["admin", "buxgalter"]}
               element={<PartnersList />}
+            />
+          ),
+        },
+        {
+          path: "/paymentmethods",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["admin"]}
+              element={<PaymentMethods />}
             />
           ),
         },

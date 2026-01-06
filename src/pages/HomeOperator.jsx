@@ -43,6 +43,41 @@ function HomeOperator() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Функция для получения названий электронных платежей
+  const getPaymentMethodName = (dbFieldName, paymentMethods = []) => {
+    const method = paymentMethods.find((m) => m.dbFieldName === dbFieldName);
+    return method ? method.name : dbFieldName;
+  };
+
+  // Функция для расчета суммы всех электронных платежей (все кроме zhisobot)
+  const calculateElectronicPayments = (report) => {
+    if (!report.paymentData) return 0;
+
+    // Исключаем zhisobot (наличные) из электронных платежей
+    const { zhisobot, ...electronicPayments } = report.paymentData;
+    return Object.values(electronicPayments).reduce(
+      (sum, amount) => sum + (amount || 0),
+      0
+    );
+  };
+
+  // Функция для получения списка электронных платежей с названиями
+  const getElectronicPaymentsList = (report) => {
+    if (!report.paymentData || !report.paymentMethods) return [];
+
+    const { zhisobot, ...electronicPayments } = report.paymentData;
+    const result = [];
+
+    Object.entries(electronicPayments).forEach(([key, amount]) => {
+      if (amount && amount > 0) {
+        const name = getPaymentMethodName(key, report.paymentMethods);
+        result.push({ key, name, amount });
+      }
+    });
+
+    return result;
+  };
+
   useEffect(() => {
     const fetchReports = async () => {
       if (
@@ -59,28 +94,98 @@ function HomeOperator() {
         setLoading(true);
         setError("");
 
-        // Получаем последние 7 отчетов для станции оператора
-        const q = query(
-          collection(db, "unifiedDailyReports"),
-          where("stationId", "in", userData.stations),
-          orderBy("reportDate", "desc"),
-          limit(7)
+        // Определяем текущую дату для поиска актуальных коллекций
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1;
+
+        // Определяем текущий квартал
+        let currentQuarter;
+        if (currentMonth >= 1 && currentMonth <= 3) currentQuarter = "I";
+        else if (currentMonth >= 4 && currentMonth <= 6) currentQuarter = "II";
+        else if (currentMonth >= 7 && currentMonth <= 9) currentQuarter = "III";
+        else currentQuarter = "IV";
+
+        // Пробуем получить данные из текущего и предыдущих кварталов
+        const allReports = [];
+        const quartersToTry = [
+          { quarter: currentQuarter, year: currentYear },
+          {
+            quarter:
+              currentQuarter === "I"
+                ? "IV"
+                : String(parseInt(currentQuarter) - 1),
+            year: currentQuarter === "I" ? currentYear - 1 : currentYear,
+          },
+          {
+            quarter:
+              currentQuarter === "I"
+                ? "III"
+                : currentQuarter === "II"
+                ? "I"
+                : "II",
+            year:
+              currentQuarter === "I" || currentQuarter === "II"
+                ? currentYear - 1
+                : currentYear,
+          },
+        ];
+
+        for (const { quarter, year } of quartersToTry) {
+          const collectionName = `unifiedDailyReports_${quarter}_${year}`;
+
+          try {
+            // Пробуем получить данные без сложного запроса сначала
+            const reportsRef = collection(db, collectionName);
+            const snapshot = await getDocs(reportsRef);
+
+            // Фильтруем локально
+            const filteredReports = [];
+            snapshot.forEach((doc) => {
+              const data = doc.data();
+              if (userData.stations.includes(data.stationId)) {
+                filteredReports.push({
+                  id: doc.id,
+                  collection: collectionName,
+                  ...data,
+                });
+              }
+            });
+
+            // Сортируем по дате и добавляем в общий массив
+            filteredReports.sort(
+              (a, b) => new Date(b.reportDate) - new Date(a.reportDate)
+            );
+            allReports.push(...filteredReports);
+
+            // Если уже набрали достаточно отчетов, выходим из цикла
+            if (allReports.length >= 7) {
+              break;
+            }
+          } catch (err) {
+            console.warn(
+              `Ошибка при загрузке коллекции ${collectionName}:`,
+              err.message
+            );
+            continue;
+          }
+        }
+
+        // Сортируем все отчеты по дате и берем последние 7
+        allReports.sort(
+          (a, b) => new Date(b.reportDate) - new Date(a.reportDate)
         );
+        const recentReports = allReports.slice(0, 7);
 
-        const querySnapshot = await getDocs(q);
-        const reportsData = [];
+        setReports(recentReports);
 
-        querySnapshot.forEach((doc) => {
-          reportsData.push({
-            id: doc.id,
-            ...doc.data(),
-          });
-        });
-
-        setReports(reportsData);
+        if (recentReports.length === 0) {
+          // Если нет отчетов, но пользователь оператор, показываем информационное сообщение
+          setError("");
+        }
       } catch (err) {
         console.error("Error fetching reports:", err);
-        setError("Ошибка при загрузке отчетов");
+        setError("Ошибка при загрузке отчетов. Проверьте консоль для деталей.");
       } finally {
         setLoading(false);
       }
@@ -115,16 +220,9 @@ function HomeOperator() {
         display="flex"
         justifyContent="center"
         alignItems="center"
-        minHeight="400px">
+        minHeight="400px"
+      >
         <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box p={3}>
-        <Alert severity="error">{error}</Alert>
       </Box>
     );
   }
@@ -142,12 +240,19 @@ function HomeOperator() {
   if (reports.length === 0) {
     return (
       <Box p={3}>
-        <Alert severity="info">Нет данных по отчетам для вашей станции.</Alert>
+        <Alert severity="info">
+          Нет данных по отчетам для вашей станции. Возможно, отчеты еще не
+          созданы.
+        </Alert>
       </Box>
     );
   }
 
   const latestReport = reports[0];
+  const electronicPayments = getElectronicPaymentsList(latestReport);
+  const totalElectronic = calculateElectronicPayments(latestReport);
+  const cashAmount = latestReport.paymentData?.zhisobot || 0;
+  const totalAllPayments = cashAmount + totalElectronic;
 
   return (
     <Box p={3}>
@@ -160,9 +265,15 @@ function HomeOperator() {
         {formatDate(latestReport.reportDate)}
       </Typography>
 
+      {error && (
+        <Box mb={3}>
+          <Alert severity="error">{error}</Alert>
+        </Box>
+      )}
+
       {/* Основная статистика */}
       <Grid container spacing={3} mb={4}>
-        {/* Общая сумма наличными */}
+        {/* Автопилот */}
         <Grid item xs={12} sm={6} md={3}>
           <Card elevation={3}>
             <CardContent>
@@ -182,75 +293,23 @@ function HomeOperator() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={3}>
-            <CardContent>
-              <Box display="flex" alignItems="center" mb={2}>
-                <AttachMoney color="primary" sx={{ fontSize: 40, mr: 2 }} />
-                <Box>
-                  <Typography color="textSecondary" variant="body2">
-                    Нақд
-                  </Typography>
-                  <Typography variant="h5" fontWeight="bold">
-                    {formatCurrency(latestReport.generalData?.cashAmount || 0)}
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
 
-        {/* Терминалы */}
-        <Grid item xs={12} sm={6} md={3}>
+        {/* Шланги */}
+        <Grid item xs={12} sm={6} md={4}>
           <Card elevation={3}>
             <CardContent>
               <Box display="flex" alignItems="center" mb={2}>
-                <CreditCard color="secondary" sx={{ fontSize: 40, mr: 2 }} />
-                <Box>
-                  <Typography color="textSecondary" variant="body2">
-                    Терминаллар
-                  </Typography>
-                  <Typography variant="h6" fontWeight="bold">
-                    Uzcard:{" "}
-                    {formatCurrency(
-                      latestReport.generalData?.uzcardTerminal || 0
-                    )}
-                  </Typography>
-                  <Typography variant="h6" fontWeight="bold">
-                    Humo:{" "}
-                    {formatCurrency(
-                      latestReport.generalData?.humoTerminal || 0
-                    )}
-                  </Typography>
-                  <Typography variant="h6" fontWeight="bold">
-                    ЭТ:{" "}
-                    {formatCurrency(
-                      latestReport.generalData?.electronicPaymentSystem || 0
-                    )}
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Общая сумма по шлангам */}
-        <Grid item xs={12} sm={6} md={3}>
-          <Card elevation={3}>
-            <CardContent>
-              <Box display="flex" alignItems="center" mb={2}>
-                <LocalGasStation color="success" sx={{ fontSize: 40, mr: 2 }} />
+                <LocalGasStation color="warning" sx={{ fontSize: 40, mr: 2 }} />
                 <Box>
                   <Typography color="textSecondary" variant="body2">
                     Шланглар бўйича сотув
                   </Typography>
                   <Typography variant="h5" fontWeight="bold">
-                    {/* {formatCurrency(latestReport.hoseTotalSum || 0)} */}
                     {formatNumber(latestReport.hoseTotalGas || 0)} м³
                   </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    {/* {formatNumber(latestReport.hoseTotalGas || 0)} м³ */}
-                  </Typography>
+                  {/* <Typography variant="body2" color="textSecondary">
+                    {formatCurrency(latestReport.hoseTotalSum || 0)}
+                  </Typography> */}
                 </Box>
               </Box>
             </CardContent>
@@ -258,21 +317,118 @@ function HomeOperator() {
         </Grid>
 
         {/* Партнеры */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <Card elevation={3}>
             <CardContent>
               <Box display="flex" alignItems="center" mb={2}>
                 <People color="info" sx={{ fontSize: 40, mr: 2 }} />
                 <Box>
                   <Typography color="textSecondary" variant="body2">
-                    Хамкорлар
+                    Хамкорлар (Шартнома)
                   </Typography>
                   <Typography variant="h5" fontWeight="bold">
-                    {formatCurrency(latestReport.partnerTotalAmount || 0)}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
                     {formatNumber(latestReport.partnerTotalM3 || 0)} м³
                   </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {formatCurrency(latestReport.partnerTotalAmount || 0)}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Общая сумма всех платежей */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card elevation={3}>
+            <CardContent>
+              <Box display="flex" alignItems="center" mb={2}>
+                <AccountBalance color="info" sx={{ fontSize: 40, mr: 2 }} />
+                <Box>
+                  <Typography color="textSecondary" variant="body2">
+                    Жами маблағ
+                  </Typography>
+                  <Typography variant="h5" fontWeight="bold">
+                    {formatCurrency(totalAllPayments)}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Барча тўлов турлари
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Наличные */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card elevation={3}>
+            <CardContent>
+              <Box display="flex" alignItems="center" mb={2}>
+                <AttachMoney color="success" sx={{ fontSize: 40, mr: 2 }} />
+                <Box>
+                  <Typography color="textSecondary" variant="body2">
+                    Нақд пул
+                  </Typography>
+                  <Typography variant="h5" fontWeight="bold">
+                    {formatCurrency(cashAmount)}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Z-ҳисобот
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Электронные платежи - сумма */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card elevation={3}>
+            <CardContent>
+              <Box display="flex" alignItems="center" mb={2}>
+                <CreditCard color="secondary" sx={{ fontSize: 40, mr: 2 }} />
+                <Box>
+                  <Typography color="textSecondary" variant="body2">
+                    Жами электрон
+                  </Typography>
+                  <Typography variant="h5" fontWeight="bold">
+                    {formatCurrency(totalElectronic)}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {electronicPayments.length} турда
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Детали электронных платежей */}
+        <Grid item xs={12} sm={6} md={4}>
+          <Card elevation={3}>
+            <CardContent>
+              <Box display="flex" alignItems="center" mb={2}>
+                <TrendingUp color="primary" sx={{ fontSize: 40, mr: 2 }} />
+                <Box>
+                  <Typography
+                    color="textSecondary"
+                    variant="body2"
+                    gutterBottom
+                  >
+                    Электрон тўловлар батафсил
+                  </Typography>
+                  {electronicPayments.length > 0 ? (
+                    electronicPayments.map((payment, index) => (
+                      <Typography key={index} variant="body2">
+                        {payment.name}: {formatCurrency(payment.amount)}
+                      </Typography>
+                    ))
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      Электрон тўловлар йўқ
+                    </Typography>
+                  )}
                 </Box>
               </Box>
             </CardContent>
@@ -344,21 +500,23 @@ function HomeOperator() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {latestReport.partnerData?.map((partner, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{partner.partnerName}</TableCell>
-                      <TableCell>{partner.contractNumber}</TableCell>
-                      <TableCell align="right">
-                        {formatNumber(partner.soldM3)}
-                      </TableCell>
-                      <TableCell align="right">
-                        {formatCurrency(partner.pricePerM3)}
-                      </TableCell>
-                      <TableCell align="right">
-                        {formatCurrency(partner.totalAmount)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {latestReport.partnerData
+                    ?.filter((partner) => (partner.soldM3 || 0) > 0) // Показываем только с продажами
+                    .map((partner, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{partner.partnerName}</TableCell>
+                        <TableCell>{partner.contractNumber}</TableCell>
+                        <TableCell align="right">
+                          {formatNumber(partner.soldM3)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrency(partner.pricePerM3)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrency(partner.totalAmount)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -376,49 +534,61 @@ function HomeOperator() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Сана</TableCell>
-                    <TableCell align="right">Нақд</TableCell>
-                    <TableCell align="right">Терминаллар</TableCell>
-                    <TableCell align="right">Шлангар бўйича</TableCell>
+                    <TableCell align="right">Нақд (Z)</TableCell>
+                    <TableCell align="right">Электрон</TableCell>
+                    <TableCell align="right">Жами</TableCell>
+                    <TableCell align="right">Шланглар</TableCell>
                     <TableCell align="right">Хамкорлар</TableCell>
                     <TableCell align="center">Холати</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {reports.map((report) => (
-                    <TableRow key={report.id}>
-                      <TableCell>{formatDate(report.reportDate)}</TableCell>
-                      <TableCell align="right">
-                        {formatCurrency(report.generalData?.cashAmount || 0)}
-                      </TableCell>
-                      <TableCell align="right">
-                        {formatCurrency(
-                          (report.generalData?.uzcardTerminal || 0) +
-                            (report.generalData?.humoTerminal || 0)
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        {formatCurrency(report.hoseTotalSum || 0)}
-                      </TableCell>
-                      <TableCell align="right">
-                        {formatCurrency(report.partnerTotalAmount || 0)}
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={
-                            report.status === "completed"
-                              ? "Тугаган"
-                              : "Процессда"
-                          }
-                          color={
-                            report.status === "completed"
-                              ? "success"
-                              : "warning"
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {reports.map((report) => {
+                    const reportCash = report.paymentData?.zhisobot || 0;
+                    const reportElectronic =
+                      calculateElectronicPayments(report);
+                    const reportTotal = reportCash + reportElectronic;
+
+                    return (
+                      <TableRow key={report.id}>
+                        <TableCell>{formatDate(report.reportDate)}</TableCell>
+                        <TableCell align="right">
+                          {formatCurrency(reportCash)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrency(reportElectronic)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrency(reportTotal)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrency(report.hoseTotalSum || 0)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrency(report.partnerTotalAmount || 0)}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={
+                              report.status === "completed"
+                                ? "Тугаган"
+                                : report.status === "pending"
+                                ? "Кутилмокда"
+                                : "Процессда"
+                            }
+                            color={
+                              report.status === "completed"
+                                ? "success"
+                                : report.status === "pending"
+                                ? "warning"
+                                : "error"
+                            }
+                            size="small"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
