@@ -98,7 +98,6 @@ const ControlPayments = () => {
           id: doc.id,
           ...doc.data(),
         }));
-        console.log("Загруженные методы платежей:", methods);
         setPaymentMethods(methods);
       } catch (error) {
         console.error("Ошибка при загрузке методов платежей:", error);
@@ -108,63 +107,139 @@ const ControlPayments = () => {
     fetchPaymentMethods();
   }, []);
 
-  // Загрузка отчетов
-  useEffect(() => {
+  // Новая функция загрузки отчетов без сложных запросов
+  const fetchReportsData = async () => {
     if (!selectedMonth) {
       setReports([]);
       return;
     }
 
-    const fetchReports = async () => {
-      setLoading(true);
+    setLoading(true);
+    try {
+      const [year, month] = selectedMonth.split("-");
+      const startDate = `${year}-${month}-01`;
+      const endDate = `${year}-${month}-31`;
+
+      // Получаем название коллекции для выбранного месяца
+      const collectionName = getCollectionName(year, month);
+
+      let allReports = [];
+
       try {
-        const [year, month] = selectedMonth.split("-");
-        const startDate = `${year}-${month}-01`;
-        const endDate = `${year}-${month}-31`;
+        // Загружаем все документы из коллекции
+        const reportsRef = collection(db, collectionName);
+        const snapshot = await getDocs(reportsRef);
 
-        // Определяем коллекцию на основе месяца
-        const collectionName = getCollectionName(year, month);
+        // Фильтруем локально
+        snapshot.forEach((doc) => {
+          const data = doc.data();
 
-        let q;
+          // Проверяем станцию
+          const stationMatch = selectedStation
+            ? data.stationId === selectedStation.id
+            : (userData?.stations || []).includes(data.stationId);
 
-        if (selectedStation) {
-          // Загрузка для конкретной станции
-          q = query(
-            collection(db, collectionName),
-            where("stationId", "==", selectedStation.id),
-            where("reportDate", ">=", startDate),
-            where("reportDate", "<=", endDate),
-            orderBy("reportDate", "asc")
-          );
-        } else {
-          // Загрузка для всех станций пользователя
-          const stationIds = userData?.stations || [];
-          if (stationIds.length === 0) {
-            setReports([]);
-            return;
+          // Проверяем дату
+          const dateMatch =
+            data.reportDate >= startDate && data.reportDate <= endDate;
+
+          if (stationMatch && dateMatch) {
+            allReports.push({
+              id: doc.id,
+              collection: collectionName,
+              ...data,
+            });
           }
+        });
 
-          q = query(
-            collection(db, collectionName),
-            where("stationId", "in", stationIds),
-            where("reportDate", ">=", startDate),
-            where("reportDate", "<=", endDate),
-            orderBy("reportDate", "asc")
+        // Если в квартальной коллекции не нашли, пробуем старую коллекцию
+        if (allReports.length === 0) {
+          console.log(
+            `Отчеты не найдены в коллекции ${collectionName}, пробуем старую коллекцию`
           );
+          await tryOldCollection(startDate, endDate);
+          return;
         }
+      } catch (firestoreError) {
+        console.error(
+          `Ошибка при загрузке из коллекции ${collectionName}:`,
+          firestoreError
+        );
+        // Пробуем загрузить из старой коллекции
+        await tryOldCollection(startDate, endDate);
+        return;
+      }
 
-        const snapshot = await getDocs(q);
-        const reportsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+      // Добавляем информацию о станции
+      const reportsWithStationInfo = await Promise.all(
+        allReports.map(async (report) => {
+          let stationInfo = stations.find((s) => s.id === report.stationId);
+          if (!stationInfo) {
+            stationInfo = await getStationInfo(report.stationId);
+          }
+          return {
+            ...report,
+            stationName: stationInfo?.stationName || "Номаълум заправка",
+          };
+        })
+      );
 
-        // Добавляем информацию о станции к каждому отчету
+      // Сортируем по дате
+      reportsWithStationInfo.sort((a, b) => {
+        if (a.reportDate < b.reportDate) return -1;
+        if (a.reportDate > b.reportDate) return 1;
+        return 0;
+      });
+
+      setReports(reportsWithStationInfo);
+      console.log(
+        `Загружено ${reportsWithStationInfo.length} отчетов из коллекции ${collectionName}`
+      );
+    } catch (error) {
+      console.error("Общая ошибка при загрузке отчетов:", error);
+      setReports([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Функция для попытки загрузки из старой коллекции
+  const tryOldCollection = async (startDate, endDate) => {
+    try {
+      console.log("Пробуем загрузить из старой коллекции unifiedDailyReports");
+      const reportsRef = collection(db, "unifiedDailyReports");
+      const snapshot = await getDocs(reportsRef);
+
+      const allReports = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+
+        // Проверяем станцию
+        const stationMatch = selectedStation
+          ? data.stationId === selectedStation.id
+          : (userData?.stations || []).includes(data.stationId);
+
+        // Проверяем дату
+        const dateMatch =
+          data.reportDate >= startDate && data.reportDate <= endDate;
+
+        if (stationMatch && dateMatch) {
+          allReports.push({
+            id: doc.id,
+            collection: "unifiedDailyReports",
+            ...data,
+          });
+        }
+      });
+
+      if (allReports.length > 0) {
+        // Добавляем информацию о станции
         const reportsWithStationInfo = await Promise.all(
-          reportsData.map(async (report) => {
-            const stationInfo =
-              stations.find((s) => s.id === report.stationId) ||
-              (await getStationInfo(report.stationId));
+          allReports.map(async (report) => {
+            let stationInfo = stations.find((s) => s.id === report.stationId);
+            if (!stationInfo) {
+              stationInfo = await getStationInfo(report.stationId);
+            }
             return {
               ...report,
               stationName: stationInfo?.stationName || "Номаълум заправка",
@@ -172,17 +247,31 @@ const ControlPayments = () => {
           })
         );
 
-        setReports(reportsWithStationInfo);
-      } catch (error) {
-        console.error("Ошибка при загрузке отчетов:", error);
-        setReports([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+        // Сортируем по дате
+        reportsWithStationInfo.sort((a, b) => {
+          if (a.reportDate < b.reportDate) return -1;
+          if (a.reportDate > b.reportDate) return 1;
+          return 0;
+        });
 
-    fetchReports();
-  }, [selectedStation, selectedMonth, refreshTrigger, userData, stations]);
+        setReports(reportsWithStationInfo);
+        console.log(
+          `Загружено ${reportsWithStationInfo.length} отчетов из старой коллекции`
+        );
+      } else {
+        console.log("Отчеты не найдены и в старой коллекции");
+        setReports([]);
+      }
+    } catch (error) {
+      console.error("Ошибка при загрузке из старой коллекции:", error);
+      setReports([]);
+    }
+  };
+
+  // Загрузка отчетов при изменении параметров
+  useEffect(() => {
+    fetchReportsData();
+  }, [selectedStation, selectedMonth, refreshTrigger]);
 
   // Функция для получения информации о станции
   const getStationInfo = async (stationId) => {
@@ -409,11 +498,6 @@ const ControlPayments = () => {
             <p className="text-gray-600 text-sm sm:text-base">
               Назорат ва нақд ҳамда пул ўтказиш суммаларини солиштириш
             </p>
-            {/* {isBuxgalter && (
-              <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 mt-2">
-                👑 Бухгалтер режими
-              </div>
-            )} */}
           </div>
         </div>
 
@@ -524,20 +608,6 @@ const ControlPayments = () => {
                       </button>
                     ))}
                   </div>
-
-                  {/* Отладочная информация (можно удалить после тестирования) */}
-                  {/* <div className="mt-2 text-xs text-gray-500">
-                    <p>Всего методов: {paymentMethods.length}</p>
-                    <p>
-                      Электронных платежей:{" "}
-                      {getElectronicPaymentMethods().length}
-                    </p>
-                    {getElectronicPaymentMethods().map((method) => (
-                      <span key={method.id} className="mr-2">
-                        {method.name} ({method.dbFieldName})
-                      </span>
-                    ))}
-                  </div> */}
                 </>
               )}
 
@@ -725,6 +795,19 @@ const ControlPayments = () => {
                       ? "Илтимос кутганг..."
                       : "Танланган параметлар бўйича ҳисобот мавжуд эмас"}
                   </p>
+                  {reports.length === 0 && selectedMonth && (
+                    <div className="mt-4 text-xs text-gray-500">
+                      <p>Ой: {selectedMonth}</p>
+                      <p>Заправка: {selectedStation?.stationName || "Барча"}</p>
+                      <p>
+                        Коллекция:{" "}
+                        {getCollectionName(
+                          selectedMonth.split("-")[0],
+                          selectedMonth.split("-")[1]
+                        )}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

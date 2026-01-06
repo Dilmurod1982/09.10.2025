@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 const DetailedReportModal = ({ isOpen, onClose, report }) => {
   if (!isOpen || !report) return null;
 
-  console.log(report);
   // Форматирование даты
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -23,9 +22,35 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
     return `${hours}:${minutes}`;
   };
 
+  // Фильтрация партнеров для печати (только с soldM3 > 0)
+  const getFilteredPartnerDataForPrint = () => {
+    if (!report.partnerData) return [];
+    return report.partnerData.filter((partner) => (partner.soldM3 || 0) > 0);
+  };
+
+  // Расчет итогов для отфильтрованных партнеров
+  const calculateFilteredPartnerTotals = () => {
+    const filteredPartners = getFilteredPartnerDataForPrint();
+    return {
+      totalM3: filteredPartners.reduce(
+        (sum, partner) => sum + (partner.soldM3 || 0),
+        0
+      ),
+      totalAmount: filteredPartners.reduce(
+        (sum, partner) => sum + (partner.totalAmount || 0),
+        0
+      ),
+    };
+  };
+
   // Функция для печати
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
+
+    // Получаем отфильтрованные данные партнеров
+    const filteredPartnerData = getFilteredPartnerDataForPrint();
+    const partnerTotals = calculateFilteredPartnerTotals();
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -133,7 +158,7 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
         </head>
         <body>
           <div class="print-container">
-            ${generatePrintContent()}
+            ${generatePrintContent(filteredPartnerData, partnerTotals)}
           </div>
           <script>
             window.onload = function() {
@@ -148,7 +173,7 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
   };
 
   // Генерация контента для печати
-  const generatePrintContent = () => {
+  const generatePrintContent = (filteredPartnerData, partnerTotals) => {
     const calculateDifference = () => {
       const autopilotReading = report.generalData?.autopilotReading || 0;
       const hoseTotalGas = report.hoseTotalGas || 0;
@@ -201,10 +226,10 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
       </div>
 
       ${
-        report.hasPartnerData
+        filteredPartnerData.length > 0
           ? `
       <div class="section">
-        <h3>Хамкорлар бўйича ҳисобот</h3>
+        <h3>Хамкорлар бўйича ҳисобот (фаол хамкорлар)</h3>
         <table class="compact-table">
           <thead>
             <tr>
@@ -216,7 +241,7 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
             </tr>
           </thead>
           <tbody>
-            ${report.partnerData
+            ${filteredPartnerData
               ?.map(
                 (partner, index) => `
               <tr>
@@ -234,11 +259,11 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
             <tr>
               <td colspan="3" style="text-align: right; font-weight: bold;">Итого:</td>
               <td style="font-weight: bold;">${
-                report.partnerTotalM3?.toLocaleString() || "0"
+                partnerTotals.totalM3.toLocaleString() || "0"
               } м³</td>
               <td style="font-weight: bold;">${
-                report.partnerTotalAmount?.toLocaleString() || "0"
-              } ₽</td>
+                partnerTotals.totalAmount.toLocaleString() || "0"
+              } сўм</td>
             </tr>
           </tfoot>
         </table>
@@ -273,30 +298,48 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                 report.partnerTotalM3?.toLocaleString() || "0"
               } м³</strong></span>
             </div>
-          </div>
-          <div>
-            <div class="data-row">
+             <div class="data-row">
               <span>Хамкорларга сотилган газ суммаси:</span>
               <span><strong>${
                 report.partnerTotalAmount?.toLocaleString() || "0"
               } сўм</strong></span>
             </div>
+          </div>
+          <div>
             <div class="data-row">
               <span>UzCard терминали:</span>
               <span><strong>${
-                report.generalData?.uzcardTerminal?.toLocaleString() || "0"
+                report.paymentData?.uzcard?.toLocaleString() || "0"
               } сўм</strong></span>
             </div>
             <div class="data-row">
               <span>Humo терминали:</span>
               <span><strong>${
-                report.generalData?.humoTerminal?.toLocaleString() || "0"
+                report.paymentData?.humo?.toLocaleString() || "0"
               } сўм</strong></span>
-            </div>           
+            </div>
+            <div class="data-row">
+              <span>CLICK:</span>
+              <span><strong>${
+                report.paymentData?.click?.toLocaleString() || "0"
+              } сўм</strong></span>
+            </div>
+            <div class="data-row">
+              <span>PayMe:</span>
+              <span><strong>${
+                report.paymentData?.payme?.toLocaleString() || "0"
+              } сўм</strong></span>
+            </div>
+            <div class="data-row">
+              <span>PayNet терминали:</span>
+              <span><strong>${
+                report.paymentData?.paynet?.toLocaleString() || "0"
+              } сўм</strong></span>
+            </div>
             <div class="data-row">
               <span>Z ҳисобот:</span>
               <span><strong>${
-                report.generalData?.cashAmount?.toLocaleString() || "0"
+                report.paymentData?.zhisobot?.toLocaleString() || "0"
               } сўм</strong></span>
             </div>
           </div>
@@ -332,13 +375,15 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}>
+            onClick={onClose}
+          >
             <motion.div
               className="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}>
+              onClick={(e) => e.stopPropagation()}
+            >
               {/* Заголовок */}
               <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
                 <div className="flex justify-between items-start">
@@ -352,12 +397,14 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                   </div>
                   <button
                     onClick={onClose}
-                    className="text-white hover:text-blue-200 transition-colors">
+                    className="text-white hover:text-blue-200 transition-colors"
+                  >
                     <svg
                       className="w-6 h-6"
                       fill="none"
                       stroke="currentColor"
-                      viewBox="0 0 24 24">
+                      viewBox="0 0 24 24"
+                    >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -402,7 +449,8 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                             {report.hoseData?.map((hose, index) => (
                               <tr
                                 key={hose.hose}
-                                className="border-b hover:bg-gray-50">
+                                className="border-b hover:bg-gray-50"
+                              >
                                 <td className="px-4 py-2">{index + 1}</td>
                                 <td className="px-4 py-2 font-medium">
                                   {hose.hose}
@@ -420,7 +468,8 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                             <tr>
                               <td
                                 colSpan="3"
-                                className="px-4 py-2 font-semibold text-right">
+                                className="px-4 py-2 font-semibold text-right"
+                              >
                                 Жами:
                               </td>
                               <td className="px-4 py-2 font-semibold text-green-600">
@@ -468,7 +517,8 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                               {report.partnerData?.map((partner, index) => (
                                 <tr
                                   key={partner.partnerId}
-                                  className="border-b hover:bg-gray-50">
+                                  className="border-b hover:bg-gray-50"
+                                >
                                   <td className="px-4 py-2">{index + 1}</td>
                                   <td className="px-4 py-2 font-medium">
                                     {partner.partnerName}
@@ -492,7 +542,8 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                               <tr>
                                 <td
                                   colSpan="3"
-                                  className="px-4 py-2 font-semibold text-right">
+                                  className="px-4 py-2 font-semibold text-right"
+                                >
                                   Жами:
                                 </td>
                                 <td className="px-4 py-2 font-semibold">
@@ -549,7 +600,8 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                                 calculateDifference() >= 0
                                   ? "text-green-600"
                                   : "text-red-600"
-                              }`}>
+                              }`}
+                            >
                               {calculateDifference().toLocaleString()} м³
                             </span>
                           </div>
@@ -562,8 +614,6 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                               м³
                             </span>
                           </div>
-                        </div>
-                        <div className="space-y-3">
                           <div className="flex justify-between">
                             <span className="font-medium text-gray-700">
                               Хамкорларга сотилган газ суммаси:
@@ -574,12 +624,14 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                               сўм
                             </span>
                           </div>
+                        </div>
+                        <div className="space-y-3">
                           <div className="flex justify-between">
                             <span className="font-medium text-gray-700">
                               UzCard терминали:
                             </span>
                             <span className="font-semibold text-purple-600">
-                              {report.generalData?.uzcardTerminal?.toLocaleString() ||
+                              {report.paymentData?.uzcard?.toLocaleString() ||
                                 "0"}{" "}
                               сўм
                             </span>
@@ -589,17 +641,37 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                               Humo терминали:
                             </span>
                             <span className="font-semibold text-purple-600">
-                              {report.generalData?.humoTerminal?.toLocaleString() ||
+                              {report.paymentData?.humo?.toLocaleString() ||
                                 "0"}{" "}
                               сўм
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="font-medium text-gray-700">
-                              Электрон тўловлар:
+                              CLICK:
                             </span>
                             <span className="font-semibold text-purple-600">
-                              {report.generalData?.electronicPaymentSystem?.toLocaleString() ||
+                              {report.paymentData?.click?.toLocaleString() ||
+                                "0"}{" "}
+                              сўм
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium text-gray-700">
+                              PayMe:
+                            </span>
+                            <span className="font-semibold text-purple-600">
+                              {report.paymentData?.payme?.toLocaleString() ||
+                                "0"}{" "}
+                              сўм
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium text-gray-700">
+                              PayNet:
+                            </span>
+                            <span className="font-semibold text-purple-600">
+                              {report.paymentData?.paynet?.toLocaleString() ||
                                 "0"}{" "}
                               сўм
                             </span>
@@ -609,7 +681,7 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                               Z-ҳисобот:
                             </span>
                             <span className="font-semibold text-orange-600">
-                              {report.generalData?.cashAmount?.toLocaleString() ||
+                              {report.paymentData?.zhisobot?.toLocaleString() ||
                                 "0"}{" "}
                               сўм
                             </span>
@@ -653,17 +725,20 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                 <div className="flex gap-3">
                   <button
                     onClick={onClose}
-                    className="px-5 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors">
+                    className="px-5 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
                     Ёпиш
                   </button>
                   <button
                     onClick={handlePrint}
-                    className="px-5 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-2">
+                    className="px-5 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
                     <svg
                       className="w-5 h-5"
                       fill="none"
                       stroke="currentColor"
-                      viewBox="0 0 24 24">
+                      viewBox="0 0 24 24"
+                    >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"

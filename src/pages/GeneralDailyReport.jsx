@@ -215,6 +215,17 @@ const GeneralDailyReport = () => {
     return hoseTotal - autopilotReading;
   };
 
+  // Расчет коэффициента
+  const calculateCoefficient = (report) => {
+    const autopilotReading = report.generalData?.autopilotReading || 0;
+    const hoseTotalGas = report.hoseTotalGas || 0;
+
+    if (autopilotReading === 0) return 0;
+
+    const result = ((autopilotReading - hoseTotalGas) / autopilotReading) * 100;
+    return parseFloat(result.toFixed(2));
+  };
+
   // Форматирование даты в ДД-ММ-ГГГГ
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -374,9 +385,10 @@ const GeneralDailyReport = () => {
 
     const worksheetData = [
       // Заголовок
-      ["Кунлик ҳисобот", "", "", "", "", "", "", "", "", "", "", ""],
+      ["Кунлик ҳисобот", "", "", "", "", "", "", "", "", "", "", "", ""],
       [
         `Станция: ${selectedStation?.stationName || "Ноъмалум заправка"}`,
+        "",
         "",
         "",
         "",
@@ -405,6 +417,7 @@ const GeneralDailyReport = () => {
         "",
         "",
         "",
+        "",
       ],
       [], // Пустая строка
 
@@ -414,6 +427,7 @@ const GeneralDailyReport = () => {
         "Сана",
         "Ҳисоблагич кўрсаткичи",
         "Фарқи",
+        "Коэфф %",
         "Жами шланглар (м³)",
         "Жами хамкорлар (м³)",
         "1м³ нархи",
@@ -430,6 +444,7 @@ const GeneralDailyReport = () => {
       // Данные
       ...reports.map((report, index) => {
         const counterDiff = calculateCounterDiff(report);
+        const coefficient = calculateCoefficient(report);
         const cashAmount = getCashAmount(report);
         const uzcardAmount = getPaymentAmount(report, "uzcard");
         const humoAmount = getPaymentAmount(report, "humo");
@@ -440,6 +455,7 @@ const GeneralDailyReport = () => {
           formatDate(report.reportDate),
           report.generalData?.autopilotReading || 0,
           counterDiff,
+          coefficient,
           report.hoseTotalGas || 0,
           report.partnerTotalM3 || 0,
           report.generalData?.gasPrice || 0,
@@ -475,6 +491,7 @@ const GeneralDailyReport = () => {
         "",
         "",
         reports.reduce((sum, report) => sum + calculateCounterDiff(report), 0),
+        "", // Пусто для коэффициента
         reports.reduce((sum, report) => sum + (report.hoseTotalGas || 0), 0),
         reports.reduce((sum, report) => sum + (report.partnerTotalM3 || 0), 0),
         "",
@@ -517,6 +534,7 @@ const GeneralDailyReport = () => {
       { wch: 12 }, // Дата
       { wch: 18 }, // Показание счетчика
       { wch: 15 }, // Разница счетчика
+      { wch: 12 }, // Коэфф %
       { wch: 15 }, // Свод шланги
       { wch: 15 }, // Свод партнеры
       { wch: 12 }, // Цена за м³
@@ -600,7 +618,7 @@ const GeneralDailyReport = () => {
                   <option value="">танланг...</option>
                   {monthOptions.map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.label} ({option.quarter}-чорак)
+                      {option.label}
                     </option>
                   ))}
                 </select>
@@ -685,6 +703,9 @@ const GeneralDailyReport = () => {
                         Фарқи
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                        Коэфф %
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                         Шланглар (м³)
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
@@ -710,14 +731,15 @@ const GeneralDailyReport = () => {
                           Назорат суммаси
                         </th>
                       )}
-                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                      {/* <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                         Яратилди
-                      </th>
+                      </th> */}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {reports.map((report, index) => {
                       const counterDiff = calculateCounterDiff(report);
+                      const coefficient = calculateCoefficient(report);
                       const cashAmount = getCashAmount(report);
                       const uzcardAmount = getPaymentAmount(report, "uzcard");
                       const humoAmount = getPaymentAmount(report, "humo");
@@ -742,6 +764,17 @@ const GeneralDailyReport = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">
                             {counterDiff.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
+                            <span
+                              className={
+                                coefficient >= 0
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }
+                            >
+                              {coefficient}%
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
                             {report.hoseTotalGas?.toLocaleString() || "0"} м³
@@ -805,9 +838,9 @@ const GeneralDailyReport = () => {
                               сўм
                             </td>
                           )}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {report.createdBy || "Ноъмалум"}
-                          </td>
+                          </td> */}
                         </tr>
                       );
                     })}
@@ -835,13 +868,6 @@ const GeneralDailyReport = () => {
                 <p className="mt-1 text-sm text-gray-500">
                   {selectedStation.stationName} заправка бўйича танланган даврга
                   ҳисобот мавжуд эмас
-                </p>
-                <p className="mt-1 text-sm text-gray-500">
-                  Коллекция:{" "}
-                  {getCollectionName(
-                    selectedMonth.split("-")[0],
-                    selectedMonth.split("-")[1]
-                  )}
                 </p>
               </div>
             )}

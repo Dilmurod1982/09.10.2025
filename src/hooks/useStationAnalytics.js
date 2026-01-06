@@ -36,7 +36,12 @@ export const formatNumber = (num) => {
 };
 
 export const formatCurrency = (num) => {
-  return new Intl.NumberFormat("ru-RU").format(num) + " сўм";
+  return (
+    new Intl.NumberFormat("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num) + " сўм"
+  );
 };
 
 // Функция для определения квартала по дате
@@ -88,107 +93,47 @@ const getCollectionsForPeriod = (startDate, endDate) => {
 // Функция для загрузки отчетов из всех необходимых коллекций
 const loadReportsFromCollections = async (stationIds, startDate, endDate) => {
   try {
-    // console.log("🚀 Загрузка отчетов из коллекций...");
-    // console.log("📅 Период:", startDate, "до", endDate);
-    // console.log("🏭 Станций для фильтрации:", stationIds);
-
     // Если нет станций, возвращаем пустой массив
     if (!stationIds || stationIds.length === 0) {
-      // console.log("⚠️ Нет станций для загрузки");
       return [];
     }
 
     // Получаем список коллекций за период
     const collections = getCollectionsForPeriod(startDate, endDate);
-    // console.log("📚 Коллекции для загрузки:", collections);
 
     const allReports = [];
 
     // Загружаем из каждой коллекции
     for (const collectionName of collections) {
       try {
-        // console.log(`📥 Загрузка из коллекции: ${collectionName}`);
-
         // Загружаем все документы из коллекции
         const reportsRef = collection(db, collectionName);
         const snapshot = await getDocs(reportsRef);
 
-        // console.log(
-        //   `📄 Найдено документов в ${collectionName}:`,
-        //   snapshot.size
-        // );
-
-        // Показываем все документы для отладки
-        const allDocs = [];
+        // Фильтруем по станциям и дате
         snapshot.forEach((doc) => {
           const data = doc.data();
-          allDocs.push({
-            id: doc.id,
-            stationId: data.stationId,
-            stationName: data.stationName || "Без названия",
-            reportDate: data.reportDate || "Нет даты",
-            hasData: !!data.generalData || !!data.hoseTotalGas,
-            collection: collectionName,
-          });
+          const reportDate = data.reportDate;
+          const dataStationId = data.stationId;
+
+          // Проверяем дату
+          const isDateInRange =
+            reportDate >= startDate && reportDate <= endDate;
+
+          // Проверяем станцию
+          const isStationIncluded = stationIds.includes(dataStationId);
+
+          if (isDateInRange && isStationIncluded) {
+            allReports.push({
+              id: doc.id,
+              collection: collectionName,
+              ...data,
+            });
+          }
         });
-
-        if (allDocs.length > 0) {
-          // console.log(`📋 Все документы в ${collectionName}:`, allDocs);
-
-          // Фильтруем по станциям и дате
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            const reportDate = data.reportDate;
-            const dataStationId = data.stationId;
-
-            // Проверяем дату
-            const isDateInRange =
-              reportDate >= startDate && reportDate <= endDate;
-
-            // Проверяем станцию
-            const isStationIncluded = stationIds.includes(dataStationId);
-
-            // console.log(`🔍 Проверка документа:`, {
-            //   stationId: dataStationId,
-            //   targetStations: stationIds,
-            //   matches: isStationIncluded,
-            //   date: reportDate,
-            //   dateInRange: isDateInRange,
-            //   stationName: data.stationName,
-            //   hasGeneralData: !!data.generalData,
-            //   hasHoseTotalGas: !!data.hoseTotalGas,
-            //   hasPaymentData: !!data.paymentData,
-            // });
-
-            if (isDateInRange && isStationIncluded) {
-              // console.log(
-              //   `✅ Документ принят: ${doc.id} (${data.stationName})`
-              // );
-              allReports.push({
-                id: doc.id,
-                collection: collectionName,
-                ...data,
-              });
-            } else {
-              // console.log(`❌ Документ отклонен:`, {
-              //   id: doc.id,
-              //   stationId: dataStationId,
-              //   stationName: data.stationName,
-              //   reason: !isDateInRange
-              //     ? "Дата вне диапазона"
-              //     : "Станция не совпадает",
-              //   reportDate,
-              //   dateRange: `${startDate} - ${endDate}`,
-              //   requiredStations: stationIds,
-              // });
-            }
-          });
-        } else {
-          // console.log(`📭 Коллекция ${collectionName} пуста`);
-        }
       } catch (err) {
         console.warn(
-          `⚠️ Ошибка при загрузке коллекции ${collectionName}:`,
+          `Ошибка при загрузке коллекции ${collectionName}:`,
           err.message
         );
       }
@@ -196,30 +141,8 @@ const loadReportsFromCollections = async (stationIds, startDate, endDate) => {
 
     // Также проверяем старую коллекцию для обратной совместимости
     try {
-      // console.log("📥 Проверка старой коллекции unifiedDailyReports...");
       const oldCollectionRef = collection(db, "unifiedDailyReports");
       const oldSnapshot = await getDocs(oldCollectionRef);
-
-      // console.log(
-      //   "📄 Найдено документов в старой коллекции:",
-      //   oldSnapshot.size
-      // );
-
-      const oldDocs = [];
-      oldSnapshot.forEach((doc) => {
-        const data = doc.data();
-        oldDocs.push({
-          id: doc.id,
-          stationId: data.stationId,
-          stationName: data.stationName,
-          reportDate: data.reportDate,
-          collection: "unifiedDailyReports",
-        });
-      });
-
-      if (oldDocs.length > 0) {
-        // console.log("📋 Все документы в старой коллекции:", oldDocs);
-      }
 
       oldSnapshot.forEach((doc) => {
         const data = doc.data();
@@ -238,99 +161,101 @@ const loadReportsFromCollections = async (stationIds, startDate, endDate) => {
         }
       });
     } catch (err) {
-      console.warn("⚠️ Ошибка при загрузке старой коллекции:", err.message);
-    }
-
-    // console.log("✅ Всего загружено отчетов:", allReports.length);
-
-    if (allReports.length > 0) {
-      // console.log("📋 Загруженные отчеты:");
-      allReports.forEach((r, index) => {
-        // console.log(`${index + 1}. ${r.stationName} (${r.stationId})`);
-        // console.log(`   Дата: ${r.reportDate}`);
-        // console.log(`   Коллекция: ${r.collection}`);
-        // console.log(`   Данные:`, {
-        //   hoseTotalGas: r.hoseTotalGas || "нет",
-        //   generalData: r.generalData ? "есть" : "нет",
-        //   paymentData: r.paymentData ? "есть" : "нет",
-        // });
-      });
-    } else {
-      // console.log("❌ Отчеты не найдены. Проверьте:");
-      // console.log(
-      //   "   1. Существуют ли отчеты за период",
-      //   startDate,
-      //   "-",
-      //   endDate
-      // );
-      // console.log("   2. Правильный ли ID станции:", stationIds);
-      // console.log("   3. Проверьте Firestore Console");
+      console.warn("Ошибка при загрузке старой коллекции:", err.message);
     }
 
     return allReports;
   } catch (error) {
-    console.error("❌ Ошибка при загрузке отчетов:", error);
+    console.error("Ошибка при загрузке отчетов:", error);
     return [];
   }
 };
 
-/// Функция для получения суммы наличных
+// Функция для получения суммы наличных
 const getCashAmount = (report) => {
-  // Новая структура
+  // Новая структура paymentData
   if (report.paymentData && report.paymentData.zhisobot !== undefined) {
-    return report.paymentData.zhisobot;
+    return report.paymentData.zhisobot || 0;
   }
-  // Старая структура
+  // Старая структура generalData
   return report.generalData?.cashAmount || 0;
 };
 
-// Функция для получения суммы других электронных платежей (без uzcard и humo)
+// Функция для получения суммы Humo
+const getHumoAmount = (report) => {
+  // Новая структура paymentData
+  if (report.paymentData && report.paymentData.humo !== undefined) {
+    return report.paymentData.humo || 0;
+  }
+  // Старая структура generalData
+  return report.generalData?.humoTerminal || 0;
+};
+
+// Функция для получения суммы Uzcard
+const getUzcardAmount = (report) => {
+  // Новая структура paymentData
+  if (report.paymentData && report.paymentData.uzcard !== undefined) {
+    return report.paymentData.uzcard || 0;
+  }
+  // Старая структура generalData
+  return report.generalData?.uzcardTerminal || 0;
+};
+
+// Функция для получения суммы электронных платежей (Click, PayMe, PayNet)
 const getElectronicPayments = (report) => {
   const paymentData = report.paymentData || {};
+  const generalData = report.generalData || {};
 
-  // Суммируем все электронные платежи кроме uzcard и humo
   let total = 0;
 
+  // Суммируем все электронные платежи из paymentData
   if (paymentData.click) total += paymentData.click;
   if (paymentData.payme) total += paymentData.payme;
   if (paymentData.paynet) total += paymentData.paynet;
 
+  // Если есть электронная платежная система в старых данных
+  if (paymentData.electronicPaymentSystem) {
+    total += paymentData.electronicPaymentSystem;
+  }
+
   // Старая структура для обратной совместимости
-  if (total === 0 && report.generalData) {
-    total = report.generalData.electronicPaymentSystem || 0;
+  if (total === 0 && generalData.electronicPaymentSystem) {
+    total = generalData.electronicPaymentSystem;
   }
 
   return total;
 };
 
-// Функция для получения суммы Uzcard
-const getUzcardAmount = (report) => {
-  // Новая структура
-  if (report.paymentData && report.paymentData.uzcard !== undefined) {
-    return report.paymentData.uzcard;
-  }
-  // Старая структура
-  return report.generalData?.uzcardTerminal || 0;
-};
-
-// Функция для получения суммы Humo
-const getHumoAmount = (report) => {
-  // Новая структура
-  if (report.paymentData && report.paymentData.humo !== undefined) {
-    return report.paymentData.humo;
-  }
-  // Старая структура
-  return report.generalData?.humoTerminal || 0;
-};
-
 // Функция для получения общей суммы всех платежей
 const getTotalPayments = (report) => {
-  const paymentData = report.paymentData || {};
+  const cash = getCashAmount(report);
+  const humo = getHumoAmount(report);
+  const uzcard = getUzcardAmount(report);
+  const electronic = getElectronicPayments(report);
 
-  // Суммируем все платежи из paymentData
-  return Object.values(paymentData).reduce((sum, amount) => {
-    return sum + (amount || 0);
-  }, 0);
+  return cash + humo + uzcard + electronic;
+};
+
+// Функция для получения контрольной суммы из отчета
+const getControlSum = (report) => {
+  const generalData = report.generalData || {};
+
+  // Суммируем все контрольные суммы
+  let total = 0;
+
+  if (generalData.controlTotalSum) total += generalData.controlTotalSum;
+  if (generalData.controlHumoSum) total += generalData.controlHumoSum;
+  if (generalData.controlUzcardSum) total += generalData.controlUzcardSum;
+  if (generalData.controlClickSum) total += generalData.controlClickSum;
+  if (generalData.controlPaymeSum) total += generalData.controlPaymeSum;
+  if (generalData.controlPaynetSum) total += generalData.controlPaynetSum;
+  if (generalData.controlElectronicSum)
+    total += generalData.controlElectronicSum;
+
+  // Если есть прямая контрольная сумма
+  if (generalData.controlSum) total = generalData.controlSum;
+
+  return total;
 };
 
 export const useStationAnalytics = (managedStations = []) => {
@@ -405,16 +330,10 @@ export const useStationAnalytics = (managedStations = []) => {
     const startDateStr = startDate.toISOString().split("T")[0];
     const todayStr = today.toISOString().split("T")[0];
 
-    console.log(
-      `📅 Фильтрация отчетов: ${startDateStr} - ${todayStr} (период: ${period})`
-    );
-
     const filtered = reports.filter(
       (report) =>
         report.reportDate >= startDateStr && report.reportDate <= todayStr
     );
-
-    console.log(`📊 Отчетов после фильтрации: ${filtered.length}`);
 
     return filtered;
   };
@@ -491,7 +410,7 @@ export const useStationAnalytics = (managedStations = []) => {
       }));
       return stations;
     } catch (error) {
-      console.error("❌ Ошибка при загрузке станций:", error);
+      console.error("Ошибка при загрузке станций:", error);
       return [];
     }
   };
@@ -499,32 +418,10 @@ export const useStationAnalytics = (managedStations = []) => {
   // Упрощенная функция анализа расхода газа
   const analyzeGasAndPayments = (reports, period = "30days") => {
     try {
-      console.log("⛽ Анализ расхода газа...");
-      console.log("📊 Всего отчетов для анализа:", reports.length);
-
-      // Выводим все отчеты для отладки
-      reports.forEach((report, index) => {
-        console.log(
-          `${index + 1}. ${report.stationName} - ${report.reportDate}:`,
-          {
-            hoseTotalGas: report.hoseTotalGas,
-            paymentData: report.paymentData,
-            generalData: report.generalData,
-          }
-        );
-      });
-
       // Фильтруем отчеты по периоду
       const filteredReports = filterReportsByPeriod(reports, period);
-      console.log(
-        "📅 Отчетов после фильтрации по периоду:",
-        filteredReports.length
-      );
 
       if (filteredReports.length === 0) {
-        console.log("⚠️ Нет отчетов для анализа за указанный период");
-        console.log("ℹ️ Период:", period);
-        console.log("ℹ️ Сегодня:", new Date().toISOString().split("T")[0]);
         return [];
       }
 
@@ -558,14 +455,6 @@ export const useStationAnalytics = (managedStations = []) => {
         const uzcard = getUzcardAmount(report);
         const electronic = getElectronicPayments(report);
 
-        console.log(`📝 Добавление данных для ${stationName}:`, {
-          gas,
-          cash,
-          humo,
-          uzcard,
-          electronic,
-        });
-
         stationData.totalGas += gas;
         stationData.totalCash += cash;
         stationData.totalHumo += humo;
@@ -592,12 +481,6 @@ export const useStationAnalytics = (managedStations = []) => {
           electronicPercentage: (station.totalElectronic / total) * 100,
         };
 
-        console.log(`🏪 Станция ${station.stationName}:`, {
-          totalGas: station.totalGas,
-          totalPayments,
-          paymentDistribution,
-        });
-
         return {
           ...station,
           totalPayments,
@@ -605,37 +488,30 @@ export const useStationAnalytics = (managedStations = []) => {
         };
       });
 
-      console.log("✅ Анализ завершен, станций:", result.length);
       return result.sort((a, b) => b.totalGas - a.totalGas);
     } catch (error) {
-      console.error("❌ Ошибка анализа расхода газа:", error);
+      console.error("Ошибка анализа расхода газа:", error);
       return [];
     }
   };
 
-  // ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ - ИСПРАВЛЕННАЯ
+  // ОСНОВНАЯ ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ
   const loadAnalysisData = useCallback(
     async (filters = {}) => {
       // Защита от множественных вызовов
       const currentTime = Date.now();
       if (isLoadingRef.current && currentTime - lastLoadRef.current < 1000) {
-        // console.log("⏸️ Пропускаем загрузку: предыдущая еще выполняется");
         return;
       }
 
       if (!isMountedRef.current) return;
 
       try {
-        // console.log("🚀 ========== НАЧАЛО ЗАГРУЗКИ ДАННЫХ ==========");
-        // console.log("🏭 Управляемые станции:", managedStations);
-        // console.log("📋 Количество станций:", managedStations.length);
-
         isLoadingRef.current = true;
         lastLoadRef.current = currentTime;
 
         // Если нет управляемых станций, сбрасываем данные
         if (!managedStations || managedStations.length === 0) {
-          // console.log("⚠️ Нет управляемых станций, сброс данных");
           if (isMountedRef.current) {
             setAnalysisData({
               autopilotData: [],
@@ -667,31 +543,22 @@ export const useStationAnalytics = (managedStations = []) => {
         const currentDate = new Date();
         const today = currentDate.toISOString().split("T")[0];
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 30); // Увеличиваем период до 30 дней
+        startDate.setDate(startDate.getDate() - 30);
 
         const startDateStr = startDate.toISOString().split("T")[0];
-
-        // console.log(
-        //   "📅 Расширенный период загрузки:",
-        //   startDateStr,
-        //   "до",
-        //   today
-        // );
 
         // Загружаем отчеты из квартальных коллекций
         let allReports = [];
         let allDocuments = [];
 
         try {
-          // console.log("📥 Загрузка отчетов...");
           allReports = await loadReportsFromCollections(
             managedStations,
             startDateStr,
             today
           );
-          // console.log("✅ Отчетов загружено:", allReports.length);
         } catch (error) {
-          console.error("❌ Ошибка при загрузке отчетов:", error);
+          console.error("Ошибка при загрузке отчетов:", error);
           if (isMountedRef.current) {
             setError(`Ҳисоботларни юклашда хатолик: ${error.message}`);
           }
@@ -699,7 +566,6 @@ export const useStationAnalytics = (managedStations = []) => {
 
         // Загружаем данные documents
         try {
-          // console.log("📄 Загрузка документов...");
           const documentsRef = collection(db, "documents");
           const documentsSnapshot = await getDocs(documentsRef);
           allDocuments = documentsSnapshot.docs
@@ -708,9 +574,8 @@ export const useStationAnalytics = (managedStations = []) => {
               ...doc.data(),
             }))
             .filter((doc) => managedStations.includes(doc.stationId));
-          // console.log("✅ Документов загружено:", allDocuments.length);
         } catch (error) {
-          console.error("❌ Ошибка при загрузке документов:", error);
+          console.error("Ошибка при загрузке документов:", error);
         }
 
         // Обновляем отладочную информацию
@@ -726,15 +591,12 @@ export const useStationAnalytics = (managedStations = []) => {
           lastLoadTime: new Date().toISOString(),
         };
 
-        // console.log("📊 Отладочная информация:", debugInfoUpdate);
-
         if (isMountedRef.current) {
           setDebugInfo(debugInfoUpdate);
         }
 
         // Если нет отчетов, устанавливаем пустые данные
         if (allReports.length === 0) {
-          // console.log("⚠️ Нет отчетов для анализа");
           if (isMountedRef.current) {
             setAnalysisData({
               autopilotData: [],
@@ -748,11 +610,8 @@ export const useStationAnalytics = (managedStations = []) => {
             setLoading(false);
           }
           isLoadingRef.current = false;
-          // console.log("🏁 Загрузка завершена (нет данных)");
           return;
         }
-
-        // console.log("✅ Отчеты загружены, начало анализа...");
 
         // Выполняем анализы с учетом фильтров
         const {
@@ -764,15 +623,6 @@ export const useStationAnalytics = (managedStations = []) => {
           gasPaymentsPeriod = "30days",
           gasPaymentsDateRange = null,
         } = filters;
-
-        // console.log("⚙️ Параметры фильтров:", {
-        //   negativeDiffPeriod,
-        //   missingReportsPeriod,
-        //   controlDiffPeriod,
-        //   comparisonType,
-        //   autopilotPeriod,
-        //   gasPaymentsPeriod,
-        // });
 
         // Выполняем анализы
         const autopilotData = analyzeAutopilotData(allReports, autopilotPeriod);
@@ -810,18 +660,6 @@ export const useStationAnalytics = (managedStations = []) => {
           );
         }
 
-        // console.log("📈 Результаты анализа:", {
-        //   autopilotData: autopilotData.length,
-        //   comparisonData: comparisonData.length,
-        //   negativeDifferenceData: negativeDifferenceData.length,
-        //   missingReportsData: missingReportsData.length,
-        //   controlDifferenceData: controlDifferenceData.length,
-        //   expiredDocumentsData: expiredDocumentsData.length,
-        //   gasAndPaymentsData: Array.isArray(gasAndPaymentsData)
-        //     ? gasAndPaymentsData.length
-        //     : "объект",
-        // });
-
         if (isMountedRef.current) {
           setAnalysisData({
             autopilotData,
@@ -834,17 +672,14 @@ export const useStationAnalytics = (managedStations = []) => {
           });
           setLoading(false);
         }
-
-        // console.log("✅ Анализ данных завершен успешно");
       } catch (error) {
-        console.error("❌ Критическая ошибка загрузки данных:", error);
+        console.error("Критическая ошибка загрузки данных:", error);
         if (isMountedRef.current) {
           setError(`Ошибка загрузки данных: ${error.message}`);
           setLoading(false);
         }
       } finally {
         isLoadingRef.current = false;
-        // console.log("🏁 ========== ЗАГРУЗКА ЗАВЕРШЕНА ==========");
       }
     },
     [managedStations]
@@ -1022,116 +857,64 @@ export const useStationAnalytics = (managedStations = []) => {
     }
   };
 
-  // Анализ 5: Разница контрольных сумм
+  // Анализ 5: Разница контрольных сумм - ИСПРАВЛЕННАЯ ВЕРСИЯ
   const analyzeControlDifference = (reports, period) => {
     try {
       const filteredReports = filterReportsByPeriod(reports, period);
       const problematicReports = [];
 
       filteredReports.forEach((report) => {
-        // Получаем фактические платежи из paymentData
-        const actualPayments = report.paymentData || {};
+        // Получаем фактические суммы платежей из отчета
+        const cashAmount = getCashAmount(report);
+        const humoAmount = getHumoAmount(report);
+        const uzcardAmount = getUzcardAmount(report);
+        const electronicAmount = getElectronicPayments(report);
 
-        // Получаем контрольные суммы из generalData
-        const generalData = report.generalData || {};
+        // Общая сумма фактических платежей
+        const totalActualPayments =
+          cashAmount + humoAmount + uzcardAmount + electronicAmount;
 
-        // Маппинг платежных типов на контрольные суммы
-        const paymentMappings = {
-          click: {
-            actual: actualPayments.click || 0,
-            control: generalData.controlClickSum || 0,
-            name: "CLICK",
-          },
-          humo: {
-            actual: actualPayments.humo || 0,
-            control: generalData.controlHumoSum || 0,
-            name: "HUMO",
-          },
-          payme: {
-            actual: actualPayments.payme || 0,
-            control: generalData.controlPaymeSum || 0,
-            name: "PayMe",
-          },
-          paynet: {
-            actual: actualPayments.paynet || 0,
-            control: generalData.controlPaynetSum || 0,
-            name: "PAYNET",
-          },
-          uzcard: {
-            actual: actualPayments.uzcard || 0,
-            control: generalData.controlUzcardSum || 0,
-            name: "Uzcard",
-          },
-          zhisobot: {
-            actual: actualPayments.zhisobot || 0,
-            control: generalData.controlTotalSum || 0,
-            name: "Z-хисобот",
-          },
-        };
+        // Получаем контрольную сумму из отчета
+        const controlSum = getControlSum(report);
 
-        // Проверяем каждый тип платежа на расхождение
-        const paymentDifferences = [];
-        let hasSignificantDifference = false;
+        // Рассчитываем разницу
+        const difference = totalActualPayments - controlSum;
 
-        Object.entries(paymentMappings).forEach(([key, data]) => {
-          const diff = data.actual - data.control;
-          const percentage = data.control > 0 ? (diff / data.control) * 100 : 0;
+        // Определяем, есть ли значительная разница (больше 100 сомов)
+        const hasSignificantDifference = Math.abs(difference) > 100;
 
-          // Расхождение считается значительным если разница больше 100 сомов
-          const isSignificant = Math.abs(diff) > 100;
-
-          if (isSignificant) {
-            hasSignificantDifference = true;
-          }
-
-          paymentDifferences.push({
-            type: key,
-            name: data.name,
-            actual: data.actual,
-            control: data.control,
-            difference: diff,
-            percentage: percentage,
-            isSignificant: isSignificant,
-          });
-        });
-
-        // Если есть значительные расхождения, добавляем отчет
+        // Если есть значительная разница, добавляем в отчет
         if (hasSignificantDifference) {
-          const totalActual = Object.values(paymentMappings).reduce(
-            (sum, data) => sum + data.actual,
-            0
-          );
-          const totalControl = Object.values(paymentMappings).reduce(
-            (sum, data) => sum + data.control,
-            0
-          );
-          const totalDiff = totalActual - totalControl;
-          const totalPercentage =
-            totalControl > 0 ? (totalDiff / totalControl) * 100 : 0;
-
           problematicReports.push({
-            stationName: report.stationName,
+            stationName:
+              report.stationName ||
+              `Станция ${report.stationId?.substring(0, 8)}...`,
             reportDate: report.reportDate,
             stationId: report.stationId,
-            paymentDifferences: paymentDifferences,
-            totalActual: totalActual,
-            totalControl: totalControl,
-            totalDifference: totalDiff,
-            totalPercentage: totalPercentage,
-            summary: {
-              cashAmount: actualPayments.zhisobot || 0,
-              humoAmount: actualPayments.humo || 0,
-              uzcardAmount: actualPayments.uzcard || 0,
-              electronicAmount:
-                (actualPayments.click || 0) +
-                (actualPayments.payme || 0) +
-                (actualPayments.paynet || 0),
-            },
+
+            // Фактические суммы
+            cashAmount: cashAmount,
+            humoAmount: humoAmount,
+            uzcardAmount: uzcardAmount,
+            electronicAmount: electronicAmount,
+            totalPayments: totalActualPayments,
+
+            // Контрольная сумма
+            controlSum: controlSum,
+
+            // Разница
+            difference: difference,
+
+            // Процентное соотношение
+            percentage: controlSum > 0 ? (difference / controlSum) * 100 : 0,
           });
         }
       });
 
-      return problematicReports;
+      // Сортируем по наибольшей разнице
+      return problematicReports.sort(
+        (a, b) => Math.abs(b.difference) - Math.abs(a.difference)
+      );
     } catch (error) {
       console.error("Ошибка анализа контрольных сумм:", error);
       return [];
@@ -1154,12 +937,10 @@ export const useStationAnalytics = (managedStations = []) => {
         const docTypesSnapshot = await getDocs(docTypesRef);
         docTypesSnapshot.forEach((doc) => {
           const data = doc.data();
-          // Сохраняем mapping: id -> name
           documentTypesMap.set(doc.id, data.name || doc.id);
         });
-        console.log("📋 Загружено типов документов:", documentTypesMap.size);
       } catch (error) {
-        console.warn("⚠️ Не удалось загрузить типы документов:", error);
+        console.warn("Не удалось загрузить типы документов:", error);
       }
 
       const stationsMap = new Map();
@@ -1178,13 +959,11 @@ export const useStationAnalytics = (managedStations = []) => {
           (today - expiryDate) / (1000 * 60 * 60 * 24)
         );
 
-        // Маппим docType: ищем в documentTypesMap по ID
-        // doc.docType содержит ID документа из коллекции document_types
         const docTypeName = documentTypesMap.get(doc.docType) || doc.docType;
 
         stationData.documents.push({
-          docType: docTypeName, // Используем название из document_types
-          originalDocType: doc.docType, // Сохраняем оригинальный ID
+          docType: docTypeName,
+          originalDocType: doc.docType,
           expiryDate: doc.expiryDate,
           daysOverdue,
           docNumber: doc.docNumber,
@@ -1193,15 +972,9 @@ export const useStationAnalytics = (managedStations = []) => {
         });
       });
 
-      const result = Array.from(stationsMap.values());
-      console.log(
-        "✅ Анализ просроченных документов завершен:",
-        result.length,
-        "станций"
-      );
-      return result;
+      return Array.from(stationsMap.values());
     } catch (error) {
-      console.error("❌ Ошибка анализа просроченных документов:", error);
+      console.error("Ошибка анализа просроченных документов:", error);
       return [];
     }
   };
@@ -1291,17 +1064,13 @@ export const useStationAnalytics = (managedStations = []) => {
 
   // Загружаем данные при изменении managedStations
   useEffect(() => {
-    // console.log("🔄 useEffect сработал, managedStations:", managedStations);
-
     if (!managedStations || managedStations.length === 0) {
-      // console.log("⏸️ Нет станций, пропускаем загрузку");
       setLoading(false);
       return;
     }
 
     // Задержка для предотвращения двойной загрузки
     const timer = setTimeout(() => {
-      // console.log("🎯 Запуск загрузки данных...");
       loadAnalysisData();
     }, 100);
 
