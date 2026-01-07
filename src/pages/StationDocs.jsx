@@ -160,12 +160,20 @@ const StationDocs = () => {
     }
 
     if (showLatestOnly) {
+      // Создаем объект для хранения самых последних документов по каждому типу
       const latestDocs = {};
+
       filtered.forEach((d) => {
-        if (!latestDocs[d.name] || d.expiryRaw > latestDocs[d.name].expiryRaw) {
-          latestDocs[d.name] = d;
+        // Сравниваем по expiryRaw (дате истечения) - берем документ с самой поздней датой истечения
+        if (
+          !latestDocs[d.typeId] ||
+          d.expiryRaw > latestDocs[d.typeId].expiryRaw
+        ) {
+          latestDocs[d.typeId] = d;
         }
       });
+
+      // Преобразуем объект обратно в массив
       filtered = Object.values(latestDocs);
     }
 
@@ -218,18 +226,21 @@ const StationDocs = () => {
           {canAddDocuments && (
             <button
               onClick={() => setIsModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition"
+            >
               + Янги хужжат қўшиш
             </button>
           )}
           <button
             onClick={exportToExcel}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition"
+          >
             Excel га экспорт
           </button>
           <button
             onClick={() => navigate(-1)}
-            className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition">
+            className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition"
+          >
             Орқага
           </button>
         </div>
@@ -238,9 +249,10 @@ const StationDocs = () => {
       {/* Фильтры */}
       <div className="flex flex-wrap gap-4 mb-8">
         <select
-          value={showLatestOnly ? "all" : "latest"}
+          value={showLatestOnly ? "latest" : "all"} // Исправлено здесь
           onChange={(e) => setShowLatestOnly(e.target.value === "latest")}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
+        >
           <option value="all">Барча хужжатлар</option>
           <option value="latest">Охирги хужжатлар</option>
         </select>
@@ -248,7 +260,8 @@ const StationDocs = () => {
         <select
           value={selectedType}
           onChange={(e) => setSelectedType(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
+        >
           <option value="Все">Барчаси</option>
           {Object.values(typesMap).map((type) => (
             <option key={type}>{type}</option>
@@ -258,7 +271,8 @@ const StationDocs = () => {
         <select
           value={expiryFilter}
           onChange={(e) => setExpiryFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700">
+          className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
+        >
           <option value="Все">Муддат бўйича</option>
           <option value="30 кун">30 кунгача</option>
           <option value="15 кун">15 кунгача</option>
@@ -275,7 +289,8 @@ const StationDocs = () => {
           {filteredDocs.map((d) => (
             <div
               key={d.id}
-              className={`rounded-lg p-4 shadow hover:shadow-md transition border ${d.color}`}>
+              className={`rounded-lg p-4 shadow hover:shadow-md transition border ${d.color}`}
+            >
               <div className="flex justify-between items-center mb-3">
                 <h2 className="font-medium text-lg text-gray-800">{d.name}</h2>
                 <div className="flex items-center gap-2">
@@ -291,7 +306,8 @@ const StationDocs = () => {
                         : d.diffDays <= 30
                         ? "bg-green-500"
                         : "bg-gray-300"
-                    }`}></div>
+                    }`}
+                  ></div>
                 </div>
               </div>
               <p className="text-sm text-gray-600">
@@ -306,7 +322,8 @@ const StationDocs = () => {
                   href={d.fileUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-3 inline-block text-blue-600 hover:underline text-sm">
+                  className="mt-3 inline-block text-blue-600 hover:underline text-sm"
+                >
                   📄 Файлни очиш
                 </a>
               )}
@@ -324,7 +341,8 @@ const StationDocs = () => {
             {missingDocs.map((m) => (
               <li
                 key={m.id}
-                className="border border-dashed border-gray-400 rounded-lg p-4 text-gray-600 bg-gray-50 hover:bg-gray-100 transition">
+                className="border border-dashed border-gray-400 rounded-lg p-4 text-gray-600 bg-gray-50 hover:bg-gray-100 transition"
+              >
                 {m.name}
               </li>
             ))}
