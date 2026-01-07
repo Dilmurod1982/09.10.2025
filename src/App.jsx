@@ -49,6 +49,7 @@ import {
   MeterReadings,
   HomeControlBooker,
   PaymentMethods,
+  Seal,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -324,6 +325,15 @@ function App() {
             <ProtectedLayout
               allowedRoles={["admin"]}
               element={<PaymentMethods />}
+            />
+          ),
+        },
+        {
+          path: "/seal",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["electrengineer", "admin", "nazoratbux"]}
+              element={<Seal />}
             />
           ),
         },

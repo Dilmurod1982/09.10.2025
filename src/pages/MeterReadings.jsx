@@ -12,8 +12,8 @@ import { db } from "../firebase/config";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import AddMeterResetModal from "../components/AddMeterResetModal";
-import { useAppStore } from "../lib/zustand"; // Импортируем хранилище
-import * as XLSX from "xlsx"; // Импортируем библиотеку для Excel
+import { useAppStore } from "../lib/zustand";
+import * as XLSX from "xlsx";
 
 const MeterReadings = () => {
   const [resetEvents, setResetEvents] = useState([]);
@@ -27,12 +27,10 @@ const MeterReadings = () => {
     date: "",
   });
 
-  // Получаем данные пользователя из хранилища
   const userData = useAppStore((state) => state.userData);
   const role = userData?.role;
   const isAdmin = role === "electrengineer";
 
-  // Загрузка станций
   useEffect(() => {
     const loadStations = async () => {
       try {
@@ -50,7 +48,6 @@ const MeterReadings = () => {
     loadStations();
   }, []);
 
-  // Загрузка событий обнуления
   const loadResetEvents = async () => {
     try {
       setLoading(true);
@@ -59,7 +56,6 @@ const MeterReadings = () => {
         orderBy("resetDate", "desc")
       );
 
-      // Применяем фильтры
       if (filters.stationId) {
         q = query(q, where("stationId", "==", filters.stationId));
       }
@@ -101,7 +97,7 @@ const MeterReadings = () => {
       setResetEvents(eventsData);
     } catch (error) {
       console.error("Ошибка загрузки событий обнуления:", error);
-      toast.error("Ошибка при загрузке данных");
+      toast.error("Маълумотларни юклашда хато");
     } finally {
       setLoading(false);
     }
@@ -112,25 +108,22 @@ const MeterReadings = () => {
   }, [filters]);
 
   const handleDelete = async (id) => {
-    // Проверяем права доступа
     if (!isAdmin) {
-      toast.error("У вас нет прав для удаления");
+      toast.error("Сизда ўчириш учун рухсат йўқ");
       return;
     }
 
-    if (
-      !window.confirm("Вы уверены, что хотите удалить это событие обнуления?")
-    ) {
+    if (!window.confirm("Сиз ростдан хам бу ўлчов нольлашни ўчирмоқчимисиз?")) {
       return;
     }
 
     try {
       await deleteDoc(doc(db, "meterResetEvents", id));
-      toast.success("Событие обнуления удалено");
+      toast.success("Улчов нольлаш ўчирилди");
       loadResetEvents();
     } catch (error) {
-      console.error("Ошибка удаления:", error);
-      toast.error("Ошибка при удалении");
+      console.error("Удаление ошибка:", error);
+      toast.error("Ўчиришда хатолик");
     }
   };
 
@@ -138,7 +131,6 @@ const MeterReadings = () => {
     setFilters((prev) => ({
       ...prev,
       [field]: value,
-      // Сбрасываем зависимые фильтры
       ...(field === "year" && { month: "", date: "" }),
       ...(field === "month" && { date: "" }),
     }));
@@ -153,63 +145,57 @@ const MeterReadings = () => {
     });
   };
 
-  // Функция для экспорта в Excel
   const exportToExcel = () => {
     if (resetEvents.length === 0) {
-      toast.error("Нет данных для экспорта");
+      toast.error("Экспорт қилиш учун маълумот йўқ");
       return;
     }
 
     try {
-      // Подготавливаем данные для экспорта
       const excelData = resetEvents.map((event, index) => ({
         "№": index + 1,
-        "Дата обнуления": event.resetDate,
-        Станция: event.stationName,
-        Шланг: event.hose,
-        "Показание с отчета": event.lastReadingFromReport || "Нет данных",
-        "Показание перед обнулением": event.lastReadingBeforeReset,
-        "Новое показание": event.newReadingAfterReset,
-        Разница:
-          event.lastReadingBeforeReset - (event.lastReadingFromReport || 0),
-        Примечание: event.note || "",
+        "Нолланган сана": event.resetDate,
+        "Заправка номи": event.stationName,
+        "Шланг раками": event.hose,
+        "Хисоботдаги курсаткич":
+          event.lastReadingFromReport?.toLocaleString() || "Маълумот йўқ",
+        "Ноллашдан олдинги курсаткич":
+          event.lastReadingBeforeReset.toLocaleString(),
+        "Ноллангандан кейинги курсаткич":
+          event.newReadingAfterReset.toLocaleString(),
+        Фарқ: event.lastReadingBeforeReset - (event.lastReadingFromReport || 0),
+        Изоҳ: event.note || "",
       }));
 
-      // Создаем новую книгу
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(excelData);
 
-      // Настраиваем ширину колонок
       const colWidths = [
-        { wch: 5 }, // №
-        { wch: 12 }, // Дата обнуления
-        { wch: 20 }, // Станция
-        { wch: 8 }, // Шланг
-        { wch: 18 }, // Показание с отчета
-        { wch: 22 }, // Показание перед обнулением
-        { wch: 15 }, // Новое показание
-        { wch: 10 }, // Разница
-        { wch: 25 }, // Примечание
+        { wch: 5 },
+        { wch: 12 },
+        { wch: 25 },
+        { wch: 10 },
+        { wch: 18 },
+        { wch: 22 },
+        { wch: 20 },
+        { wch: 10 },
+        { wch: 25 },
       ];
       ws["!cols"] = colWidths;
 
-      // Добавляем лист в книгу
-      XLSX.utils.book_append_sheet(wb, ws, "Обнуления счетчиков");
+      XLSX.utils.book_append_sheet(wb, ws, "Улчовлар нольлаш");
 
-      // Генерируем имя файла с текущей датой
       const date = new Date().toISOString().split("T")[0];
-      const fileName = `Обнуления_счетчиков_${date}.xlsx`;
+      const fileName = `Улчовлар_нольлаш_${date}.xlsx`;
 
-      // Сохраняем файл
       XLSX.writeFile(wb, fileName);
-      toast.success("Данные успешно экспортированы в Excel");
+      toast.success("Excelга муваффақиятли экспорт қилинди");
     } catch (error) {
-      console.error("Ошибка при экспорте в Excel:", error);
-      toast.error("Ошибка при экспорте данных");
+      console.error("Excelга экспорт хатолик:", error);
+      toast.error("Маълумотларни экспорт қилишда хатолик");
     }
   };
 
-  // Генерация годов и месяцев для фильтров
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
   const months = [
@@ -228,126 +214,135 @@ const MeterReadings = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Заголовок */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Обнуления счетчиков
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            Колонка курсаткичларини ноллаш
           </h1>
           <p className="text-gray-600 mt-2">
-            Учет обнулений показаний счетчиков шлангов
+            Шланг ўлчов кўрсаткичларини ноллашларни ҳисоби
           </p>
-
-          {/* <div className="mt-2">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              Роль: {role}
-            </span>
-          </div> */}
         </div>
 
-        {/* Фильтры */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Станция */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Станция
-              </label>
-              <select
-                value={filters.stationId}
-                onChange={(e) =>
-                  handleFilterChange("stationId", e.target.value)
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <option value="">Все станции</option>
-                {stations.map((station) => (
-                  <option key={station.id} value={station.id}>
-                    {station.stationName}
-                  </option>
-                ))}
-              </select>
+        {/* Фильтры и кнопки - улучшенная версия */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 mb-6">
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Фильтры */}
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Станция */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Заправка номи
+                </label>
+                <select
+                  value={filters.stationId}
+                  onChange={(e) =>
+                    handleFilterChange("stationId", e.target.value)
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                >
+                  <option value="">Барча заправкалар</option>
+                  {stations.map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {station.stationName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Год */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Йил
+                </label>
+                <select
+                  value={filters.year}
+                  onChange={(e) => handleFilterChange("year", e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                >
+                  <option value="">Барча йил</option>
+                  {years.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Месяц */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ой
+                </label>
+                <select
+                  value={filters.month}
+                  onChange={(e) => handleFilterChange("month", e.target.value)}
+                  disabled={!filters.year}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-100"
+                >
+                  <option value="">Барча ой</option>
+                  {months.map((month) => (
+                    <option key={month.value} value={month.value}>
+                      {month.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Дата */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Сана
+                </label>
+                <input
+                  type="date"
+                  value={filters.date}
+                  onChange={(e) => handleFilterChange("date", e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                />
+              </div>
             </div>
 
-            {/* Год */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Год
-              </label>
-              <select
-                value={filters.year}
-                onChange={(e) => handleFilterChange("year", e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                <option value="">Все годы</option>
-                {years.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Месяц */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Месяц
-              </label>
-              <select
-                value={filters.month}
-                onChange={(e) => handleFilterChange("month", e.target.value)}
-                disabled={!filters.year}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100">
-                <option value="">Все месяцы</option>
-                {months.map((month) => (
-                  <option key={month.value} value={month.value}>
-                    {month.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Дата */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Конкретная дата
-              </label>
-              <input
-                type="date"
-                value={filters.date}
-                onChange={(e) => handleFilterChange("date", e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Кнопки */}
-            <div className="flex items-end space-x-2">
+            {/* Кнопки - вертикальное расположение на мобильных */}
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-2 lg:w-48">
               <button
                 onClick={clearFilters}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-                Сбросить
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors duration-200 text-sm font-medium"
+              >
+                Фильтрларни тозалаш
               </button>
 
-              {/* Кнопка Excel */}
               <button
                 onClick={exportToExcel}
                 disabled={resetEvents.length === 0}
-                className="px-4 py-2 border border-green-600 text-green-600 rounded-lg hover:bg-green-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <svg
-                  className="w-4 h-4 mr-2"
+                  className="w-4 h-4"
                   fill="currentColor"
-                  viewBox="0 0 16 16">
+                  viewBox="0 0 16 16"
+                >
                   <path d="M5.884 6.68a.5.5 0 0 0-.772.63L8 11.154l2.888-3.844a.5.5 0 0 0-.772-.63L8 9.846l-2.116-2.166z" />
                   <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z" />
                 </svg>
-                Excel
+                Excelга юклаб олиш
               </button>
 
-              {/* Кнопка добавления - только для admin */}
               {isAdmin && (
                 <button
                   onClick={() => setIsAddModalOpen(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200">
-                  + Добавить обнуление
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="currentColor"
+                    viewBox="0 0 16 16"
+                  >
+                    <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
+                  </svg>
+                  Ноллашни қўшиш
                 </button>
               )}
             </div>
@@ -355,25 +350,14 @@ const MeterReadings = () => {
         </div>
 
         {/* Информация о количестве записей */}
-        <div className="mb-4 flex justify-between items-center">
+        <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div className="text-sm text-gray-600">
-            Найдено записей:{" "}
+            Топилган ёзувлар:{" "}
             <span className="font-semibold">{resetEvents.length}</span>
           </div>
-          {/* {resetEvents.length > 0 && (
-            <button
-              onClick={exportToExcel}
-              className="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center">
-              <svg
-                className="w-4 h-4 mr-1"
-                fill="currentColor"
-                viewBox="0 0 16 16">
-                <path d="M5.884 6.68a.5.5 0 0 0-.772.63L8 11.154l2.888-3.844a.5.5 0 0 0-.772-.63L8 9.846l-2.116-2.166z" />
-                <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z" />
-              </svg>
-              Скачать Excel
-            </button>
-          )} */}
+          <div className="text-xs text-gray-500">
+            Ўлчовлар санаси: {resetEvents.length}
+          </div>
         </div>
 
         {/* Таблица */}
@@ -384,35 +368,33 @@ const MeterReadings = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[800px]">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       №
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Дата
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Сана
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Станция
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Заправка номи
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Шланг
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Показание с отчета
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Хисоботдаги курсаткич
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Показание перед обнулением
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ноллашдан олдинги курсаткич
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Новое показание
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ноллангандан кейинги курсаткич
                     </th>
-
-                    {/* Столбец действий показываем только для admin */}
                     {isAdmin && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Действия
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ҳаракатлар
                       </th>
                     )}
                   </tr>
@@ -420,36 +402,35 @@ const MeterReadings = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {resetEvents.map((event) => (
                     <tr key={event.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         {event.number}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         {event.resetDate}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         {event.stationName}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         {event.hose}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         {event.lastReadingFromReport?.toLocaleString() ||
-                          "Нет данных"}
+                          "Маълумот йўқ"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         {event.lastReadingBeforeReset.toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         {event.newReadingAfterReset.toLocaleString()}
                       </td>
-
-                      {/* Кнопка удаления - только для admin */}
                       {isAdmin && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                           <button
                             onClick={() => handleDelete(event.id)}
-                            className="text-red-600 hover:text-red-900 transition-colors duration-200">
-                            Удалить
+                            className="text-red-600 hover:text-red-900 transition-colors duration-200"
+                          >
+                            Ўчириш
                           </button>
                         </td>
                       )}
@@ -461,7 +442,7 @@ const MeterReadings = () => {
               {resetEvents.length === 0 && (
                 <div className="text-center py-12">
                   <div className="text-gray-500">
-                    Нет данных для отображения
+                    Кўрсатиш учун маълумотлар йўқ
                   </div>
                 </div>
               )}
@@ -470,7 +451,6 @@ const MeterReadings = () => {
         </div>
       </div>
 
-      {/* Модальное окно добавления - только для admin */}
       {isAdmin && (
         <AddMeterResetModal
           isOpen={isAddModalOpen}

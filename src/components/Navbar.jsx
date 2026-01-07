@@ -58,6 +58,8 @@ import {
   Calculate as CalculateIcon,
   Work as WorkIcon,
   Speed as MeterIcon,
+  SettingsBackupRestore as ZeroIcon, // Иконка для ноллаш
+  Lock as SealIcon, // Иконка для пломбалаш
 } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
@@ -101,6 +103,7 @@ export default function Navbar() {
   const [dailyReportsOpen, setDailyReportsOpen] = React.useState(false);
   const [energySettlementsOpen, setEnergySettlementsOpen] =
     React.useState(false);
+  const [zeroSealOpen, setZeroSealOpen] = React.useState(false); // Новое состояние для ноллаш ва пломбалаш
   const [userModalOpen, setUserModalOpen] = React.useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = React.useState(false);
   const [passwordData, setPasswordData] = React.useState({
@@ -182,6 +185,7 @@ export default function Navbar() {
       setPartnersOpen(false);
       setDailyReportsOpen(false);
       setEnergySettlementsOpen(false);
+      setZeroSealOpen(false); // Закрываем ноллаш ва пломбалаш при закрытии меню
     }
   };
 
@@ -215,6 +219,7 @@ export default function Navbar() {
   const handleDailyReportsClick = () => setDailyReportsOpen(!dailyReportsOpen);
   const handleEnergySettlementsClick = () =>
     setEnergySettlementsOpen(!energySettlementsOpen);
+  const handleZeroSealClick = () => setZeroSealOpen(!zeroSealOpen); // Обработчик для ноллаш ва пломбалаш
 
   const handlePasswordChange = () => {
     setPasswordModalOpen(true);
@@ -369,6 +374,7 @@ export default function Navbar() {
     }
   };
 
+  // Обновленный массив menuItems - удаляем "Колонка кўрсаткичларини ўзгартириш" отсюда
   const menuItems = [
     { text: "Заправкалар", icon: <LocalGasStationIcon />, path: "/stations" },
     { text: "Ходимлар", icon: <BadgeIcon />, path: "/employees" },
@@ -376,10 +382,20 @@ export default function Navbar() {
     { text: "МЧЖлар", icon: <CorporateFareIcon />, path: "/ltds" },
     { text: "Банк", icon: <AccountBalanceIcon />, path: "/banks" },
     { text: "Лавозимлар", icon: <WorkIcon />, path: "/jobtitle" },
+    // Убрали отсюда "Колонка кўрсаткичларини ўзгартириш"
+  ];
+
+  // Пункты для "Ноллаш ва пломбалаш"
+  const zeroSealItems = [
     {
       text: "Колонка кўрсаткичларини ўзгартириш",
       icon: <MeterIcon />,
       path: "/meterreadings",
+    },
+    {
+      text: "Колонкаларни пломбалаш",
+      icon: <SealIcon />,
+      path: "/seal",
     },
   ];
 
@@ -515,7 +531,7 @@ export default function Navbar() {
     },
   ];
 
-  // ⚙️ ФИЛЬТРАЦИЯ ПУНКТОВ ПО РОЛИ - ИСПРАВЛЕННЫЙ КОД
+  // ⚙️ ФИЛЬТРАЦИЯ ПУНКТОВ ПО РОЛИ - ОБНОВЛЕННЫЙ КОД
   const getFilteredMenuItems = () => {
     if (!role) return [];
 
@@ -524,9 +540,8 @@ export default function Navbar() {
         return menuItems;
 
       case "electrengineer":
-        return menuItems.filter(
-          (item) => item.text === "Колонка кўрсаткичларини ўзгартириш"
-        );
+        // Теперь electrengineer не видит пункт в основном меню, он будет в "Ноллаш ва пломбалаш"
+        return menuItems.filter((item) => item.text === ""); // Пустой фильтр
 
       case "buxgalter":
         return menuItems.filter((item) => item.text === "Ҳамкорлар");
@@ -540,21 +555,16 @@ export default function Navbar() {
             item.text !== "МЧЖлар" &&
             item.text !== "Банк" &&
             item.text !== "Лавозимлар" &&
-            item.text !== "Фойдаланувчилар" &&
-            item.text !== "Колонка кўрсаткичларини ўзгартириш"
+            item.text !== "Фойдаланувчилар"
+          // Убрали проверку на "Колонка кўрсаткичларини ўзгартириш"
         );
 
       case "nazoratbux":
-        return menuItems.filter(
-          (item) => item.text === "Колонка кўрсаткичларини ўзгартириш"
-        );
+        // Теперь nazoratbux не видит пункт в основном меню, он будет в "Ноллаш ва пломбалаш"
+        return menuItems.filter((item) => item.text === ""); // Пустой фильтр
 
       case "operator":
-        return menuItems.filter(
-          (item) =>
-            item.text !== "Фойдаланувчилар" &&
-            item.text !== "Колонка кўрсаткичларини ўзгартириш"
-        );
+        return menuItems.filter((item) => item.text !== "Фойдаланувчилар");
 
       default:
         return [];
@@ -562,6 +572,14 @@ export default function Navbar() {
   };
 
   const filteredMenuItems = getFilteredMenuItems();
+
+  // Определяем, кому показывать "Ноллаш ва пломбалаш"
+  const canSeeZeroSeal = () => {
+    if (!role) return false;
+
+    // Показываем для admin, electrengineer и nazoratbux
+    return ["admin", "electrengineer", "nazoratbux"].includes(role);
+  };
 
   const isRahbarOrBooker =
     role === "rahbar" || role === "buxgalter" || role === "nazoratbux";
@@ -1024,6 +1042,74 @@ export default function Navbar() {
             {/* Содержимое меню */}
             <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
               <List sx={{ padding: "8px" }}>
+                {/* 🔹 НОВЫЙ РАЗДЕЛ: Ноллаш ва пломбалаш (для admin, electrengineer, nazoratbux) */}
+                {canSeeZeroSeal() && (
+                  <>
+                    <ListItem disablePadding sx={{ mb: 1 }}>
+                      <ListItemButton
+                        onClick={handleZeroSealClick}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                          },
+                        }}
+                      >
+                        <ListItemIcon sx={{ color: "white" }}>
+                          <ZeroIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="🔄 Ноллаш ва пломбалаш"
+                          primaryTypographyProps={{ fontWeight: "500" }}
+                        />
+                        {zeroSealOpen ? <ExpandLess /> : <ExpandMore />}
+                      </ListItemButton>
+                    </ListItem>
+                    <Collapse in={zeroSealOpen} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding>
+                        {zeroSealItems.map((item, index) => (
+                          <ListItem
+                            key={item.text}
+                            disablePadding
+                            sx={{ pl: 2 }}
+                          >
+                            <ListItemButton
+                              onClick={() => handleMenuClick(item.path)}
+                              sx={{
+                                borderRadius: "8px",
+                                py: 1.2,
+                                transition: "all 0.3s ease",
+                                "&:hover": {
+                                  backgroundColor: "rgba(255,255,255,0.08)",
+                                  transform: "translateX(5px)",
+                                },
+                              }}
+                            >
+                              <ListItemIcon
+                                sx={{
+                                  minWidth: "40px",
+                                  color: "rgba(255,255,255,0.8)",
+                                }}
+                              >
+                                {item.icon}
+                              </ListItemIcon>
+                              <ListItemText
+                                primary={item.text}
+                                primaryTypographyProps={{
+                                  fontSize: "14px",
+                                  color: "rgba(255,255,255,0.9)",
+                                }}
+                              />
+                            </ListItemButton>
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Collapse>
+                  </>
+                )}
+
                 {/* 🔹 Основные пункты (для admin, buxgalter, rahbar, electrengineer и nazoratbux) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
