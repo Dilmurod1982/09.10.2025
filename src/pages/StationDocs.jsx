@@ -21,7 +21,8 @@ const StationDocs = () => {
   const [loading, setLoading] = useState(true);
   const [missingDocs, setMissingDocs] = useState([]);
 
-  const [showLatestOnly, setShowLatestOnly] = useState(false);
+  // Изменение: устанавливаем true по умолчанию
+  const [showLatestOnly, setShowLatestOnly] = useState(true);
   const [selectedType, setSelectedType] = useState("Все");
   const [expiryFilter, setExpiryFilter] = useState("Все");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,14 +76,14 @@ const StationDocs = () => {
 
       // === Станция ===
       const stationSnap = await getDocs(
-        query(collection(db, "stations"), where("__name__", "==", id))
+        query(collection(db, "stations"), where("__name__", "==", id)),
       );
       if (!stationSnap.empty)
         setStationName(stationSnap.docs[0].data().stationName);
 
       // === Документы станции ===
       const docsSnap = await getDocs(
-        query(collection(db, "documents"), where("stationId", "==", id))
+        query(collection(db, "documents"), where("stationId", "==", id)),
       );
 
       const docsData = docsSnap.docs
@@ -129,7 +130,7 @@ const StationDocs = () => {
       const existingTypeIds = new Set(sortedDocs.map((d) => d.typeId));
       const missing = typesArray
         .filter(
-          (t) => t.validity === "expiration" && !existingTypeIds.has(t.id)
+          (t) => t.validity === "expiration" && !existingTypeIds.has(t.id),
         )
         .map((t) => ({ id: t.id, name: t.name }));
 
@@ -203,7 +204,7 @@ const StationDocs = () => {
     });
     saveAs(
       new Blob([excelBuffer], { type: "application/octet-stream" }),
-      `${stationName || "Станция"}_Хужжатлар.xlsx`
+      `${stationName || "Станция"}_Хужжатлар.xlsx`,
     );
   };
 
@@ -249,7 +250,7 @@ const StationDocs = () => {
       {/* Фильтры */}
       <div className="flex flex-wrap gap-4 mb-8">
         <select
-          value={showLatestOnly ? "latest" : "all"} // Исправлено здесь
+          value={showLatestOnly ? "latest" : "all"}
           onChange={(e) => setShowLatestOnly(e.target.value === "latest")}
           className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
         >
@@ -300,12 +301,12 @@ const StationDocs = () => {
                       d.diffDays < 0
                         ? "bg-red-500"
                         : d.diffDays <= 5
-                        ? "bg-yellow-500"
-                        : d.diffDays <= 15
-                        ? "bg-orange-500"
-                        : d.diffDays <= 30
-                        ? "bg-green-500"
-                        : "bg-gray-300"
+                          ? "bg-yellow-500"
+                          : d.diffDays <= 15
+                            ? "bg-orange-500"
+                            : d.diffDays <= 30
+                              ? "bg-green-500"
+                              : "bg-gray-300"
                     }`}
                   ></div>
                 </div>

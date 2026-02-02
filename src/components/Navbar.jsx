@@ -296,7 +296,7 @@ export default function Navbar() {
 
     if (!validatePassword(passwordData.newPassword)) {
       setPasswordError(
-        "Парол камида 8 та белгидан иборат бўлиши керак, жумладан, катта ва кичик харфлар, рақамлар ва махсус белгилар"
+        "Парол камида 8 та белгидан иборат бўлиши керак, жумладан, катта ва кичик харфлар, рақамлар ва махсус белгилар",
       );
       return;
     }
@@ -345,7 +345,7 @@ export default function Navbar() {
         }
       } catch (firestoreError) {
         throw new Error(
-          "Паролни маълумотлар базасига сақлашда хатолик юз берди"
+          "Паролни маълумотлар базасига сақлашда хатолик юз берди",
         );
       }
 
@@ -383,6 +383,20 @@ export default function Navbar() {
     { text: "Банк", icon: <AccountBalanceIcon />, path: "/banks" },
     { text: "Лавозимлар", icon: <WorkIcon />, path: "/jobtitle" },
     // Убрали отсюда "Колонка кўрсаткичларини ўзгартириш"
+  ];
+
+  // Новые пункты для документов rahbar/booker (перенесены из навбара)
+  const rahbarDocumentsItems = [
+    {
+      text: "Муддатлар бўйича хужжатлар",
+      icon: <DescriptionIcon />,
+      path: "/employeesdocdeadline",
+    },
+    {
+      text: "Муддатсиз хужжатлар",
+      icon: <AllInclusiveIcon />,
+      path: "/employeesdocdeadlineinf",
+    },
   ];
 
   // Пункты для "Ноллаш ва пломбалаш"
@@ -555,7 +569,7 @@ export default function Navbar() {
             item.text !== "МЧЖлар" &&
             item.text !== "Банк" &&
             item.text !== "Лавозимлар" &&
-            item.text !== "Фойдаланувчилар"
+            item.text !== "Фойдаланувчилар",
           // Убрали проверку на "Колонка кўрсаткичларини ўзгартириш"
         );
 
@@ -581,8 +595,16 @@ export default function Navbar() {
     return ["admin", "electrengineer", "nazoratbux"].includes(role);
   };
 
-  const isRahbarOrBooker =
-    role === "rahbar" || role === "buxgalter" || role === "nazoratbux";
+  // Определяем, кому показывать кнопки документов в навбаре
+  const shouldShowDocumentButtonsInNavbar = () => {
+    if (!role) return false;
+
+    // Показываем в навбаре только на десктопе/планшете для rahbar и buxgalter
+    const isRahbarOrBooker = ["rahbar", "buxgalter", "nazoratbux"].includes(
+      role,
+    );
+    return isRahbarOrBooker && !isMobile;
+  };
 
   const getRoleBadge = () => {
     const roleConfig = {
@@ -684,8 +706,8 @@ export default function Navbar() {
             {/* Бейдж роли на десктопе */}
             {!isMobile && getRoleBadge()}
           </Box>
-          {/* Кнопки для rahbar и booker */}
-          {isRahbarOrBooker && !isMobile && (
+          {/* Кнопки для rahbar и booker - ТОЛЬКО НА ДЕСКТОПЕ/ПЛАНШЕТЕ */}
+          {shouldShowDocumentButtonsInNavbar() && (
             <Box sx={{ display: "flex", gap: 1, mr: 3 }}>
               <Button
                 color="inherit"
@@ -707,7 +729,7 @@ export default function Navbar() {
                   fontWeight: "500",
                 }}
               >
-                📄 Муддалар бўйича хужжатлар
+                📄 Муддатлар бўйича хужжатлар
               </Button>
               <Button
                 color="inherit"
@@ -1042,6 +1064,77 @@ export default function Navbar() {
             {/* Содержимое меню */}
             <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
               <List sx={{ padding: "8px" }}>
+                {/* 🔹 НОВЫЙ РАЗДЕЛ: Документы для rahbar/buxgalter/nazoratbux (на мобильных) */}
+                {(role === "rahbar" ||
+                  role === "buxgalter" ||
+                  role === "nazoratbux") &&
+                  isMobile && (
+                    <>
+                      <ListItem disablePadding sx={{ mb: 1 }}>
+                        <ListItemButton
+                          sx={{
+                            borderRadius: "12px",
+                            py: 1.5,
+                            transition: "all 0.3s ease",
+                            "&:hover": {
+                              backgroundColor: "rgba(255,255,255,0.1)",
+                            },
+                            background: "rgba(59, 130, 246, 0.2)",
+                          }}
+                        >
+                          <ListItemIcon sx={{ color: "white" }}>
+                            <DescriptionIcon />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary="📑 Хужжатлар"
+                            primaryTypographyProps={{ fontWeight: "500" }}
+                          />
+                        </ListItemButton>
+                      </ListItem>
+
+                      {rahbarDocumentsItems.map((item) => (
+                        <ListItem
+                          key={item.text}
+                          disablePadding
+                          sx={{ pl: 2, mb: 1 }}
+                        >
+                          <ListItemButton
+                            onClick={() => handleMenuClick(item.path)}
+                            sx={{
+                              borderRadius: "8px",
+                              py: 1.2,
+                              transition: "all 0.3s ease",
+                              "&:hover": {
+                                backgroundColor: "rgba(255,255,255,0.08)",
+                                transform: "translateX(5px)",
+                              },
+                            }}
+                          >
+                            <ListItemIcon
+                              sx={{
+                                minWidth: "40px",
+                                color: "rgba(255,255,255,0.8)",
+                              }}
+                            >
+                              {item.icon}
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={item.text}
+                              primaryTypographyProps={{
+                                fontSize: "14px",
+                                color: "rgba(255,255,255,0.9)",
+                              }}
+                            />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+
+                      <Divider
+                        sx={{ my: 2, borderColor: "rgba(255,255,255,0.1)" }}
+                      />
+                    </>
+                  )}
+
                 {/* 🔹 НОВЫЙ РАЗДЕЛ: Ноллаш ва пломбалаш (для admin, electrengineer, nazoratbux) */}
                 {canSeeZeroSeal() && (
                   <>

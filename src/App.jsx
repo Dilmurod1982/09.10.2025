@@ -50,6 +50,7 @@ import {
   HomeControlBooker,
   PaymentMethods,
   Seal,
+  UserAllDocuments,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -71,7 +72,7 @@ function App() {
   const userData = useAppStore((state) => state.userData);
   const loadUserData = useAppStore((state) => state.loadUserData);
   const checkExistingSession = useAppStore(
-    (state) => state.checkExistingSession
+    (state) => state.checkExistingSession,
   );
 
   // Проверяем сессию при загрузке приложения
@@ -302,7 +303,7 @@ function App() {
           ),
         },
         {
-          path: "//homecontrolbooker",
+          path: "/homecontrolbooker",
           element: (
             <ProtectedLayout
               allowedRoles={["nazoratbux"]}
@@ -373,12 +374,13 @@ function App() {
             />
           ),
         },
+
         {
-          path: "/stationdocsinf/:id",
+          path: "/user-all-docs/:userId",
           element: (
             <ProtectedLayout
               allowedRoles={["admin", "rahbar", "buxgalter", "nazoratbux"]}
-              element={<StationDocsInf />}
+              element={<UserAllDocuments />}
             />
           ),
         },
