@@ -374,6 +374,15 @@ function App() {
             />
           ),
         },
+        {
+          path: "/stationdocsinf/:id",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["admin", "rahbar", "buxgalter", "nazoratbux"]}
+              element={<StationDocsInf />}
+            />
+          ),
+        },
 
         {
           path: "/user-all-docs/:userId",
