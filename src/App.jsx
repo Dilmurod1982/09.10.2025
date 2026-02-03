@@ -51,6 +51,7 @@ import {
   PaymentMethods,
   Seal,
   UserAllDocuments,
+  PriceOfGasPage,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -65,6 +66,7 @@ import { auth } from "./firebase/config";
 import SessionWarning from "./components/SessionWarning";
 import DocumentPage from "./pages/DocumentPage";
 import { Toaster } from "react-hot-toast";
+import GasSettlementsDataList from "./components/GasSettlements/GasSettlementsDataList";
 
 function App() {
   const setUser = useAppStore((state) => state.setUser);
@@ -529,13 +531,22 @@ function App() {
           path: "/employeesdocdeadlineinf",
           element: <EmployeesDocDeadlineInf />,
         },
+
+        {
+          path: "/elektrsettlements",
+          element: <ElektrSettlements />,
+        },
         {
           path: "/gassettlements",
           element: <GasSettlements />,
         },
         {
-          path: "/elektrsettlements",
-          element: <ElektrSettlements />,
+          path: "/gas-settlements/list",
+          element: <GasSettlementsDataList />,
+        },
+        {
+          path: "/price-of-gas",
+          element: <PriceOfGasPage />,
         },
       ],
     },

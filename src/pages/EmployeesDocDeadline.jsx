@@ -151,6 +151,7 @@ const EmployeesDocDeadline = () => {
       <h1 className="text-2xl font-semibold mb-6">
         Заправкалар бўйича хужжатлар
       </h1>
+      <a href="https://amzn.to/4kcc0fm">Перейти по ссылке</a>
 
       <div className="mb-4 text-gray-600">
         Фақат Сизга бириктирилган заправкалар хужжатлари кўрсатилмоқда

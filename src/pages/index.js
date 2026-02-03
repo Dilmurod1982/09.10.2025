@@ -49,3 +49,4 @@ export { default as HomeControlBooker } from "./HomeControlBooker";
 export { default as PaymentMethods } from "./PaymentMethods";
 export { default as Seal } from "./Seal";
 export { default as UserAllDocuments } from "./UserAllDocuments";
+export { default as PriceOfGasPage } from "./PriceOfGasPage";
