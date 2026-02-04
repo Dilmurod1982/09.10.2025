@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   doc,
   getDoc,
+  setDoc,
   updateDoc,
   Timestamp,
   collection,
@@ -19,6 +20,30 @@ export const useGasSettlements = () => {
   const [banks, setBanks] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
 
+  // Функция для создания документа если он не существует
+  const ensureDocumentExists = async () => {
+    try {
+      const gasSettlementsRef = doc(db, "gasSettlements", "main");
+      const docSnap = await getDoc(gasSettlementsRef);
+
+      if (!docSnap.exists()) {
+        console.log("Creating new gasSettlements document...");
+        await setDoc(gasSettlementsRef, {
+          mainData: [],
+          data: [],
+          priceOfGas: [],
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+        console.log("Document created successfully");
+      }
+      return true;
+    } catch (err) {
+      console.error("Error ensuring document exists:", err);
+      throw err;
+    }
+  };
+
   // Загрузка всех данных
   const loadAllData = async () => {
     setLoading(true);
@@ -26,6 +51,9 @@ export const useGasSettlements = () => {
 
     try {
       console.log("=== Loading gas settlements data ===");
+
+      // Убеждаемся, что документ существует
+      await ensureDocumentExists();
 
       // Загружаем основные данные из gasSettlements
       const gasSettlementsRef = doc(db, "gasSettlements", "main");
@@ -44,29 +72,9 @@ export const useGasSettlements = () => {
         console.log("Settlements data count:", settlements.length);
         console.log("Price data count:", prices.length);
 
-        if (settlements.length > 0) {
-          console.log("Sample settlement data:", settlements[0]);
-          console.log("Sample period:", settlements[0].period);
-          console.log("Sample stationId:", settlements[0].stationId);
-        }
-
         setStations(mainData);
         setSettlementsData(settlements);
         setPriceOfGas(prices);
-      } else {
-        console.log(
-          "No gas settlements document found, creating empty structure",
-        );
-        await updateDoc(gasSettlementsRef, {
-          mainData: [],
-          data: [],
-          priceOfGas: [],
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        });
-        setStations([]);
-        setSettlementsData([]);
-        setPriceOfGas([]);
       }
 
       // Загружаем регионы
@@ -83,7 +91,7 @@ export const useGasSettlements = () => {
           });
         });
 
-        console.log("Loaded regions:", regionsList.length);
+        console.log("Loaded regions:", regionsList.length, regionsList);
         setRegions(regionsList);
       } catch (regionErr) {
         console.warn("Could not load regions:", regionErr.message);
@@ -104,7 +112,7 @@ export const useGasSettlements = () => {
           });
         });
 
-        console.log("Loaded banks:", banksList.length);
+        console.log("Loaded banks:", banksList.length, banksList);
         setBanks(banksList);
       } catch (bankErr) {
         console.warn("Could not load banks:", bankErr.message);
@@ -128,13 +136,18 @@ export const useGasSettlements = () => {
     }
   };
 
-  // Сохранение данных
+  // Сохранение данных (обновленная версия)
   const saveData = async (fieldName, data) => {
     setLoading(true);
     try {
       console.log(`Saving data to ${fieldName}:`, data);
 
       const docRef = doc(db, "gasSettlements", "main");
+
+      // Убеждаемся, что документ существует
+      await ensureDocumentExists();
+
+      // Теперь обновляем документ
       await updateDoc(docRef, {
         [fieldName]: data,
         updatedAt: Timestamp.now(),

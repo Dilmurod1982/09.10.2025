@@ -4,7 +4,9 @@ import { useGasSettlements } from "../hooks/useGasSettlements";
 import AddNewPriceGas from "../components/GasSettlements/AddNewPriceGas";
 
 const PriceOfGasPage = () => {
-  const { priceOfGas, loading, error, reloadData } = useGasSettlements();
+  const { priceOfGas, loading, error, reloadData, deletePrice } =
+    useGasSettlements();
+
   const [openModal, setOpenModal] = useState(false);
   const [editingPrice, setEditingPrice] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -18,11 +20,17 @@ const PriceOfGasPage = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return "Настоящее время";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("ru-RU", {
-      month: "long",
-      year: "numeric",
-    });
+    try {
+      const [year, month] = dateString.split("-");
+      const date = new Date(year, month - 1, 1);
+      return date.toLocaleDateString("ru-RU", {
+        month: "long",
+        year: "numeric",
+      });
+    } catch (err) {
+      console.error("Error formatting date:", dateString, err);
+      return dateString;
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -30,15 +38,16 @@ const PriceOfGasPage = () => {
       style: "currency",
       currency: "UZS",
       minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
   const filteredPrices = priceOfGas.filter(
     (price) =>
-      formatCurrency(price.price)
+      formatCurrency(price.price || 0)
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      formatDate(price.startDate)
+      formatDate(price.startDate || "")
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
       (price.endDate &&
@@ -53,15 +62,25 @@ const PriceOfGasPage = () => {
       "PriceOfGasPage: priceOfGas updated",
       priceOfGas.length,
       "items",
+      priceOfGas,
     );
   }, [priceOfGas, refreshTrigger]);
 
-  const handleDelete = async (priceIndex) => {
+  const handleDelete = async (startDate) => {
+    if (!startDate) {
+      console.error("No startDate provided for deletion");
+      return;
+    }
+
     if (window.confirm("Вы уверены, что хотите удалить эту цену?")) {
-      // Здесь должна быть реализация удаления
-      console.log("Delete price at index:", priceIndex);
-      // После удаления обновляем данные
-      await refreshData();
+      const success = await deletePrice(startDate);
+      if (success) {
+        console.log("Price deleted successfully");
+        // Обновляем данные после удаления
+        await refreshData();
+      } else {
+        console.error("Failed to delete price");
+      }
     }
   };
 
@@ -230,7 +249,7 @@ const PriceOfGasPage = () => {
               {filteredPrices.length > 0 ? (
                 filteredPrices.map((price, index) => (
                   <motion.tr
-                    key={`${price.startDate}-${price.price}`}
+                    key={`${price.startDate}-${price.price}-${index}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: index * 0.05 }}
@@ -241,7 +260,7 @@ const PriceOfGasPage = () => {
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-xl text-purple-600">
-                          {formatCurrency(price.price)}
+                          {formatCurrency(price.price || 0)}
                         </span>
                         <span className="text-gray-500 text-sm">/м³</span>
                       </div>
@@ -250,7 +269,7 @@ const PriceOfGasPage = () => {
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                         <span className="font-medium">
-                          {formatDate(price.startDate)}
+                          {formatDate(price.startDate || "")}
                         </span>
                       </div>
                     </td>
@@ -258,14 +277,14 @@ const PriceOfGasPage = () => {
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                         <span className="font-medium">
-                          {formatDate(price.endDate)}
+                          {formatDate(price.endDate || "")}
                         </span>
                       </div>
                     </td>
                     <td className="p-4">
                       <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800">
-                        {formatDate(price.startDate)} →{" "}
-                        {formatDate(price.endDate)}
+                        {formatDate(price.startDate || "")} →{" "}
+                        {formatDate(price.endDate || "")}
                       </div>
                     </td>
                     <td className="p-4">
@@ -297,7 +316,7 @@ const PriceOfGasPage = () => {
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => handleDelete(index)}
+                          onClick={() => handleDelete(price.startDate)}
                           className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
                           title="Удалить"
                         >

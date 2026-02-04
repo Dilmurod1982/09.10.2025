@@ -1,7 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 
-const GasSettlementsTable = ({ data }) => {
+const GasSettlementsTable = ({ data, onRowClick }) => {
   const formatNumber = (num) => {
     return new Intl.NumberFormat("ru-RU").format(num);
   };
@@ -99,9 +99,10 @@ const GasSettlementsTable = ({ data }) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: index * 0.05 }}
-              className={`border-t hover:bg-blue-50 transition-colors ${
+              className={`border-t hover:bg-blue-50 transition-colors cursor-pointer ${
                 index % 2 === 0 ? "bg-gray-50" : "bg-white"
               }`}
+              onClick={() => onRowClick(row)}
             >
               <td className="p-4 font-medium">{row.id}</td>
               <td className="p-4 font-medium text-blue-600">

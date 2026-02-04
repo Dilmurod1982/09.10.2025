@@ -3,7 +3,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useGasSettlements } from "../../hooks/useGasSettlements";
 
 const AddNewDataGasStation = ({ open, onClose }) => {
-  const { addNewStation, regions, banks } = useGasSettlements();
+  const {
+    addNewStation,
+    regions,
+    banks,
+    loading: hookLoading,
+  } = useGasSettlements();
+
   const [formData, setFormData] = useState({
     name: "",
     landmark: "",
@@ -16,9 +22,10 @@ const AddNewDataGasStation = ({ open, onClose }) => {
     startDate: "",
     startBalance: "",
   });
+
   const [displayStartBalance, setDisplayStartBalance] = useState("");
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [selectedBank, setSelectedBank] = useState(null);
 
   useEffect(() => {
@@ -82,14 +89,11 @@ const AddNewDataGasStation = ({ open, onClose }) => {
       newErrors.account = "Расчетный счет должен содержать ровно 20 цифр";
     }
 
-    // Проверяем МФО только если банк не выбран или МФО введен вручную
     if (formData.bank) {
-      // Если выбран банк, МФО должно быть 5 цифр (автоматически заполняется)
       if (!validateMFO(formData.mfo)) {
         newErrors.mfo = "МФО должен содержать ровно 5 цифр";
       }
     } else if (formData.mfo && !validateMFO(formData.mfo)) {
-      // Если банк не выбран, но МФО введено
       newErrors.mfo = "МФО должен содержать ровно 5 цифр";
     }
 
@@ -109,7 +113,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
 
     // Очищаем пробелы из чисел перед сохранением
     const cleanData = {
@@ -122,7 +126,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
 
     const result = await addNewStation(cleanData);
 
-    setLoading(false);
+    setSubmitting(false);
 
     if (result.success) {
       onClose();
@@ -192,13 +196,10 @@ const AddNewDataGasStation = ({ open, onClose }) => {
     const { name, value } = e.target;
 
     if (name === "bank") {
-      // При выборе банка
       const selectedBankObj = banks.find((bank) => bank.name === value);
 
       if (selectedBankObj) {
         setSelectedBank(selectedBankObj);
-
-        // Автоматически заполняем МФО из выбранного банка
         const bankMFO = selectedBankObj.mfo || "";
         const formattedMFO = formatMFO(bankMFO);
 
@@ -222,7 +223,6 @@ const AddNewDataGasStation = ({ open, onClose }) => {
         [name]: formatted,
       }));
     } else if (name === "mfo") {
-      // Если выбран банк, запрещаем ручное редактирование МФО
       if (!selectedBank) {
         const formatted = formatMFO(value);
         setFormData((prev) => ({
@@ -260,7 +260,6 @@ const AddNewDataGasStation = ({ open, onClose }) => {
     }
   };
 
-  // Обработка ручного сброса МФО (если пользователь хочет ввести другой МФО)
   const handleMFOReset = () => {
     setSelectedBank(null);
     setFormData((prev) => ({
@@ -270,7 +269,6 @@ const AddNewDataGasStation = ({ open, onClose }) => {
     }));
   };
 
-  // Генерируем варианты дат
   const generateDateOptions = () => {
     const options = [];
     const currentYear = new Date().getFullYear();
@@ -286,7 +284,6 @@ const AddNewDataGasStation = ({ open, onClose }) => {
     return options;
   };
 
-  // Подсказки для полей
   const getFieldHint = (fieldName) => {
     const hints = {
       account: "20 цифр (например: 1234 5678 9012 3456 7890)",
@@ -299,7 +296,6 @@ const AddNewDataGasStation = ({ open, onClose }) => {
     return hints[fieldName] || "";
   };
 
-  // Получаем текст для кнопки сброса МФО
   const getMFOButtonText = () => {
     if (selectedBank) {
       return "Изменить МФО вручную";
@@ -308,6 +304,8 @@ const AddNewDataGasStation = ({ open, onClose }) => {
   };
 
   if (!open) return null;
+
+  const isLoading = hookLoading || submitting;
 
   return (
     <AnimatePresence>
@@ -326,7 +324,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
               <button
                 onClick={onClose}
                 className="text-white hover:bg-blue-800 p-2 rounded-full transition-colors"
-                disabled={loading}
+                disabled={isLoading}
               >
                 <svg
                   className="w-6 h-6"
@@ -369,7 +367,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                     errors.name ? "border-red-500" : "border-gray-300"
                   }`}
                   placeholder="Введите наименование"
-                  disabled={loading}
+                  disabled={isLoading}
                 />
                 {errors.name && (
                   <p className="mt-1 text-sm text-red-600">{errors.name}</p>
@@ -387,7 +385,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   onChange={handleChange}
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Введите ориентир"
-                  disabled={loading}
+                  disabled={isLoading}
                 />
               </div>
 
@@ -402,7 +400,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                     errors.region ? "border-red-500" : "border-gray-300"
                   }`}
-                  disabled={loading}
+                  disabled={isLoading}
                 >
                   <option value="">Выберите область</option>
                   {regions.map((region) => (
@@ -413,6 +411,17 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                 </select>
                 {errors.region && (
                   <p className="mt-1 text-sm text-red-600">{errors.region}</p>
+                )}
+                {hookLoading && regions.length === 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Загрузка областей...
+                  </p>
+                )}
+                {!hookLoading && regions.length === 0 && (
+                  <p className="mt-1 text-xs text-yellow-600">
+                    Нет доступных областей. Проверьте коллекцию regions в
+                    Firestore.
+                  </p>
                 )}
               </div>
 
@@ -427,7 +436,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   onChange={handleChange}
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Введите адрес"
-                  disabled={loading}
+                  disabled={isLoading}
                 />
               </div>
 
@@ -440,7 +449,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   value={formData.bank}
                   onChange={handleChange}
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  disabled={loading}
+                  disabled={isLoading}
                 >
                   <option value="">Выберите банк</option>
                   {banks.map((bank) => (
@@ -466,6 +475,16 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                     <span>МФО банка будет заполнено автоматически</span>
                   </div>
                 )}
+                {hookLoading && banks.length === 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Загрузка банков...
+                  </p>
+                )}
+                {!hookLoading && banks.length === 0 && (
+                  <p className="mt-1 text-xs text-yellow-600">
+                    Нет доступных банков. Проверьте коллекцию banks в Firestore.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -482,7 +501,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                     errors.account ? "border-red-500" : "border-gray-300"
                   }`}
                   placeholder="1234 5678 9012 3456 7890"
-                  disabled={loading}
+                  disabled={isLoading}
                 />
                 {errors.account ? (
                   <p className="mt-1 text-sm text-red-600">{errors.account}</p>
@@ -503,7 +522,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                       type="button"
                       onClick={handleMFOReset}
                       className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
-                      disabled={loading}
+                      disabled={isLoading}
                     >
                       {getMFOButtonText()}
                     </button>
@@ -519,7 +538,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                     errors.mfo ? "border-red-500" : "border-gray-300"
                   } ${selectedBank ? "bg-gray-50 cursor-not-allowed" : ""}`}
                   placeholder="12345"
-                  disabled={loading || selectedBank}
+                  disabled={isLoading || selectedBank}
                   readOnly={!!selectedBank}
                 />
                 {errors.mfo ? (
@@ -550,7 +569,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                     errors.inn ? "border-red-500" : "border-gray-300"
                   }`}
                   placeholder="123456789"
-                  disabled={loading}
+                  disabled={isLoading}
                 />
                 {errors.inn ? (
                   <p className="mt-1 text-sm text-red-600">{errors.inn}</p>
@@ -572,7 +591,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                     errors.startDate ? "border-red-500" : "border-gray-300"
                   }`}
-                  disabled={loading}
+                  disabled={isLoading}
                 >
                   <option value="">Выберите месяц и год</option>
                   {generateDateOptions().map((option) => (
@@ -601,7 +620,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                     errors.startBalance ? "border-red-500" : "border-gray-300"
                   }`}
                   placeholder="0"
-                  disabled={loading}
+                  disabled={isLoading}
                 />
                 {errors.startBalance ? (
                   <p className="mt-1 text-sm text-red-600">
@@ -664,7 +683,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-                disabled={loading}
+                disabled={isLoading}
               >
                 Отмена
               </motion.button>
@@ -673,9 +692,9 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={loading}
+                disabled={isLoading}
               >
-                {loading ? (
+                {submitting ? (
                   <div className="flex items-center gap-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
                     Сохранение...

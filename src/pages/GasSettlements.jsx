@@ -8,6 +8,7 @@ import {
 } from "../utils/calculations";
 import GasSettlementsTable from "../components/GasSettlements/GasSettlementsTable";
 import AddNewDataGasStation from "../components/GasSettlements/AddNewDataGasStation";
+import StationDetailsModal from "../components/GasSettlements/StationDetailsModal";
 
 const GasSettlements = () => {
   const navigate = useNavigate();
@@ -23,6 +24,8 @@ const GasSettlements = () => {
   });
 
   const [openModal, setOpenModal] = useState(false);
+  const [selectedStation, setSelectedStation] = useState(null);
+  const [stationDetailsModal, setStationDetailsModal] = useState(false);
   const [tableData, setTableData] = useState([]);
 
   // Для отладки
@@ -158,6 +161,7 @@ const GasSettlements = () => {
         calculatedData.push({
           id: index++,
           stationName: station.name || "Неизвестно",
+          stationId: station.id, // Добавляем ID станции
           startBalance,
           limit: dataItem.limit || 0,
           amountOfLimit: dataItem.amountOfLimit || 0,
@@ -183,6 +187,28 @@ const GasSettlements = () => {
 
     console.log("Calculated table data:", calculatedData);
     setTableData(calculatedData);
+  };
+
+  // Обработчик клика по строке таблицы
+  const handleRowClick = (row) => {
+    console.log("Row clicked:", row);
+
+    // Находим полные данные станции
+    const station = stations.find(
+      (s) =>
+        s.name === row.stationName ||
+        s.id.toString() === row.stationId?.toString(),
+    );
+
+    if (station) {
+      setSelectedStation({
+        station,
+        rowData: row,
+      });
+      setStationDetailsModal(true);
+    } else {
+      console.warn("Station not found for row:", row);
+    }
   };
 
   const handleFilterChange = (name, value) => {
@@ -323,7 +349,7 @@ const GasSettlements = () => {
       </div>
 
       {/* Таблица */}
-      <GasSettlementsTable data={tableData} />
+      <GasSettlementsTable data={tableData} onRowClick={handleRowClick} />
 
       {/* Модальное окно добавления заправки */}
       <AnimatePresence>
@@ -331,6 +357,19 @@ const GasSettlements = () => {
           <AddNewDataGasStation
             open={openModal}
             onClose={() => setOpenModal(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Модальное окно деталей станции */}
+      <AnimatePresence>
+        {stationDetailsModal && (
+          <StationDetailsModal
+            open={stationDetailsModal}
+            onClose={() => setStationDetailsModal(false)}
+            stationData={selectedStation}
+            stations={stations}
+            settlementsData={settlementsData}
           />
         )}
       </AnimatePresence>
