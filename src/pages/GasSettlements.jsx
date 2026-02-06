@@ -9,6 +9,7 @@ import {
 import GasSettlementsTable from "../components/GasSettlements/GasSettlementsTable";
 import AddNewDataGasStation from "../components/GasSettlements/AddNewDataGasStation";
 import StationDetailsModal from "../components/GasSettlements/StationDetailsModal";
+import * as XLSX from "xlsx";
 
 const GasSettlements = () => {
   const navigate = useNavigate();
@@ -27,18 +28,122 @@ const GasSettlements = () => {
   const [selectedStation, setSelectedStation] = useState(null);
   const [stationDetailsModal, setStationDetailsModal] = useState(false);
   const [tableData, setTableData] = useState([]);
+  const [exporting, setExporting] = useState(false);
+
+  // Функция экспорта в Excel
+  const exportToExcel = async (data, filters, stations) => {
+    try {
+      setExporting(true);
+
+      // Создаем рабочую книгу
+      const workbook = XLSX.utils.book_new();
+      const filterInfo = [
+        ["Маълумот:"],
+        ["Йил:", filters.year],
+        [
+          "Ой:",
+          new Date(2023, filters.month - 1).toLocaleString("ru", {
+            month: "long",
+          }),
+        ],
+        [
+          "Заправка:",
+          filters.stationId === "all"
+            ? "Жами заправкалар"
+            : stations.find(
+                (s) => s.id.toString() === filters.stationId.toString(),
+              )?.name || "Номаълум",
+        ],
+        ["Ёзувлар сони:", data.length],
+        ["Экспорта санаси:", new Date().toLocaleString("ru-RU")],
+      ];
+      // Подготовка данных для экспорта
+      const exportData = data.map((row, index) => ({
+        "№": index + 1,
+        "Заправка номи": row.stationName,
+        "Ой бошига сальдо": row.startBalance,
+        "Лимит (м³)": row.limit,
+        "Лимита суммаси (сўм)": row.amountOfLimit,
+        "Жами газ (м³)": row.totalGas,
+        "Пилот бўйича (м³)": row.gasByMeter,
+        "Конф. хатоси (м³)": row.confError,
+        "Низкий перепад (м³)": row.lowPress,
+        "Акт бўйича (м³)": row.gasAct,
+        "Газ суммаси (сўм)": row.amountOfGas,
+        Оплачено: row.payment,
+        "Ой охирига сальдо": row.endBalance,
+      }));
+
+      // Добавляем итоговую строку
+      const totals = {
+        "№": "ИТОГО",
+        "Заправка номи": "",
+        "Ой бошига сальдо": data.reduce(
+          (sum, row) => sum + row.startBalance,
+          0,
+        ),
+        "Лимит (м³)": data.reduce((sum, row) => sum + row.limit, 0),
+        "Лимита суммаси (сўм)": data.reduce(
+          (sum, row) => sum + row.amountOfLimit,
+          0,
+        ),
+        "Жами газ (м³)": data.reduce((sum, row) => sum + row.totalGas, 0),
+        "Пилот бўйича (м³)": data.reduce((sum, row) => sum + row.gasByMeter, 0),
+        "Конф. хатоси (м³)": data.reduce((sum, row) => sum + row.confError, 0),
+        "Низкий перепад (м³)": data.reduce((sum, row) => sum + row.lowPress, 0),
+        "Акт бўйича (м³)": data.reduce((sum, row) => sum + row.gasAct, 0),
+        "Газ суммаси (сўм)": data.reduce(
+          (sum, row) => sum + row.amountOfGas,
+          0,
+        ),
+        Оплачено: data.reduce((sum, row) => sum + row.payment, 0),
+        "Ой охирига сальдо": data.reduce((sum, row) => sum + row.endBalance, 0),
+      };
+
+      exportData.push(totals);
+
+      // Создаем лист
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Добавляем информацию о фильтрах
+
+      // Добавляем информацию о фильтрах ниже данных
+      const wsData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      wsData.push([]); // Пустая строка
+      filterInfo.forEach((row) => wsData.push(row));
+
+      // Обновляем лист с добавленной информацией
+      XLSX.utils.sheet_add_json(worksheet, wsData, { skipHeader: true });
+
+      // Добавляем лист в книгу
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Учет газа");
+
+      // Генерируем имя файла
+      const fileName = `gas_settlements_${filters.year}-${filters.month.toString().padStart(2, "0")}_${new Date().getTime()}.xlsx`;
+
+      // Сохраняем файл
+      XLSX.writeFile(workbook, fileName);
+
+      return true;
+    } catch (error) {
+      console.error("Экспортда хатолик:", error);
+      throw error;
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Для отладки
   useEffect(() => {
-    console.log("=== GAS SETTLEMENTS DEBUG ===");
-    console.log("Filters:", filters);
-    console.log("Stations count:", stations.length);
-    console.log("Settlements data count:", settlementsData.length);
-    console.log("Loading:", loading);
+    // console.log("=== GAS SETTLEMENTS DEBUG ===");
+    // console.log("Filters:", filters);
+    // console.log("Stations count:", stations.length);
+    // console.log("Settlements data count:", settlementsData.length);
+    // console.log("Loading:", loading);
 
     if (settlementsData.length > 0) {
-      console.log("Sample settlements data:", settlementsData[0]);
-      console.log("Sample period:", settlementsData[0]?.period);
+      // console.log("Sample settlements data:", settlementsData[0]);
+      // console.log("Sample period:", settlementsData[0]?.period);
     }
   }, [filters, stations, settlementsData, loading]);
 
@@ -52,22 +157,22 @@ const GasSettlements = () => {
   }, [filters, stations, settlementsData]);
 
   const calculateTableData = () => {
-    console.log("Calculating table data...");
+    // console.log("Calculating table data...");
 
     // Форматируем выбранный период
     const selectedPeriod = `${filters.year}-${filters.month.toString().padStart(2, "0")}`;
-    console.log("Selected period for filtering:", selectedPeriod);
+    // console.log("Selected period for filtering:", selectedPeriod);
 
     // Фильтруем данные
     const filteredData = settlementsData.filter((item) => {
       if (!item.period) {
-        console.log("Item has no period:", item);
+        // console.log("Item has no period:", item);
         return false;
       }
 
-      console.log(
-        `Checking item: period=${item.period}, stationId=${item.stationId}`,
-      );
+      // console.log(
+      //   `Checking item: period=${item.period}, stationId=${item.stationId}`,
+      // );
 
       // Проверяем период
       const periodMatches = item.period === selectedPeriod;
@@ -77,15 +182,15 @@ const GasSettlements = () => {
         filters.stationId === "all" ||
         item.stationId.toString() === filters.stationId.toString();
 
-      console.log(
-        `Matches: period=${periodMatches}, station=${stationMatches}`,
-      );
+      // console.log(
+      //   `Matches: period=${periodMatches}, station=${stationMatches}`,
+      // );
 
       return periodMatches && stationMatches;
     });
 
-    console.log("Filtered data count:", filteredData.length);
-    console.log("Filtered data:", filteredData);
+    // console.log("Filtered data count:", filteredData.length);
+    // console.log("Filtered data:", filteredData);
 
     if (filteredData.length === 0) {
       setTableData([]);
@@ -127,10 +232,9 @@ const GasSettlements = () => {
       });
     }
 
-    console.log("Stations map:", stationsMap);
+    // console.log("Stations map:", stationsMap);
 
     const calculatedData = [];
-    let index = 1;
 
     // Проходим по всем станциям в карте
     Object.keys(stationsMap).forEach((stationId) => {
@@ -159,9 +263,9 @@ const GasSettlements = () => {
         );
 
         calculatedData.push({
-          id: index++,
+          id: parseInt(stationId), // Используем ID станции как основной ID
+          stationId: station.id,
           stationName: station.name || "Неизвестно",
-          stationId: station.id, // Добавляем ID станции
           startBalance,
           limit: dataItem.limit || 0,
           amountOfLimit: dataItem.amountOfLimit || 0,
@@ -177,21 +281,32 @@ const GasSettlements = () => {
       });
     });
 
-    // Сортируем по имени станции
-    calculatedData.sort((a, b) => a.stationName.localeCompare(b.stationName));
+    // Сортируем по ID станции (числовое сравнение)
+    calculatedData.sort((a, b) => {
+      // Сначала пытаемся сортировать по числовому ID
+      const idA = parseInt(a.id) || 0;
+      const idB = parseInt(b.id) || 0;
 
-    // Обновляем индексы
-    calculatedData.forEach((item, idx) => {
-      item.id = idx + 1;
+      // Если ID одинаковые или оба равны 0, сортируем по имени
+      if (idA === idB) {
+        return a.stationName.localeCompare(b.stationName);
+      }
+
+      return idA - idB;
     });
 
-    console.log("Calculated table data:", calculatedData);
+    // Обновляем индексы для отображения (1, 2, 3...)
+    calculatedData.forEach((item, idx) => {
+      item.displayId = idx + 1; // Добавляем отдельное поле для отображения
+    });
+
+    // console.log("Calculated table data (sorted by ID):", calculatedData);
     setTableData(calculatedData);
   };
 
   // Обработчик клика по строке таблицы
   const handleRowClick = (row) => {
-    console.log("Row clicked:", row);
+    // console.log("Row clicked:", row);
 
     // Находим полные данные станции
     const station = stations.find(
@@ -212,17 +327,27 @@ const GasSettlements = () => {
   };
 
   const handleFilterChange = (name, value) => {
-    console.log(`Filter change: ${name} = ${value}`);
+    // console.log(`Filter change: ${name} = ${value}`);
     setFilters((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  const handleExportExcel = () => {
-    // Реализация экспорта в Excel
-    console.log("Export to Excel:", tableData);
-    alert("Экспорт в Excel (реализуйте эту функцию)");
+  // Функция экспорта в Excel
+  const handleExportExcel = async () => {
+    if (tableData.length === 0) {
+      alert("Экспорт учун маълумот йўқ!");
+      return;
+    }
+
+    try {
+      await exportToExcel(tableData, filters, stations);
+      // alert(`Данные успешно экспортированы в Excel!`);
+    } catch (error) {
+      console.error("Ошибка при экспорте:", error);
+      alert("Excel га экспортда хатолик: " + error.message);
+    }
   };
 
   if (loading) {
@@ -237,7 +362,7 @@ const GasSettlements = () => {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-2xl font-semibold text-gray-800">
-          Учет с газоснабжающей организацией
+          Худудгаз билан ҳисоб-китоблар (Газ ҳисоботи)
         </h2>
         <motion.button
           onClick={() => navigate("/gas-settlements/list")}
@@ -245,7 +370,7 @@ const GasSettlements = () => {
           whileTap={{ scale: 0.95 }}
           className="bg-blue-600 text-white px-5 py-2.5 rounded-xl shadow-md hover:bg-blue-700 transition-colors"
         >
-          📋 Список введенных данных
+          📋 Киритилган маълумотлар рўйхати
         </motion.button>
       </div>
 
@@ -254,14 +379,14 @@ const GasSettlements = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Год
+              Йил
             </label>
             <select
               value={filters.year}
               onChange={(e) => handleFilterChange("year", e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              {[2023, 2024, 2025, 2026].map((year) => (
+              {[2026].map((year) => (
                 <option key={year} value={year}>
                   {year}
                 </option>
@@ -271,7 +396,7 @@ const GasSettlements = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Месяц
+              Ой
             </label>
             <select
               value={filters.month}
@@ -297,7 +422,7 @@ const GasSettlements = () => {
               onChange={(e) => handleFilterChange("stationId", e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="all">Все заправки</option>
+              <option value="all">Барча заправкалар</option>
               {stations.map((station) => (
                 <option key={station.id} value={station.id}>
                   {station.name}
@@ -311,9 +436,24 @@ const GasSettlements = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleExportExcel}
-              className="w-full bg-green-600 text-white px-4 py-3 rounded-xl shadow-md hover:bg-green-700 transition-colors"
+              disabled={exporting || tableData.length === 0}
+              className={`w-full px-4 py-3 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 ${
+                exporting || tableData.length === 0
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-green-600 hover:bg-green-700"
+              } text-white`}
             >
-              📊 Excel
+              {exporting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                  <span>Экспорт...</span>
+                </>
+              ) : (
+                <>
+                  <span>📊</span>
+                  <span>Excel</span>
+                </>
+              )}
             </motion.button>
           </div>
         </div>
@@ -326,7 +466,7 @@ const GasSettlements = () => {
             onClick={() => setOpenModal(true)}
             className="bg-blue-600 text-white px-4 py-3 rounded-xl shadow-md hover:bg-blue-700 transition-colors"
           >
-            ⛽ Добавить Заправку
+            ⛽ Заправка қўшиш
           </motion.button>
 
           <motion.button
@@ -335,21 +475,26 @@ const GasSettlements = () => {
             onClick={() => navigate("/price-of-gas")}
             className="bg-purple-600 text-white px-4 py-3 rounded-xl shadow-md hover:bg-purple-700 transition-colors"
           >
-            💰 Цены на газ
+            💰 Газ нархлари
           </motion.button>
 
           <div className="text-right text-sm text-gray-500 mt-2">
-            <p>Всего заправок: {stations.length}</p>
-            <p>Данных за период: {tableData.length}</p>
+            <p>Жами заправкалар: {stations.length}</p>
+            <p>Давр учун маълумот: {tableData.length}</p>
             <p className="text-xs text-gray-400">
-              Период: {filters.year}-{filters.month.toString().padStart(2, "0")}
+              Давр: {filters.year}-{filters.month.toString().padStart(2, "0")}
             </p>
           </div>
         </div>
       </div>
 
       {/* Таблица */}
-      <GasSettlementsTable data={tableData} onRowClick={handleRowClick} />
+      <GasSettlementsTable
+        data={tableData}
+        onRowClick={handleRowClick}
+        // Передаем пропс для инвертированной цветовой логики
+        invertBalanceColors={true}
+      />
 
       {/* Модальное окно добавления заправки */}
       <AnimatePresence>

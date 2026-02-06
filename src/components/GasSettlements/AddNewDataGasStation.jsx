@@ -77,28 +77,28 @@ const AddNewDataGasStation = ({ open, onClose }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) newErrors.name = "Введите наименование";
-    if (!formData.region) newErrors.region = "Выберите область";
-    if (!formData.startDate) newErrors.startDate = "Выберите стартовый месяц";
+    if (!formData.name.trim()) newErrors.name = "Номини киритинг";
+    if (!formData.region) newErrors.region = "Вилоятни танланг";
+    if (!formData.startDate) newErrors.startDate = "Бошлангич ойни танланг";
 
     if (!validateStartBalance(formData.startBalance)) {
-      newErrors.startBalance = "Введите корректное сальдо";
+      newErrors.startBalance = "Тўғри сальдо киритинг";
     }
 
     if (formData.account && !validateAccount(formData.account)) {
-      newErrors.account = "Расчетный счет должен содержать ровно 20 цифр";
+      newErrors.account = "Ҳисоб рақами 20 та рақамдан иборат бўлиши керак";
     }
 
     if (formData.bank) {
       if (!validateMFO(formData.mfo)) {
-        newErrors.mfo = "МФО должен содержать ровно 5 цифр";
+        newErrors.mfo = "МФО 5 та рақамдан иборат бўлиши керак";
       }
     } else if (formData.mfo && !validateMFO(formData.mfo)) {
-      newErrors.mfo = "МФО должен содержать ровно 5 цифр";
+      newErrors.mfo = "МФО 5 та рақамдан иборат бўлиши керак";
     }
 
     if (formData.inn && !validateINN(formData.inn)) {
-      newErrors.inn = "ИНН должен содержать ровно 9 цифр";
+      newErrors.inn = "СТИР 9 та рақамдан иборат бўлиши керак";
     }
 
     return newErrors;
@@ -131,7 +131,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
     if (result.success) {
       onClose();
     } else {
-      setErrors({ submit: result.error || "Ошибка при сохранении" });
+      setErrors({ submit: result.error || "Сақлашда хатолик" });
     }
   };
 
@@ -273,7 +273,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
     const options = [];
     const currentYear = new Date().getFullYear();
 
-    for (let year = 2020; year <= currentYear + 5; year++) {
+    for (let year = 2026; year <= currentYear + 5; year++) {
       for (let month = 1; month <= 12; month++) {
         const value = `${year}-${month.toString().padStart(2, "0")}`;
         const label = `${year} ${new Date(year, month - 1).toLocaleString("ru", { month: "long" })}`;
@@ -286,19 +286,19 @@ const AddNewDataGasStation = ({ open, onClose }) => {
 
   const getFieldHint = (fieldName) => {
     const hints = {
-      account: "20 цифр (например: 1234 5678 9012 3456 7890)",
+      account: "20 рақам (мисол: 1234 5678 9012 3456 7890)",
       mfo: selectedBank
-        ? "Заполняется автоматически из выбранного банка"
-        : "5 цифр (например: 12345)",
-      inn: "9 цифр (например: 123456789)",
-      startBalance: "Можно вводить отрицательные значения",
+        ? "Танланган банк бўйича автоматик тўлдирилади"
+        : "5 рақам (мисол: 12345)",
+      inn: "9 рақам (мисол: 123456789)",
+      startBalance: "Манфий ёки мусбат бўлиши мумкин",
     };
     return hints[fieldName] || "";
   };
 
   const getMFOButtonText = () => {
     if (selectedBank) {
-      return "Изменить МФО вручную";
+      return "МФОни қўл билан киритишга ўтиш";
     }
     return "";
   };
@@ -319,7 +319,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
             <div className="flex justify-between items-center">
               <h3 className="text-xl font-semibold text-white">
-                Добавить новую заправку
+                Янги заправка қўшиш
               </h3>
               <button
                 onClick={onClose}
@@ -356,7 +356,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Наименование заправки *
+                  Заправка номи *
                 </label>
                 <input
                   type="text"
@@ -366,7 +366,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                     errors.name ? "border-red-500" : "border-gray-300"
                   }`}
-                  placeholder="Введите наименование"
+                  placeholder="Заправка номини киритинг"
                   disabled={isLoading}
                 />
                 {errors.name && (
@@ -376,7 +376,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ориентир
+                  Мўлжал *
                 </label>
                 <input
                   type="text"
@@ -384,14 +384,14 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   value={formData.landmark}
                   onChange={handleChange}
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Введите ориентир"
+                  placeholder="Мўлжални киритинг"
                   disabled={isLoading}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Область *
+                  Вилоят *
                 </label>
                 <select
                   name="region"
@@ -402,7 +402,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   }`}
                   disabled={isLoading}
                 >
-                  <option value="">Выберите область</option>
+                  <option value="">Вилоятни тангланг</option>
                   {regions.map((region) => (
                     <option key={region.id || region.name} value={region.name}>
                       {region.name}
@@ -414,20 +414,20 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                 )}
                 {hookLoading && regions.length === 0 && (
                   <p className="mt-1 text-xs text-gray-500">
-                    Загрузка областей...
+                    Вилоятлар юкланмоқда...
                   </p>
                 )}
                 {!hookLoading && regions.length === 0 && (
                   <p className="mt-1 text-xs text-yellow-600">
-                    Нет доступных областей. Проверьте коллекцию regions в
-                    Firestore.
+                    Вилоятлар юкланмади. Firestore тўғри юкланганлигига қараб
+                    қўйинг.
                   </p>
                 )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Адрес
+                  Манзил
                 </label>
                 <input
                   type="text"
@@ -435,7 +435,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   value={formData.address}
                   onChange={handleChange}
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Введите адрес"
+                  placeholder="Манзилни киритинг"
                   disabled={isLoading}
                 />
               </div>
@@ -451,7 +451,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   disabled={isLoading}
                 >
-                  <option value="">Выберите банк</option>
+                  <option value="">Банкни танланг</option>
                   {banks.map((bank) => (
                     <option key={bank.id || bank.name} value={bank.name}>
                       {bank.name}
@@ -472,24 +472,24 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                         clipRule="evenodd"
                       />
                     </svg>
-                    <span>МФО банка будет заполнено автоматически</span>
+                    <span>МФО банка автоматик тўлдирилади</span>
                   </div>
                 )}
                 {hookLoading && banks.length === 0 && (
                   <p className="mt-1 text-xs text-gray-500">
-                    Загрузка банков...
+                    Банклар рўйхати юкланмоқда...
                   </p>
                 )}
                 {!hookLoading && banks.length === 0 && (
                   <p className="mt-1 text-xs text-yellow-600">
-                    Нет доступных банков. Проверьте коллекцию banks в Firestore.
+                    Firestore тўғри юкланмаган. Банклар рўйхати юкланмади.
                   </p>
                 )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Расчетный счет
+                  Ҳисоб рақам
                 </label>
                 <input
                   type="text"
@@ -550,14 +550,14 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                 )}
                 {selectedBank && selectedBank.mfo && (
                   <div className="mt-1 text-xs text-gray-500">
-                    Из банка: {selectedBank.name} ({selectedBank.mfo})
+                    Банкдан: {selectedBank.name} ({selectedBank.mfo})
                   </div>
                 )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  ИНН
+                  СТИР
                 </label>
                 <input
                   type="text"
@@ -582,7 +582,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Стартовый месяц *
+                  Бошланғич ой *
                 </label>
                 <select
                   name="startDate"
@@ -593,7 +593,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   }`}
                   disabled={isLoading}
                 >
-                  <option value="">Выберите месяц и год</option>
+                  <option value="">Йил ва ойни танланг</option>
                   {generateDateOptions().map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -609,7 +609,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Стартовое сальдо *
+                  Бошланғич сальдо *
                 </label>
                 <input
                   type="text"
@@ -634,7 +634,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            {/* <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
               <div className="flex items-start gap-3">
                 <div className="text-blue-500 mt-0.5">
                   <svg
@@ -674,7 +674,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                   </ul>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             <div className="flex justify-end gap-4 pt-6 border-t">
               <motion.button
@@ -685,7 +685,7 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                 className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
                 disabled={isLoading}
               >
-                Отмена
+                Бекор қилиш
               </motion.button>
               <motion.button
                 type="submit"
@@ -697,10 +697,10 @@ const AddNewDataGasStation = ({ open, onClose }) => {
                 {submitting ? (
                   <div className="flex items-center gap-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                    Сохранение...
+                    Сақлаш...
                   </div>
                 ) : (
-                  "Сохранить заправку"
+                  "Заправкани сақлаш"
                 )}
               </motion.button>
             </div>

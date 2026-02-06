@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useGasSettlements } from "../../hooks/useGasSettlements";
 import AddNewGasSettlementsData from "./AddNewGasSettlementsData";
+import { db } from "../../firebase/config";
+import { doc, updateDoc } from "firebase/firestore";
 
 const GasSettlementsDataList = () => {
   const navigate = useNavigate();
-  const { settlementsData, stations, loading, reloadData } =
+  const { settlementsData, stations, loading, reloadData, priceOfGas } =
     useGasSettlements();
   const [openModal, setOpenModal] = useState(false);
   const [viewModal, setViewModal] = useState(false);
@@ -14,7 +16,23 @@ const GasSettlementsDataList = () => {
   const [selectedData, setSelectedData] = useState(null);
   const [uniquePeriods, setUniquePeriods] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0); // Для принудительного обновления
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [editingData, setEditingData] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  // Функция для получения текущей цены на газ для периода
+  const getCurrentPriceForPeriod = (period) => {
+    if (!priceOfGas || !priceOfGas.length) return 0;
+
+    const periodDate = new Date(period);
+    const priceEntry = priceOfGas.find((p) => {
+      const startDate = new Date(p.startDate);
+      const endDate = p.endDate ? new Date(p.endDate) : new Date();
+      return periodDate >= startDate && periodDate <= endDate;
+    });
+
+    return priceEntry ? priceEntry.price : 0;
+  };
 
   // Функция для обновления уникальных периодов
   const updateUniquePeriods = (data) => {
@@ -53,6 +71,8 @@ const GasSettlementsDataList = () => {
     const dataForPeriod = settlementsData.filter(
       (item) => item.period === period,
     );
+    console.log(dataForPeriod);
+
     setSelectedData({
       period,
       data: dataForPeriod,
@@ -68,15 +88,108 @@ const GasSettlementsDataList = () => {
       period,
       data: dataForPeriod,
     });
+    setEditingData([...dataForPeriod]); // Создаем копию данных для редактирования
     setEditModal(true);
+  };
+
+  // Обработка изменений в форме редактирования
+  const handleEditChange = (index, field, value) => {
+    const newEditingData = [...editingData];
+    newEditingData[index] = {
+      ...newEditingData[index],
+      [field]: Number(value) || 0,
+    };
+
+    // Пересчитываем totalGas и суммы, если изменились компоненты газа
+    if (
+      field === "gasByMeter" ||
+      field === "confError" ||
+      field === "lowPress" ||
+      field === "gasAct"
+    ) {
+      const totalGas =
+        (Number(newEditingData[index].gasByMeter) || 0) +
+        (Number(newEditingData[index].confError) || 0) +
+        (Number(newEditingData[index].lowPress) || 0) +
+        (Number(newEditingData[index].gasAct) || 0);
+
+      newEditingData[index].totalGas = totalGas;
+
+      // Пересчитываем amountOfGas на основе totalGas и текущей цены
+      const price = getCurrentPriceForPeriod(selectedData.period);
+      newEditingData[index].amountOfGas = totalGas * price;
+    }
+
+    // Пересчитываем amountOfLimit на основе лимита и текущей цены
+    if (field === "limit") {
+      const price = getCurrentPriceForPeriod(selectedData.period);
+      newEditingData[index].amountOfLimit = (Number(value) || 0) * price;
+    }
+
+    setEditingData(newEditingData);
+  };
+
+  // Сохранение отредактированных данных
+  const handleSaveEdit = async () => {
+    if (!selectedData || !editingData.length) return;
+
+    setSaving(true);
+
+    try {
+      // 1. Получаем ссылку на документ main в коллекции gasSettlements
+      const mainDocRef = doc(db, "gasSettlements", "main");
+
+      // 2. Получаем текущие данные
+      const currentData = [...settlementsData];
+
+      // 3. Обновляем данные в массиве currentData
+      editingData.forEach((editedItem) => {
+        const index = currentData.findIndex(
+          (item) =>
+            item.period === editedItem.period &&
+            item.stationId === editedItem.stationId,
+        );
+
+        if (index !== -1) {
+          // Пересчитываем суммы перед сохранением
+          const price = getCurrentPriceForPeriod(editedItem.period);
+          const updatedItem = {
+            ...currentData[index],
+            ...editedItem,
+            amountOfLimit: editedItem.limit * price,
+            amountOfGas: editedItem.totalGas * price,
+            updatedAt: new Date().toISOString(),
+          };
+
+          currentData[index] = updatedItem;
+        }
+      });
+
+      // 4. Сохраняем обновленные данные в Firebase
+      await updateDoc(mainDocRef, {
+        data: currentData,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // 5. Обновляем локальные данные
+      await reloadData();
+      setRefreshKey((prev) => prev + 1);
+
+      // 6. Закрываем модальное окно
+      setEditModal(false);
+      alert("Данные успешно сохранены!");
+    } catch (error) {
+      console.error("Ошибка при сохранении данных:", error);
+      alert("Ошибка при сохранении данных: " + error.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Обработка закрытия модального окна добавления данных
   const handleAddModalClose = async () => {
     setOpenModal(false);
-    // Обновляем данные после закрытия модального окна
     await reloadData();
-    // Принудительно обновляем состояние
     setRefreshKey((prev) => prev + 1);
   };
 
@@ -157,6 +270,7 @@ const GasSettlementsDataList = () => {
         </div>
       </div>
 
+      {/* Поле поиска */}
       <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -182,6 +296,7 @@ const GasSettlementsDataList = () => {
         </div>
       </div>
 
+      {/* Индикатор загрузки */}
       {loading && settlementsData.length > 0 && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-2xl">
           <div className="flex items-center gap-2 text-blue-700">
@@ -191,6 +306,7 @@ const GasSettlementsDataList = () => {
         </div>
       )}
 
+      {/* ТАБЛИЦА СО СПИСКОМ ПЕРИОДОВ - ЭТО ОСНОВНАЯ ЧАСТЬ, КОТОРАЯ ОТСУТСТВОВАЛА */}
       <div className="bg-white rounded-2xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
@@ -445,21 +561,82 @@ const GasSettlementsDataList = () => {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <div className="bg-white p-3 rounded-lg border">
                             <div className="text-sm text-gray-500 mb-1">
                               Лимит
                             </div>
-                            <div className="font-mono font-medium">
-                              {item.limit || 0}
+                            <div className="font-mono font-medium ">
+                              {new Intl.NumberFormat("ru-RU", {
+                                minimumFractionDigits: 0,
+                              }).format(item.limit || 0)}
                             </div>
                           </div>
                           <div className="bg-white p-3 rounded-lg border">
                             <div className="text-sm text-gray-500 mb-1">
-                              Газ по счетчику
+                              Сумма по лимиту
                             </div>
-                            <div className="font-mono font-medium">
-                              {item.gasByMeter || 0}
+                            <div className="font-mono font-medium ">
+                              {new Intl.NumberFormat("ru-RU", {
+                                style: "currency",
+                                currency: "UZS",
+                                minimumFractionDigits: 0,
+                              }).format(item.amountOfLimit || 0)}
+                            </div>
+                          </div>
+                          <div className="bg-white p-3 rounded-lg border">
+                            <div className="text-sm text-gray-500 mb-1">
+                              Всего получено газа
+                            </div>
+                            <div className="font-mono font-medium ">
+                              {new Intl.NumberFormat("ru-RU", {
+                                minimumFractionDigits: 0,
+                              }).format(item.totalGas || 0)}
+                            </div>
+
+                            <div className="text-sm text-gray-500 mb-1">
+                              В.т.ч. по счетчику
+                            </div>
+                            <div className="font-mono font-medium ">
+                              {new Intl.NumberFormat("ru-RU", {
+                                minimumFractionDigits: 0,
+                              }).format(item.gasByMeter || 0)}
+                            </div>
+                            <div className="text-sm text-gray-500 mb-1">
+                              Ошибка конфигурации
+                            </div>
+                            <div className="font-mono font-medium ">
+                              {new Intl.NumberFormat("ru-RU", {
+                                minimumFractionDigits: 0,
+                              }).format(item.confError || 0)}
+                            </div>
+                            <div className="text-sm text-gray-500 mb-1">
+                              Нижний предел
+                            </div>
+                            <div className="font-mono font-medium ">
+                              {new Intl.NumberFormat("ru-RU", {
+                                minimumFractionDigits: 0,
+                              }).format(item.lowPress || 0)}
+                            </div>
+                            <div className="text-sm text-gray-500 mb-1">
+                              По акту
+                            </div>
+                            <div className="font-mono font-medium ">
+                              {new Intl.NumberFormat("ru-RU", {
+                                minimumFractionDigits: 0,
+                              }).format(item.gasAct || 0)}
+                            </div>
+                          </div>
+                          <div className="bg-white p-3 rounded-lg border">
+                            <div className="text-sm text-gray-500 mb-1">
+                              Сумма всего газа
+                            </div>
+                            <div className="font-mono font-medium ">
+                              {new Intl.NumberFormat("ru-RU", {
+                                style: "currency",
+                                currency: "UZS",
+                                minimumFractionDigits: 0,
+                              }).format(item.amountOfGas || 0)}
                             </div>
                           </div>
                           <div className="bg-white p-3 rounded-lg border">
@@ -472,14 +649,6 @@ const GasSettlementsDataList = () => {
                                 currency: "UZS",
                                 minimumFractionDigits: 0,
                               }).format(item.payment || 0)}
-                            </div>
-                          </div>
-                          <div className="bg-white p-3 rounded-lg border">
-                            <div className="text-sm text-gray-500 mb-1">
-                              Всего газа
-                            </div>
-                            <div className="font-mono font-medium">
-                              {item.totalGas || 0}
                             </div>
                           </div>
                         </div>
@@ -522,13 +691,13 @@ const GasSettlementsDataList = () => {
 
       {/* Модальное окно редактирования данных */}
       <AnimatePresence>
-        {editModal && selectedData && (
+        {editModal && selectedData && editingData.length > 0 && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden"
             >
               <div className="bg-gradient-to-r from-green-600 to-green-700 p-6">
                 <div className="flex justify-between items-center">
@@ -541,7 +710,8 @@ const GasSettlementsDataList = () => {
                       })}
                     </h3>
                     <p className="text-green-100 text-sm">
-                      Измените данные и нажмите "Сохранить"
+                      Текущая цена на газ:{" "}
+                      {getCurrentPriceForPeriod(selectedData.period)} сум/м³
                     </p>
                   </div>
                   <button
@@ -566,52 +736,224 @@ const GasSettlementsDataList = () => {
               </div>
 
               <div className="p-6 overflow-y-auto max-h-[60vh]">
-                <div className="space-y-4">
-                  {selectedData.data.map((item, index) => {
+                <div className="space-y-6">
+                  {editingData.map((item, index) => {
                     const station = stations.find(
                       (s) =>
                         s.id && s.id.toString() === item.stationId.toString(),
                     );
+                    const price = getCurrentPriceForPeriod(item.period);
+                    const calculatedAmountOfLimit = (item.limit || 0) * price;
+                    const calculatedAmountOfGas = (item.totalGas || 0) * price;
 
                     return (
                       <div
                         key={`${item.stationId}-${item.period}`}
-                        className="bg-gray-50 rounded-xl p-4 border border-gray-200"
+                        className="bg-gray-50 rounded-xl p-6 border border-gray-200"
                       >
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center font-medium">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center font-bold text-lg">
                             {index + 1}
                           </div>
                           <div>
-                            <h4 className="font-medium text-blue-600">
+                            <h4 className="font-bold text-xl text-blue-600">
                               {station?.name || "Неизвестно"}
                             </h4>
                             <p className="text-sm text-gray-500">
-                              ID: {item.stationId}
+                              ID: {item.stationId} • {station?.landmark || ""}
                             </p>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Газ по счетчику
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                          {/* Лимит газа */}
+                          <div className="bg-white p-4 rounded-lg border border-gray-300">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Лимит газа (м³)
                             </label>
                             <input
                               type="number"
-                              defaultValue={item.gasByMeter || 0}
-                              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                              value={item.limit || 0}
+                              onChange={(e) =>
+                                handleEditChange(index, "limit", e.target.value)
+                              }
+                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg font-mono"
                             />
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Оплата (сум)
+
+                          {/* Сумма по лимиту (рассчитывается автоматически) */}
+                          <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Сумма по лимиту (сум)
                             </label>
-                            <input
-                              type="number"
-                              defaultValue={item.payment || 0}
-                              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                            />
+                            <div className="text-xl font-mono text-gray-800">
+                              {new Intl.NumberFormat("ru-RU").format(
+                                calculatedAmountOfLimit,
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {item.limit || 0} м³ × {price} сум/м³
+                            </p>
+                          </div>
+
+                          {/* Компоненты газа */}
+                          <div className="bg-white p-4 rounded-lg border border-gray-300">
+                            <label className="block text-sm font-semibold text-gray-700 mb-3">
+                              Компоненты газа (м³)
+                            </label>
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                  По счетчику
+                                </label>
+                                <input
+                                  type="number"
+                                  value={item.gasByMeter || 0}
+                                  onChange={(e) =>
+                                    handleEditChange(
+                                      index,
+                                      "gasByMeter",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                  Ошибка конфигурации
+                                </label>
+                                <input
+                                  type="number"
+                                  value={item.confError || 0}
+                                  onChange={(e) =>
+                                    handleEditChange(
+                                      index,
+                                      "confError",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                  Низкий предел
+                                </label>
+                                <input
+                                  type="number"
+                                  value={item.lowPress || 0}
+                                  onChange={(e) =>
+                                    handleEditChange(
+                                      index,
+                                      "lowPress",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 mb-1">
+                                  По акту
+                                </label>
+                                <input
+                                  type="number"
+                                  value={item.gasAct || 0}
+                                  onChange={(e) =>
+                                    handleEditChange(
+                                      index,
+                                      "gasAct",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Расчетные поля */}
+                          <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
+                            <label className="block text-sm font-semibold text-gray-700 mb-3">
+                              Расчетные значения
+                            </label>
+                            <div className="space-y-3">
+                              <div>
+                                <div className="text-xs text-gray-600 mb-1">
+                                  Всего газа (м³)
+                                </div>
+                                <div className="text-lg font-mono font-bold">
+                                  {new Intl.NumberFormat("ru-RU").format(
+                                    item.totalGas || 0,
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-600 mb-1">
+                                  Сумма газа (сум)
+                                </div>
+                                <div className="text-lg font-mono font-bold text-blue-600">
+                                  {new Intl.NumberFormat("ru-RU").format(
+                                    calculatedAmountOfGas,
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                  {item.totalGas || 0} м³ × {price} сум/м³
+                                </p>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-600 mb-1">
+                                  Оплата (сум)
+                                </div>
+                                <input
+                                  type="number"
+                                  value={item.payment || 0}
+                                  onChange={(e) =>
+                                    handleEditChange(
+                                      index,
+                                      "payment",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 font-mono"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Сводка по станции */}
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <span className="text-gray-600">Лимит:</span>
+                              <span className="font-bold ml-2">
+                                {item.limit || 0} м³
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Всего газа:</span>
+                              <span className="font-bold ml-2">
+                                {item.totalGas || 0} м³
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-600">Сальдо:</span>
+                              <span
+                                className={`font-bold ml-2 ${
+                                  calculatedAmountOfGas - (item.payment || 0) >=
+                                  0
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }`}
+                              >
+                                {new Intl.NumberFormat("ru-RU").format(
+                                  calculatedAmountOfGas - (item.payment || 0),
+                                )}{" "}
+                                сум
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -625,28 +967,30 @@ const GasSettlementsDataList = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setEditModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={saving}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
                 >
                   Отмена
                 </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={async () => {
-                    // Реализация сохранения
-                    console.log("Save edited data:", selectedData);
 
-                    // Обновляем данные после редактирования
-                    await reloadData();
-                    setRefreshKey((prev) => prev + 1);
+                <div className="flex items-center gap-4">
+                  {saving && (
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500"></div>
+                      <span className="text-sm">Сохранение...</span>
+                    </div>
+                  )}
 
-                    setEditModal(false);
-                    alert("Данные сохранены и обновлены!");
-                  }}
-                  className="px-6 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all"
-                >
-                  Сохранить изменения
-                </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleSaveEdit}
+                    disabled={saving}
+                    className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {saving ? "Сохранение..." : "Сохранить изменения"}
+                  </motion.button>
+                </div>
               </div>
             </motion.div>
           </div>

@@ -1,7 +1,11 @@
 import React from "react";
 import { motion } from "framer-motion";
 
-const GasSettlementsTable = ({ data, onRowClick }) => {
+const GasSettlementsTable = ({
+  data,
+  onRowClick,
+  invertBalanceColors = true,
+}) => {
   const formatNumber = (num) => {
     return new Intl.NumberFormat("ru-RU").format(num);
   };
@@ -12,6 +16,17 @@ const GasSettlementsTable = ({ data, onRowClick }) => {
       currency: "UZS",
       minimumFractionDigits: 0,
     }).format(num);
+  };
+
+  // Функция для определения цвета сальдо (инвертированная логика)
+  const getBalanceColor = (balance) => {
+    if (invertBalanceColors) {
+      // Инвертированная логика: положительные = красный, отрицательные = зеленый
+      return balance >= 0 ? "text-red-600" : "text-green-600";
+    } else {
+      // Обычная логика: положительные = зеленый, отрицательные = красный
+      return balance >= 0 ? "text-green-600" : "text-red-600";
+    }
   };
 
   if (!data || data.length === 0) {
@@ -33,10 +48,10 @@ const GasSettlementsTable = ({ data, onRowClick }) => {
           </svg>
         </div>
         <h3 className="text-lg font-medium text-gray-600 mb-1">
-          Нет данных для отображения
+          Қўрсатиш учун маълумотлар топилмади
         </h3>
         <p className="text-gray-400">
-          Выберите другой период или добавьте данные
+          Бошқа даврни танланг ёки маълумот киритинг
         </p>
       </div>
     );
@@ -55,40 +70,43 @@ const GasSettlementsTable = ({ data, onRowClick }) => {
               №
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
-              Наименование заправки
+              ID
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
-              Сальдо начало
+              Заправка номи
+            </th>
+            <th className="p-4 text-left font-semibold text-gray-700 border-b">
+              Ой бошига сальдо
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
               Лимит (м³)
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
-              Сумма лимита
+              Лимит суммаси (сўм)
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
-              Всего газа
+              Жами газ (м³)
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
-              По счетчику
+              Пилот газ (м³)
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
-              Ошибка конф.
+              Конф. хатоси (м³)
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
-              Низкий перепад
+              Низкий перепад (м³)
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
-              По акту
+              Акт газ (м³)
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
-              Сумма газа
+              Газ суммаси (сўм)
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
-              Оплачено
+              Тўланди
             </th>
             <th className="p-4 text-left font-semibold text-gray-700 border-b">
-              Сальдо конец
+              Ой охирига сальдо
             </th>
           </tr>
         </thead>
@@ -104,11 +122,15 @@ const GasSettlementsTable = ({ data, onRowClick }) => {
               }`}
               onClick={() => onRowClick(row)}
             >
-              <td className="p-4 font-medium">{row.id}</td>
+              <td className="p-4 font-medium">{row.displayId || index + 1}</td>
+              <td className="p-4 font-mono text-gray-500">{row.stationId}</td>
               <td className="p-4 font-medium text-blue-600">
                 {row.stationName}
               </td>
-              <td className="p-4 font-mono">
+              {/* Сальдо начало с инвертированной цветовой логикой */}
+              <td
+                className={`p-4 font-mono font-bold ${getBalanceColor(row.startBalance)}`}
+              >
                 {formatCurrency(row.startBalance)}
               </td>
               <td className="p-4 font-mono">{formatNumber(row.limit)}</td>
@@ -126,10 +148,9 @@ const GasSettlementsTable = ({ data, onRowClick }) => {
               <td className="p-4 font-mono text-purple-600 font-semibold">
                 {formatCurrency(row.payment)}
               </td>
+              {/* Сальдо конец с инвертированной цветовой логикой */}
               <td
-                className={`p-4 font-mono font-bold ${
-                  row.endBalance >= 0 ? "text-green-600" : "text-red-600"
-                }`}
+                className={`p-4 font-mono font-bold ${getBalanceColor(row.endBalance)}`}
               >
                 {formatCurrency(row.endBalance)}
               </td>
@@ -144,12 +165,12 @@ const GasSettlementsTable = ({ data, onRowClick }) => {
         </div>
         <div className="flex gap-4">
           <div className="flex items-center">
-            <div className="w-3 h-3 bg-green-600 rounded-full mr-2"></div>
-            <span>Положительное сальдо</span>
+            <div className="w-3 h-3 bg-red-600 rounded-full mr-2"></div>
+            <span>Положительное сальдо (инвертированная логика)</span>
           </div>
           <div className="flex items-center">
-            <div className="w-3 h-3 bg-red-600 rounded-full mr-2"></div>
-            <span>Отрицательное сальдо</span>
+            <div className="w-3 h-3 bg-green-600 rounded-full mr-2"></div>
+            <span>Отрицательное сальдо (инвертированная логика)</span>
           </div>
         </div>
       </div>
