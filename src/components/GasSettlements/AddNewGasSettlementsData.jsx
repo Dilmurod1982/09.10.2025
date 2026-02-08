@@ -17,6 +17,20 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Новые состояния для дней
+  const [useCalculatedConsumption, setUseCalculatedConsumption] =
+    useState(false);
+  const [actualConsumptionDays, setActualConsumptionDays] = useState("");
+  const [remainingDays, setRemainingDays] = useState("");
+
+  // Функция для получения количества дней в месяце
+  const getDaysInMonth = (yearMonth) => {
+    if (!yearMonth) return 30; // По умолчанию 30 дней
+
+    const [year, month] = yearMonth.split("-").map(Number);
+    return new Date(year, month, 0).getDate();
+  };
+
   // Функция для поиска цены по дате
   const findPriceForDate = (priceArray, targetDate) => {
     if (!priceArray || !Array.isArray(priceArray) || priceArray.length === 0) {
@@ -24,23 +38,19 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
       return null;
     }
 
-    const target = new Date(targetDate + "-01"); // Добавляем день для корректного сравнения
+    const target = new Date(targetDate + "-01");
     console.log("Ищем цену для даты:", targetDate, "target:", target);
 
-    // Сортируем по startDate в порядке убывания (новые цены сначала)
     const sortedPrices = [...priceArray].sort((a, b) => {
       return new Date(b.startDate + "-01") - new Date(a.startDate + "-01");
     });
 
     console.log("Отсортированные цены:", sortedPrices);
 
-    // Ищем первую цену, которая действует на указанную дату
     for (const priceData of sortedPrices) {
       const startDate = new Date(priceData.startDate + "-01");
 
-      // Проверяем, действует ли цена на указанную дату
       if (target >= startDate) {
-        // Если у цены есть endDate, проверяем, не закончилась ли она
         if (priceData.endDate) {
           const endDate = new Date(priceData.endDate + "-01");
           if (target <= endDate) {
@@ -55,7 +65,6 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
             return priceData.price;
           }
         } else {
-          // Если endDate null, цена действует бессрочно
           console.log(
             "Найдена бессрочная цена:",
             priceData.price,
@@ -82,6 +91,76 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
     return price || 0;
   };
 
+  // Расчет производных полей с учетом новых полей
+  const calculateDerivedFields = (data) => {
+    // Убираем пробелы и конвертируем в числа
+    const getNumericValue = (value) => {
+      if (!value || value === "" || value === null || value === undefined)
+        return null;
+      const cleaned = String(value).replace(/\s/g, "").replace(/,/g, ".");
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? null : num;
+    };
+
+    const gasByMeter = getNumericValue(data.gasByMeter);
+    const confError = getNumericValue(data.confError);
+    const lowPress = getNumericValue(data.lowPress);
+    const gasAct = getNumericValue(data.gasAct);
+    const limit = getNumericValue(data.limit);
+    const actualConsumption = getNumericValue(data.actualConsumption);
+
+    const price = getCurrentPrice();
+
+    // Расчет суммы лимита
+    const amountOfLimit = limit !== null ? limit * price : null;
+
+    // Расчет общего газа в зависимости от режима
+    let totalGas = null;
+    let calculatedMonthlyConsumption = null;
+
+    if (useCalculatedConsumption) {
+      // Режим расчетного потребления
+      if (
+        actualConsumption !== null &&
+        actualConsumptionDays &&
+        remainingDays
+      ) {
+        const daysInMonth = getDaysInMonth(period);
+        calculatedMonthlyConsumption =
+          (actualConsumption / actualConsumptionDays) * daysInMonth;
+        totalGas = calculatedMonthlyConsumption;
+      }
+    } else {
+      // Обычный режим
+      const gasSum = [gasByMeter, confError, lowPress, gasAct]
+        .filter((val) => val !== null)
+        .reduce((sum, val) => sum + val, 0);
+
+      totalGas = gasSum || null;
+    }
+
+    // Расчет суммы газа
+    const amountOfGas = totalGas !== null ? totalGas * price : null;
+
+    console.log("calculateDerivedFields - Расчет:", {
+      limit,
+      price,
+      amountOfLimit,
+      totalGas,
+      amountOfGas,
+      calculatedMonthlyConsumption,
+      actualConsumption,
+    });
+
+    return {
+      totalGas,
+      amountOfLimit,
+      amountOfGas,
+      price,
+      calculatedMonthlyConsumption,
+    };
+  };
+
   useEffect(() => {
     if (stations.length > 0 && open) {
       // Определяем следующий период после последней записи
@@ -103,6 +182,11 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
       setSuggestedPeriod(suggested);
       setPeriod(suggested);
 
+      // Сбросить состояние дней при открытии
+      setUseCalculatedConsumption(false);
+      setActualConsumptionDays("");
+      setRemainingDays("");
+
       // Получаем цену для начального периода
       const initialPrice = getCurrentPrice();
       console.log("Начальная цена для периода", suggested, ":", initialPrice);
@@ -114,14 +198,16 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
         landmark: station.landmark,
         index: index + 1,
         limit: "",
-        amountOfLimit: 0,
+        amountOfLimit: null,
         gasByMeter: "",
         confError: "",
         lowPress: "",
         gasAct: "",
-        totalGas: 0,
-        amountOfGas: 0,
+        totalGas: null,
+        amountOfGas: null,
         payment: "",
+        actualConsumption: "",
+        calculatedMonthlyConsumption: null,
       }));
 
       setFormData(initialData);
@@ -130,36 +216,17 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
     }
   }, [stations, settlementsData, open, priceOfGas]);
 
-  const calculateDerivedFields = (data) => {
-    // Убираем пробелы и конвертируем в числа
-    const getNumericValue = (value) => {
-      if (!value || value === "") return 0;
-      const cleaned = String(value).replace(/\s/g, "").replace(/,/g, ".");
-      const num = parseFloat(cleaned);
-      return isNaN(num) ? 0 : num;
-    };
-
-    const gasByMeter = getNumericValue(data.gasByMeter);
-    const confError = getNumericValue(data.confError);
-    const lowPress = getNumericValue(data.lowPress);
-    const gasAct = getNumericValue(data.gasAct);
-    const limit = getNumericValue(data.limit);
-
-    const totalGas = gasByMeter + confError + lowPress + gasAct;
-    const price = getCurrentPrice();
-    const amountOfLimit = limit * price;
-    const amountOfGas = totalGas * price;
-
-    console.log("calculateDerivedFields - Расчет:", {
-      limit,
-      price,
-      amountOfLimit,
-      totalGas,
-      amountOfGas,
-    });
-
-    return { totalGas, amountOfLimit, amountOfGas, price };
-  };
+  // Эффект для расчета оставшихся дней
+  useEffect(() => {
+    if (period && actualConsumptionDays !== "") {
+      const daysInMonth = getDaysInMonth(period);
+      const days = parseInt(actualConsumptionDays) || 0;
+      const remaining = daysInMonth - days;
+      setRemainingDays(remaining >= 0 ? remaining.toString() : "0");
+    } else {
+      setRemainingDays("");
+    }
+  }, [period, actualConsumptionDays]);
 
   const handleFieldChange = (index, field, value) => {
     const newFormData = [...formData];
@@ -171,15 +238,23 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
     };
 
     // Пересчитываем производные поля
-    if (
-      ["gasByMeter", "confError", "lowPress", "gasAct", "limit"].includes(field)
-    ) {
+    const derivedFields = [
+      "gasByMeter",
+      "confError",
+      "lowPress",
+      "gasAct",
+      "limit",
+      "actualConsumption",
+    ];
+
+    if (derivedFields.includes(field)) {
       const derived = calculateDerivedFields(newFormData[index]);
       newFormData[index] = {
         ...newFormData[index],
         totalGas: derived.totalGas,
         amountOfLimit: derived.amountOfLimit,
         amountOfGas: derived.amountOfGas,
+        calculatedMonthlyConsumption: derived.calculatedMonthlyConsumption,
       };
     }
 
@@ -207,12 +282,30 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
           ...data,
           amountOfLimit: derived.amountOfLimit,
           amountOfGas: derived.amountOfGas,
+          calculatedMonthlyConsumption: derived.calculatedMonthlyConsumption,
         };
       });
 
       setFormData(newFormData);
     }
-  }, [period]);
+  }, [period, useCalculatedConsumption, actualConsumptionDays]);
+
+  // Эффект для пересчета при изменении режима расчета
+  useEffect(() => {
+    if (formData.length > 0) {
+      const newFormData = formData.map((data) => {
+        const derived = calculateDerivedFields(data);
+        return {
+          ...data,
+          totalGas: derived.totalGas,
+          amountOfGas: derived.amountOfGas,
+          calculatedMonthlyConsumption: derived.calculatedMonthlyConsumption,
+        };
+      });
+
+      setFormData(newFormData);
+    }
+  }, [useCalculatedConsumption]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -221,8 +314,21 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
       newErrors.period = "Выберите период";
     }
 
+    // Проверка дней потребления, если включен режим расчета
+    if (useCalculatedConsumption) {
+      if (!actualConsumptionDays || actualConsumptionDays === "") {
+        newErrors.actualConsumptionDays = "Введите количество дней";
+      } else {
+        const days = parseInt(actualConsumptionDays);
+        const daysInMonth = getDaysInMonth(period);
+        if (days < 1 || days > daysInMonth) {
+          newErrors.actualConsumptionDays = `Количество дней должно быть от 1 до ${daysInMonth}`;
+        }
+      }
+    }
+
     formData.forEach((row, index) => {
-      // Проверяем, что все поля являются числами
+      // Проверяем, что все поля являются числами (если не пустые)
       const fieldsToCheck = [
         "limit",
         "gasByMeter",
@@ -230,12 +336,16 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
         "lowPress",
         "gasAct",
         "payment",
+        "actualConsumption",
       ];
 
       fieldsToCheck.forEach((field) => {
         const value = row[field];
-        if (value !== "" && isNaN(parseFloat(value.replace(/[\s,]/g, "")))) {
-          newErrors[`${index}_${field}`] = "Введите число";
+        if (value !== "") {
+          const cleanedValue = value.replace(/[\s,]/g, "");
+          if (cleanedValue !== "" && isNaN(parseFloat(cleanedValue))) {
+            newErrors[`${index}_${field}`] = "Введите число";
+          }
         }
       });
     });
@@ -262,11 +372,12 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
     try {
       // Подготавливаем все данные для сохранения
       const dataToSave = formData.map((data) => {
-        // Убираем группировку (пробелы) и запятые из значений перед сохранением
+        // Функция для очистки и преобразования значения
         const cleanValue = (val) => {
-          if (val === "") return 0;
+          if (val === "" || val === null || val === undefined) return null;
           const cleaned = String(val).replace(/[\s,]/g, "");
-          return parseFloat(cleaned) || 0;
+          const num = parseFloat(cleaned);
+          return isNaN(num) ? null : num;
         };
 
         const derived = calculateDerivedFields(data);
@@ -277,12 +388,24 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
           limit: cleanValue(data.limit),
           amountOfLimit: derived.amountOfLimit,
           totalGas: derived.totalGas,
-          gasByMeter: cleanValue(data.gasByMeter),
-          confError: cleanValue(data.confError),
-          lowPress: cleanValue(data.lowPress),
-          gasAct: cleanValue(data.gasAct),
+          gasByMeter: useCalculatedConsumption
+            ? null
+            : cleanValue(data.gasByMeter),
+          confError: useCalculatedConsumption
+            ? null
+            : cleanValue(data.confError),
+          lowPress: useCalculatedConsumption ? null : cleanValue(data.lowPress),
+          gasAct: useCalculatedConsumption ? null : cleanValue(data.gasAct),
           amountOfGas: derived.amountOfGas,
           payment: cleanValue(data.payment),
+          actualConsumption: useCalculatedConsumption
+            ? cleanValue(data.actualConsumption)
+            : null,
+          calculatedMonthlyConsumption: derived.calculatedMonthlyConsumption,
+          useCalculatedConsumption: useCalculatedConsumption,
+          actualConsumptionDays: useCalculatedConsumption
+            ? parseInt(actualConsumptionDays)
+            : null,
           createdAt: new Date().toISOString(),
         };
       });
@@ -314,6 +437,7 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
   };
 
   const formatCurrency = (amount) => {
+    if (amount === null || amount === undefined) return "";
     return new Intl.NumberFormat("ru-RU", {
       style: "currency",
       currency: "UZS",
@@ -322,12 +446,13 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
   };
 
   const formatNumber = (num) => {
+    if (num === null || num === undefined) return "";
     return new Intl.NumberFormat("ru-RU").format(num);
   };
 
   // Функция для форматирования ввода чисел с группировкой
   const formatInputNumber = (value, addGrouping = false) => {
-    if (value === "") return "";
+    if (value === "" || value === null || value === undefined) return "";
 
     // Убираем все нецифровые символы, кроме точки и запятых
     const cleaned = value.replace(/[^\d.,-]/g, "").replace(/,/g, ".");
@@ -362,7 +487,7 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.9 }}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-8xl max-h-[90vh] overflow-hidden"
         >
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
             <div className="flex justify-between items-center">
@@ -447,38 +572,103 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
             )}
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Период (год-месяц) *
-              </label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="month"
-                  value={period}
-                  onChange={(e) => setPeriod(e.target.value)}
-                  className={`p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.period ? "border-red-500" : "border-gray-300"
-                  }`}
-                  disabled={loading}
-                />
-                <div className="text-sm text-gray-600">
-                  <div className="font-medium">Следующий период:</div>
-                  <div className="text-blue-600">{suggestedPeriod}</div>
-                  <div className="text-green-600 font-medium mt-1">
-                    Цена газа: {currentPrice} сум/м³
-                  </div>
-                  {currentPrice === 0 && (
-                    <div className="text-red-600 text-xs mt-1">
-                      Внимание: цена для выбранного периода не найдена!
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Левая колонка - Период */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Период (год-месяц) *
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="month"
+                      value={period}
+                      onChange={(e) => setPeriod(e.target.value)}
+                      className={`p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.period ? "border-red-500" : "border-gray-300"
+                      }`}
+                      disabled={loading}
+                    />
+                    <div className="text-sm text-gray-600">
+                      <div className="font-medium">Следующий период:</div>
+                      <div className="text-blue-600">{suggestedPeriod}</div>
+                      <div className="text-green-600 font-medium mt-1">
+                        Цена газа: {currentPrice} сум/м³
+                      </div>
+                      {currentPrice === 0 && (
+                        <div className="text-red-600 text-xs mt-1">
+                          Внимание: цена для выбранного периода не найдена!
+                        </div>
+                      )}
                     </div>
+                  </div>
+                  {errors.period && (
+                    <p className="mt-1 text-sm text-red-600">{errors.period}</p>
                   )}
                 </div>
+
+                {/* Правая колонка - Настройки дней */}
+                <div>
+                  <div className="mb-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <label className="flex items-center gap-2 mb-3">
+                        <input
+                          type="checkbox"
+                          checked={useCalculatedConsumption}
+                          onChange={(e) =>
+                            setUseCalculatedConsumption(e.target.checked)
+                          }
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                          disabled={loading}
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          Использовать расчетное потребление
+                        </span>
+                      </label>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Кол-во дней потр-ния газа
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max={period ? getDaysInMonth(period) : 31}
+                          value={actualConsumptionDays}
+                          onChange={(e) =>
+                            setActualConsumptionDays(e.target.value)
+                          }
+                          className={`w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                            errors.actualConsumptionDays
+                              ? "border-red-500"
+                              : "border-gray-300"
+                          } ${!useCalculatedConsumption ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                          disabled={loading || !useCalculatedConsumption}
+                        />
+                        {errors.actualConsumptionDays && (
+                          <p className="mt-1 text-xs text-red-600">
+                            {errors.actualConsumptionDays}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Оставшиеся дни месяца
+                        </label>
+                        <input
+                          type="text"
+                          value={remainingDays}
+                          className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
+                          readOnly
+                          disabled
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              {errors.period && (
-                <p className="mt-1 text-sm text-red-600">{errors.period}</p>
-              )}
             </div>
 
-            <div className="overflow-x-auto bg-white rounded-xl shadow-inner border text-xs">
+            <div className="overflow-x-auto bg-white rounded-xl shadow-inner border text-xs mb-4">
               <table className="w-full border-collapse">
                 <thead className="bg-gradient-to-r from-blue-50 to-blue-100">
                   <tr className="text-xs">
@@ -495,19 +685,36 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                       Лимит
                     </th>
                     <th className="p-2 text-left font-semibold text-gray-700 border-b whitespace-nowrap min-w-[90px]">
-                      Сумма лимита газа
+                      Сумма <br />
+                      лимита <br />
+                      газа
                     </th>
+
+                    {/* Новые столбцы */}
+                    <th className="p-2 text-left font-semibold text-gray-700 border-b whitespace-nowrap min-w-[100px]">
+                      Факт <br />
+                      пот-ние <br />
+                      газа
+                    </th>
+                    <th className="p-2 text-left font-semibold text-gray-700 border-b whitespace-nowrap min-w-[110px]">
+                      Ожидаемый
+                    </th>
+
                     <th className="p-2 text-left font-semibold text-gray-700 border-b whitespace-nowrap min-w-[70px]">
                       Всего газ
                     </th>
                     <th className="p-2 text-left font-semibold text-gray-700 border-b whitespace-nowrap min-w-[80px]">
-                      Газ по счетчику
+                      Газ по <br />
+                      счетчику
                     </th>
                     <th className="p-2 text-left font-semibold text-gray-700 border-b whitespace-nowrap min-w-[80px]">
-                      Ошибка конфигурации
+                      Ошибка <br /> конфигу-
+                      <br />
+                      рации
                     </th>
                     <th className="p-2 text-left font-semibold text-gray-700 border-b whitespace-nowrap min-w-[90px]">
-                      Низкий перепад давления
+                      Низкий <br /> перепад
+                      <br /> давления
                     </th>
                     <th className="p-2 text-left font-semibold text-gray-700 border-b whitespace-nowrap min-w-[60px]">
                       По акту
@@ -544,7 +751,7 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                           {row.landmark}
                         </td>
 
-                        {/* Лимит - шире */}
+                        {/* Лимит */}
                         <td className="p-1">
                           <input
                             type="text"
@@ -562,7 +769,7 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                                 ? "border-red-500"
                                 : "border-gray-300"
                             }`}
-                            placeholder="0"
+                            placeholder=""
                             disabled={loading}
                           />
                           {errors[`${index}_limit`] && (
@@ -577,12 +784,60 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                           <div className="font-mono text-green-600 font-medium text-xs">
                             {formatCurrency(derived.amountOfLimit)}
                           </div>
-                          <div className="text-[10px] text-gray-500 leading-tight">
-                            {row.limit
-                              ? parseFloat(row.limit.replace(/[\s,]/g, "") || 0)
-                              : 0}{" "}
-                            × {derived.price} сум/м³
+                          {row.limit && row.limit !== "" && (
+                            <div className="text-[10px] text-gray-500 leading-tight">
+                              {parseFloat(row.limit.replace(/[\s,]/g, "") || 0)}{" "}
+                              × {derived.price} сум/м³
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Фактическое потребление газа */}
+                        <td className="p-1">
+                          <input
+                            type="text"
+                            value={row.actualConsumption}
+                            onChange={(e) =>
+                              handleNumberInput(
+                                index,
+                                "actualConsumption",
+                                e.target.value,
+                                true,
+                              )
+                            }
+                            className={`w-full p-1 border rounded text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
+                              errors[`${index}_actualConsumption`]
+                                ? "border-red-500"
+                                : "border-gray-300"
+                            } ${!useCalculatedConsumption ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                            placeholder=""
+                            disabled={loading || !useCalculatedConsumption}
+                          />
+                          {errors[`${index}_actualConsumption`] && (
+                            <p className="mt-1 text-xs text-red-600">
+                              {errors[`${index}_actualConsumption`]}
+                            </p>
+                          )}
+                        </td>
+
+                        {/* Расчетное потребление газа в месяц */}
+                        <td className="p-1">
+                          <div className="font-mono font-medium text-xs text-purple-600">
+                            {formatNumber(derived.calculatedMonthlyConsumption)}
                           </div>
+                          {row.actualConsumption &&
+                            row.actualConsumption !== "" &&
+                            actualConsumptionDays &&
+                            period && (
+                              <div className="text-[10px] text-gray-500 leading-tight">
+                                {parseFloat(
+                                  row.actualConsumption.replace(/[\s,]/g, "") ||
+                                    0,
+                                )}{" "}
+                                ÷ {actualConsumptionDays} ×{" "}
+                                {getDaysInMonth(period)}
+                              </div>
+                            )}
                         </td>
 
                         {/* Всего газ */}
@@ -590,32 +845,34 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                           <div className="font-mono font-medium text-xs">
                             {formatNumber(derived.totalGas)}
                           </div>
-                          <div className="text-[10px] text-gray-500 leading-tight">
-                            ={" "}
-                            {row.gasByMeter
-                              ? parseFloat(
-                                  row.gasByMeter.replace(/[\s,]/g, "") || 0,
-                                )
-                              : 0}{" "}
-                            +
-                            {row.confError
-                              ? parseFloat(
-                                  row.confError.replace(/[\s,]/g, "") || 0,
-                                )
-                              : 0}{" "}
-                            +
-                            {row.lowPress
-                              ? parseFloat(
-                                  row.lowPress.replace(/[\s,]/g, "") || 0,
-                                )
-                              : 0}{" "}
-                            +
-                            {row.gasAct
-                              ? parseFloat(
-                                  row.gasAct.replace(/[\s,]/g, "") || 0,
-                                )
-                              : 0}
-                          </div>
+                          {!useCalculatedConsumption && (
+                            <div className="text-[10px] text-gray-500 leading-tight">
+                              ={" "}
+                              {row.gasByMeter && row.gasByMeter !== ""
+                                ? parseFloat(
+                                    row.gasByMeter.replace(/[\s,]/g, "") || 0,
+                                  )
+                                : 0}{" "}
+                              +
+                              {row.confError && row.confError !== ""
+                                ? parseFloat(
+                                    row.confError.replace(/[\s,]/g, "") || 0,
+                                  )
+                                : 0}{" "}
+                              +
+                              {row.lowPress && row.lowPress !== ""
+                                ? parseFloat(
+                                    row.lowPress.replace(/[\s,]/g, "") || 0,
+                                  )
+                                : 0}{" "}
+                              +
+                              {row.gasAct && row.gasAct !== ""
+                                ? parseFloat(
+                                    row.gasAct.replace(/[\s,]/g, "") || 0,
+                                  )
+                                : 0}
+                            </div>
+                          )}
                         </td>
 
                         {/* Газ по счетчику */}
@@ -635,9 +892,9 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                               errors[`${index}_gasByMeter`]
                                 ? "border-red-500"
                                 : "border-gray-300"
-                            }`}
-                            placeholder="0"
-                            disabled={loading}
+                            } ${useCalculatedConsumption ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                            placeholder=""
+                            disabled={loading || useCalculatedConsumption}
                           />
                           {errors[`${index}_gasByMeter`] && (
                             <p className="mt-1 text-xs text-red-600">
@@ -663,9 +920,9 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                               errors[`${index}_confError`]
                                 ? "border-red-500"
                                 : "border-gray-300"
-                            }`}
-                            placeholder="0"
-                            disabled={loading}
+                            } ${useCalculatedConsumption ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                            placeholder=""
+                            disabled={loading || useCalculatedConsumption}
                           />
                           {errors[`${index}_confError`] && (
                             <p className="mt-1 text-xs text-red-600">
@@ -691,9 +948,9 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                               errors[`${index}_lowPress`]
                                 ? "border-red-500"
                                 : "border-gray-300"
-                            }`}
-                            placeholder="0"
-                            disabled={loading}
+                            } ${useCalculatedConsumption ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                            placeholder=""
+                            disabled={loading || useCalculatedConsumption}
                           />
                           {errors[`${index}_lowPress`] && (
                             <p className="mt-1 text-xs text-red-600">
@@ -719,9 +976,9 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                               errors[`${index}_gasAct`]
                                 ? "border-red-500"
                                 : "border-gray-300"
-                            }`}
-                            placeholder="0"
-                            disabled={loading}
+                            } ${useCalculatedConsumption ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                            placeholder=""
+                            disabled={loading || useCalculatedConsumption}
                           />
                           {errors[`${index}_gasAct`] && (
                             <p className="mt-1 text-xs text-red-600">
@@ -735,12 +992,15 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                           <div className="font-mono text-blue-600 font-semibold text-xs">
                             {formatCurrency(derived.amountOfGas)}
                           </div>
-                          <div className="text-[10px] text-gray-500 leading-tight">
-                            {derived.totalGas} × {derived.price} сум/м³
-                          </div>
+                          {derived.totalGas !== null && (
+                            <div className="text-[10px] text-gray-500 leading-tight">
+                              {formatNumber(derived.totalGas)} × {derived.price}{" "}
+                              сум/м³
+                            </div>
+                          )}
                         </td>
 
-                        {/* Оплата - шире и с группировкой */}
+                        {/* Оплата */}
                         <td className="p-1">
                           <input
                             type="text"
@@ -758,7 +1018,7 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                                 ? "border-red-500"
                                 : "border-gray-300"
                             }`}
-                            placeholder="0"
+                            placeholder=""
                             disabled={loading}
                           />
                           {errors[`${index}_payment`] && (
@@ -773,53 +1033,6 @@ const AddNewGasSettlementsData = ({ open, onClose }) => {
                 </tbody>
               </table>
             </div>
-
-            {/* <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-6 text-xs">
-              <div className="flex items-start gap-3">
-                <div className="text-blue-500 mt-0.5">
-                  <svg
-                    className="w-4 h-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-blue-800 font-medium mb-1">
-                    Информация:
-                  </p>
-                  <ul className="text-[11px] text-blue-700 space-y-0.5">
-                    <li>
-                      • Цена газа на {period}: {currentPrice} сум/м³
-                    </li>
-                    <li>
-                      • Сумма лимита газа = Лимит × Цена газа на выбранную дату
-                    </li>
-                    <li>
-                      • Всего газа = Газ по счетчику + Ошибка конфигурации +
-                      Низкий перепад давления + По акту
-                    </li>
-                    <li>
-                      • Сумма газа = Всего газа × Цена газа на выбранную дату
-                    </li>
-                    <li>• Все вычисляемые поля рассчитываются автоматически</li>
-                    <li>• Период обязателен для заполнения</li>
-                    <li>
-                      • При вводе чисел используются автоматические группировки
-                      (пробелы)
-                    </li>
-                    <li>
-                      • При сохранении группировка автоматически убирается
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div> */}
 
             <div className="flex justify-end gap-4 pt-6 mt-6 border-t">
               <motion.button
