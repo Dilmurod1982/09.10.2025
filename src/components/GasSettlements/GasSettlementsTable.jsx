@@ -125,9 +125,6 @@ const GasSettlementsTable = ({
                 №
               </th>
               <th className="p-4 text-left font-semibold text-gray-700 border-b whitespace-nowrap">
-                ID
-              </th>
-              <th className="p-4 text-left font-semibold text-gray-700 border-b whitespace-nowrap">
                 Заправка номи
               </th>
               <th className="p-4 text-left font-semibold text-gray-700 border-b whitespace-nowrap">
@@ -182,9 +179,6 @@ const GasSettlementsTable = ({
               >
                 <td className="p-4 font-medium whitespace-nowrap">
                   {row.displayId || index + 1}
-                </td>
-                <td className="p-4 font-mono text-gray-500 whitespace-nowrap">
-                  {row.stationId}
                 </td>
                 <td className="p-4 font-medium text-blue-600 whitespace-nowrap">
                   {row.stationName}
