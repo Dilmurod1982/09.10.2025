@@ -61,7 +61,7 @@ export const calculateStartBalance = (
   );
 
   if (!startData || !startData.startDate) {
-    console.log("No start data found for station:", stationId);
+    // console.log("No start data found for station:", stationId);
     return 0;
   }
 
@@ -71,12 +71,12 @@ export const calculateStartBalance = (
   const endDate = new Date(selectedDate);
 
   if (!startDate) {
-    console.log("Could not parse start date:", startData.startDate);
+    // console.log("Could not parse start date:", startData.startDate);
     return balance;
   }
 
-  console.log(`Calculating balance for station ${stationId}`);
-  console.log("Start date:", startDate, "End date:", endDate);
+  // console.log(`Calculating balance for station ${stationId}`);
+  // console.log("Start date:", startDate, "End date:", endDate);
 
   // Фильтруем данные по дате и станции
   const relevantData = data.filter((item) => {
@@ -99,7 +99,7 @@ export const calculateStartBalance = (
     return dateA - dateB;
   });
 
-  console.log(`Found ${relevantData.length} relevant records`);
+  // console.log(`Found ${relevantData.length} relevant records`);
 
   // Рассчитываем баланс
   relevantData.forEach((item, idx) => {
@@ -107,14 +107,14 @@ export const calculateStartBalance = (
     const payment = parseFloat(item.payment) || 0;
     const netChange = amount - payment;
 
-    console.log(
-      `Record ${idx + 1}: amount=${amount}, payment=${payment}, net=${netChange}`,
-    );
+    // console.log(
+    //   `Record ${idx + 1}: amount=${amount}, payment=${payment}, net=${netChange}`,
+    // );
 
     balance += netChange;
   });
 
-  console.log(`Final balance for station ${stationId}: ${balance}`);
+  // console.log(`Final balance for station ${stationId}: ${balance}`);
   return balance;
 };
 
@@ -128,12 +128,12 @@ export const calculateEndBalance = (
   const gasAmount = amountOfGas || amountOfLimit || 0;
   const finalBalance = startBalance + gasAmount - (payment || 0);
 
-  console.log("End balance calculation:", {
-    startBalance,
-    gasAmount,
-    payment,
-    finalBalance,
-  });
+  // console.log("End balance calculation:", {
+  //   startBalance,
+  //   gasAmount,
+  //   payment,
+  //   finalBalance,
+  // });
 
   return finalBalance;
 };
@@ -141,13 +141,13 @@ export const calculateEndBalance = (
 // Поиск цены на определенную дату
 export const findPriceForDate = (priceOfGas, date) => {
   if (!priceOfGas || !priceOfGas.length) {
-    console.log("No price data available");
+    // console.log("No price data available");
     return 0;
   }
 
   const targetDate = parsePeriodToDate(date);
   if (!targetDate) {
-    console.log("Could not parse target date:", date);
+    // console.log("Could not parse target date:", date);
     return 0;
   }
 
@@ -165,7 +165,7 @@ export const findPriceForDate = (priceOfGas, date) => {
     const isWithinRange = targetDate >= startDate && targetDate <= endDate;
 
     if (isWithinRange) {
-      console.log(`Found price: ${p.price} from ${startDate} to ${endDate}`);
+      // console.log(`Found price: ${p.price} from ${startDate} to ${endDate}`);
     }
 
     return isWithinRange;
@@ -213,12 +213,12 @@ export const calculateAmountOfLimit = (limit, priceOfGas, period) => {
   const price = findPriceForDate(priceOfGas, period);
   const result = limit * price;
 
-  console.log("Amount of limit calculation:", {
-    limit,
-    price,
-    period,
-    result,
-  });
+  // console.log("Amount of limit calculation:", {
+  //   limit,
+  //   price,
+  //   period,
+  //   result,
+  // });
 
   return result;
 };
@@ -230,16 +230,16 @@ export const calculateAmountOfGas = (gasData, priceOfGas, period) => {
   const price = findPriceForDate(priceOfGas, period);
   const result = totalGas * price;
 
-  console.log("Amount of gas calculation:", {
-    gasByMeter,
-    confError,
-    lowPress,
-    gasAct,
-    totalGas,
-    price,
-    period,
-    result,
-  });
+  // console.log("Amount of gas calculation:", {
+  //   gasByMeter,
+  //   confError,
+  //   lowPress,
+  //   gasAct,
+  //   totalGas,
+  //   price,
+  //   period,
+  //   result,
+  // });
 
   return result;
 };

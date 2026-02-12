@@ -15,6 +15,9 @@ const GasSettlements = () => {
   const navigate = useNavigate();
   const { stations, settlementsData, loading } = useGasSettlements();
 
+  // Получаем пользователя из localStorage или контекста
+  const [currentUser, setCurrentUser] = useState(null);
+
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
 
@@ -29,6 +32,19 @@ const GasSettlements = () => {
   const [stationDetailsModal, setStationDetailsModal] = useState(false);
   const [tableData, setTableData] = useState([]);
   const [exporting, setExporting] = useState(false);
+
+  // Получаем данные пользователя при загрузке
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setCurrentUser(user);
+      }
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+    }
+  }, []);
 
   // Функция экспорта в Excel
   const exportToExcel = async (data, filters, stations) => {
@@ -61,6 +77,7 @@ const GasSettlements = () => {
       const exportData = data.map((row, index) => ({
         "№": index + 1,
         "Заправка номи": row.stationName,
+        Манзили: row.landmark,
         "Ой бошига сальдо": row.startBalance,
         "Лимит (м³)": row.limit,
         "Лимита суммаси (сўм)": row.amountOfLimit,
@@ -266,6 +283,7 @@ const GasSettlements = () => {
           id: parseInt(stationId), // Используем ID станции как основной ID
           stationId: station.id,
           stationName: station.name || "Неизвестно",
+          landmark: station.landmark || "Немаълум",
           startBalance,
           limit: dataItem.limit || 0,
           amountOfLimit: dataItem.amountOfLimit || 0,
@@ -350,6 +368,9 @@ const GasSettlements = () => {
     }
   };
 
+  // Проверяем, является ли пользователь админом
+  const isAdmin = currentUser?.role === "admin";
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -364,14 +385,18 @@ const GasSettlements = () => {
         <h2 className="text-2xl font-semibold text-gray-800">
           Худудгаз билан ҳисоб-китоблар (Газ ҳисоботи)
         </h2>
-        <motion.button
-          onClick={() => navigate("/gas-settlements/list")}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="bg-blue-600 text-white px-5 py-2.5 rounded-xl shadow-md hover:bg-blue-700 transition-colors"
-        >
-          📋 Киритилган маълумотлар рўйхати
-        </motion.button>
+
+        {/* Кнопка "Киритилган маълумотлар рўйхати" только для админа */}
+        {isAdmin && (
+          <motion.button
+            onClick={() => navigate("/gas-settlements/list")}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="bg-blue-600 text-white px-5 py-2.5 rounded-xl shadow-md hover:bg-blue-700 transition-colors"
+          >
+            📋 Киритилган маълумотлар рўйхати
+          </motion.button>
+        )}
       </div>
 
       {/* Фильтры */}
@@ -458,47 +483,61 @@ const GasSettlements = () => {
           </div>
         </div>
 
-        {/* Кнопки действий */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setOpenModal(true)}
-            className="bg-blue-600 text-white px-4 py-3 rounded-xl shadow-md hover:bg-blue-700 transition-colors"
-          >
-            ⛽ Заправка қўшиш
-          </motion.button>
+        {/* Кнопки действий - только для админа */}
+        {isAdmin && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setOpenModal(true)}
+              className="bg-blue-600 text-white px-4 py-3 rounded-xl shadow-md hover:bg-blue-700 transition-colors"
+            >
+              ⛽ Заправка қўшиш
+            </motion.button>
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => navigate("/price-of-gas")}
-            className="bg-purple-600 text-white px-4 py-3 rounded-xl shadow-md hover:bg-purple-700 transition-colors"
-          >
-            💰 Газ нархлари
-          </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate("/price-of-gas")}
+              className="bg-purple-600 text-white px-4 py-3 rounded-xl shadow-md hover:bg-purple-700 transition-colors"
+            >
+              💰 Газ нархлари
+            </motion.button>
 
-          <div className="text-right text-sm text-gray-500 mt-2">
-            <p>Жами заправкалар: {stations.length}</p>
-            <p>Давр учун маълумот: {tableData.length}</p>
-            <p className="text-xs text-gray-400">
-              Давр: {filters.year}-{filters.month.toString().padStart(2, "0")}
-            </p>
+            <div className="text-right text-sm text-gray-500 mt-2">
+              <p>Жами заправкалар: {stations.length}</p>
+              <p>Давр учун маълумот: {tableData.length}</p>
+              <p className="text-xs text-gray-400">
+                Давр: {filters.year}-{filters.month.toString().padStart(2, "0")}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Если пользователь не админ, показываем только информацию о количестве */}
+        {!isAdmin && (
+          <div className="pt-4 border-t">
+            <div className="text-right text-sm text-gray-500">
+              <p>Жами заправкалар: {stations.length}</p>
+              <p>Давр учун маълумот: {tableData.length}</p>
+              <p className="text-xs text-gray-400">
+                Давр: {filters.year}-{filters.month.toString().padStart(2, "0")}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Таблица */}
       <GasSettlementsTable
         data={tableData}
         onRowClick={handleRowClick}
-        // Передаем пропс для инвертированной цветовой логики
         invertBalanceColors={true}
       />
 
-      {/* Модальное окно добавления заправки */}
+      {/* Модальное окно добавления заправки - только для админа */}
       <AnimatePresence>
-        {openModal && (
+        {openModal && isAdmin && (
           <AddNewDataGasStation
             open={openModal}
             onClose={() => setOpenModal(false)}
