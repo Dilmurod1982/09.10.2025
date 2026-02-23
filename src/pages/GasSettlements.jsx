@@ -32,11 +32,13 @@ const GasSettlements = () => {
   const [stationDetailsModal, setStationDetailsModal] = useState(false);
   const [tableData, setTableData] = useState([]);
   const [exporting, setExporting] = useState(false);
-
+  // console.log(currentUser);
   // Получаем данные пользователя при загрузке
   useEffect(() => {
     try {
-      const userStr = localStorage.getItem("user");
+      const userStr = localStorage.getItem("userData");
+      console.log(userStr);
+
       if (userStr) {
         const user = JSON.parse(userStr);
         setCurrentUser(user);
