@@ -37,7 +37,6 @@ const GasSettlements = () => {
   useEffect(() => {
     try {
       const userStr = localStorage.getItem("userData");
-      console.log(userStr);
 
       if (userStr) {
         const user = JSON.parse(userStr);
