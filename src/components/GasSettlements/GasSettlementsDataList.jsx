@@ -1320,10 +1320,10 @@ const GasSettlementsDataList = () => {
                                 );
                               }}
                               thousandSeparator=" "
-                              decimalScale={0}
+                              decimalScale={2}
                               allowNegative={false}
                               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg font-mono"
-                              placeholder=""
+                              placeholder="0.00"
                             />
                           </div>
 
@@ -1350,7 +1350,7 @@ const GasSettlementsDataList = () => {
                                   value={item.limit}
                                   displayType="text"
                                   thousandSeparator=" "
-                                  decimalScale={0}
+                                  decimalScale={2}
                                 />{" "}
                                 м³ ×{" "}
                                 <NumericFormat
@@ -1383,10 +1383,10 @@ const GasSettlementsDataList = () => {
                                     );
                                   }}
                                   thousandSeparator=" "
-                                  decimalScale={0}
+                                  decimalScale={2}
                                   allowNegative={false}
                                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg font-mono"
-                                  placeholder=""
+                                  placeholder="0.00"
                                 />
                               </div>
 
@@ -1402,7 +1402,7 @@ const GasSettlementsDataList = () => {
                                       }
                                       displayType="text"
                                       thousandSeparator=" "
-                                      decimalScale={0}
+                                      decimalScale={2}
                                     />
                                   ) : (
                                     "-"
@@ -1415,7 +1415,7 @@ const GasSettlementsDataList = () => {
                                         value={item.actualConsumption}
                                         displayType="text"
                                         thousandSeparator=" "
-                                        decimalScale={0}
+                                        decimalScale={2}
                                       />{" "}
                                       ÷ {actualConsumptionDays} ×{" "}
                                       {getDaysInMonth(selectedData.period)}
@@ -1445,10 +1445,10 @@ const GasSettlementsDataList = () => {
                                       );
                                     }}
                                     thousandSeparator=" "
-                                    decimalScale={0}
+                                    decimalScale={2}
                                     allowNegative={false}
                                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                    placeholder=""
+                                    placeholder="0.00"
                                   />
                                 </div>
                                 <div>
@@ -1466,10 +1466,10 @@ const GasSettlementsDataList = () => {
                                       );
                                     }}
                                     thousandSeparator=" "
-                                    decimalScale={0}
+                                    decimalScale={2}
                                     allowNegative={false}
                                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                    placeholder=""
+                                    placeholder="0.00"
                                   />
                                 </div>
                                 <div>
@@ -1487,10 +1487,10 @@ const GasSettlementsDataList = () => {
                                       );
                                     }}
                                     thousandSeparator=" "
-                                    decimalScale={0}
+                                    decimalScale={2}
                                     allowNegative={false}
                                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                    placeholder=""
+                                    placeholder="0.00"
                                   />
                                 </div>
                                 <div>
@@ -1508,10 +1508,10 @@ const GasSettlementsDataList = () => {
                                       );
                                     }}
                                     thousandSeparator=" "
-                                    decimalScale={0}
+                                    decimalScale={4}
                                     allowNegative={false}
                                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                    placeholder=""
+                                    placeholder="0.00"
                                   />
                                 </div>
                               </div>
@@ -1534,7 +1534,7 @@ const GasSettlementsDataList = () => {
                                       value={derived.totalGas}
                                       displayType="text"
                                       thousandSeparator=" "
-                                      decimalScale={0}
+                                      decimalScale={2}
                                     />
                                   ) : (
                                     "-"
@@ -1563,7 +1563,7 @@ const GasSettlementsDataList = () => {
                                       value={derived.totalGas}
                                       displayType="text"
                                       thousandSeparator=" "
-                                      decimalScale={0}
+                                      decimalScale={2}
                                     />{" "}
                                     м³ ×{" "}
                                     <NumericFormat
@@ -1594,7 +1594,7 @@ const GasSettlementsDataList = () => {
                                   decimalScale={0}
                                   allowNegative={false}
                                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 font-mono"
-                                  placeholder=""
+                                  placeholder="0"
                                 />
                               </div>
                             </div>
