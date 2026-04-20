@@ -55,6 +55,58 @@ const EmployeesDocDeadline = () => {
         ...doc.data(),
       }));
 
+      // Для каждой станции создаем объект для хранения последних документов по каждому типу
+      const stationLatestDocs = {};
+
+      // Сначала получаем все типы документов, чтобы знать, какие типы существуют
+      const typesSnap = await getDocs(collection(db, "document_types"));
+      const validTypes = [];
+      typesSnap.forEach((doc) => {
+        const data = doc.data();
+        if (data.validity === "expiration") {
+          validTypes.push(data.id);
+        }
+      });
+
+      // Группируем документы по станциям и типам, находим последний по дате истечения
+      docsSnap.forEach((doc) => {
+        const data = doc.data();
+        const stationId = data.stationId;
+        const docType = data.docType;
+
+        // Проверяем, что тип документа относится к expiration
+        if (!validTypes.includes(docType)) return;
+
+        // Показываем документы только для станций пользователя
+        if (userData.stations && userData.stations.includes(stationId)) {
+          const expiry = new Date(data.expiryDate);
+
+          // Инициализируем структуру для станции, если её нет
+          if (!stationLatestDocs[stationId]) {
+            stationLatestDocs[stationId] = {};
+          }
+
+          // Инициализируем структуру для типа документа, если её нет
+          if (!stationLatestDocs[stationId][docType]) {
+            stationLatestDocs[stationId][docType] = {
+              expiry: expiry,
+              doc: data,
+              docId: doc.id,
+            };
+          } else {
+            // Сравниваем даты и оставляем только самый новый документ (с самой поздней датой истечения)
+            if (expiry > stationLatestDocs[stationId][docType].expiry) {
+              stationLatestDocs[stationId][docType] = {
+                expiry: expiry,
+                doc: data,
+                docId: doc.id,
+              };
+            }
+          }
+        }
+      });
+
+      // Считаем статистику только по последним документам каждого типа
       const counts = {};
       const total = {
         total: 0,
@@ -64,13 +116,13 @@ const EmployeesDocDeadline = () => {
         less5: 0,
       };
 
-      docsSnap.forEach((doc) => {
-        const data = doc.data();
-        const stationId = data.stationId;
+      // Проходим по всем станциям и их последним документам
+      Object.keys(stationLatestDocs).forEach((stationId) => {
+        const stationDocs = stationLatestDocs[stationId];
 
-        // Показываем документы только для станций пользователя
-        if (userData.stations.includes(stationId)) {
-          const expiry = new Date(data.expiryDate);
+        Object.keys(stationDocs).forEach((docType) => {
+          const data = stationDocs[docType].doc;
+          const expiry = stationDocs[docType].expiry;
           const now = new Date();
           const diffDays = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
 
@@ -100,6 +152,19 @@ const EmployeesDocDeadline = () => {
             counts[stationId].less30++;
             total.less30++;
           }
+        });
+      });
+
+      // Для станций, у которых нет документов, добавляем пустую статистику
+      stationsData.forEach((station) => {
+        if (!counts[station.id]) {
+          counts[station.id] = {
+            total: 0,
+            expired: 0,
+            less30: 0,
+            less15: 0,
+            less5: 0,
+          };
         }
       });
 
@@ -195,9 +260,6 @@ const EmployeesDocDeadline = () => {
                 Муддати ўтган: {totalStats.expired || 0}
               </p>
             </div>
-            {/* <div className="mt-3 text-xs text-blue-600 font-medium">
-              Барча бириктирилган заправкалар хужжатлари →
-            </div> */}
           </Link>
         )}
 

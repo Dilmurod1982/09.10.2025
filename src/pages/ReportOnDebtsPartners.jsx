@@ -4,12 +4,14 @@ import { db } from "../firebase/config";
 import { useAppStore } from "../lib/zustand";
 import * as XLSX from "xlsx";
 import { toast } from "react-hot-toast";
+import PartnerDetailsModal from "../components/PartnerDetailsModal";
 
 const ReportOnDebtsPartners = () => {
   const userData = useAppStore((state) => state.userData);
 
   const [stations, setStations] = useState([]);
   const [contracts, setContracts] = useState([]);
+  const [partnersData, setPartnersData] = useState({}); // Хранилище данных партнеров
 
   const [selectedStation, setSelectedStation] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("");
@@ -19,6 +21,10 @@ const ReportOnDebtsPartners = () => {
 
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Состояния для модального окна партнера
+  const [selectedPartnerDetails, setSelectedPartnerDetails] = useState(null);
+  const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
 
   // Периоды для выбора
   const periodOptions = [
@@ -68,8 +74,6 @@ const ReportOnDebtsPartners = () => {
   const pad2 = (n) => String(n).padStart(2, "0");
 
   const getLastDayOfMonth = (yearNum, monthNum1to12) => {
-    // new Date(y, m, 0) даёт последний день ПРЕДЫДУЩЕГО месяца,
-    // поэтому monthNum1to12 подходит: m=2 => последний день февраля
     return new Date(yearNum, monthNum1to12, 0).getDate();
   };
 
@@ -80,7 +84,7 @@ const ReportOnDebtsPartners = () => {
 
     if (periodType === "month") {
       if (!month) return { startDate: "", endDate: "" };
-      const m = Number(month); // 1..12
+      const m = Number(month);
       const lastDay = getLastDayOfMonth(y, m);
 
       return {
@@ -245,15 +249,55 @@ const ReportOnDebtsPartners = () => {
     fetchContracts();
   }, [userData]);
 
+  // Загрузка данных партнеров из коллекции partners
+  useEffect(() => {
+    const fetchPartnersData = async () => {
+      if (!contracts.length) return;
+
+      try {
+        // Собираем уникальные имена/ID партнеров из контрактов
+        const uniquePartners = [...new Set(contracts.map((c) => c.partner))];
+
+        if (uniquePartners.length === 0) return;
+
+        // Загружаем всех партнеров из коллекции partners
+        const partnersSnapshot = await getDocs(collection(db, "partners"));
+        const partnersMap = {};
+
+        partnersSnapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          // Используем название партнера как ключ
+          if (data.name) {
+            partnersMap[data.name] = {
+              id: doc.id,
+              ...data,
+            };
+          }
+          // Также сохраняем по ID на всякий случай
+          partnersMap[doc.id] = {
+            id: doc.id,
+            ...data,
+          };
+        });
+
+        setPartnersData(partnersMap);
+      } catch (error) {
+        console.error("Error fetching partners:", error);
+        toast.error("Хамкорлар маълумотини юклашда хатолик");
+      }
+    };
+
+    fetchPartnersData();
+  }, [contracts]);
+
   // Сброс выбранных значений при смене периода
   useEffect(() => {
     setSelectedMonth("");
     setSelectedQuarter("");
   }, [selectedPeriod]);
 
-  // ---------- Генерация отчёта (исправлено: сравнение дат строками) ----------
+  // ---------- Генерация отчёта ----------
   useEffect(() => {
-    // обязательные поля
     if (!selectedPeriod || !selectedYear) {
       setReportData([]);
       return;
@@ -298,30 +342,37 @@ const ReportOnDebtsPartners = () => {
 
         for (const contract of filteredContracts) {
           const contractId = contract.id;
-          const partner = contract.partner;
+          const partnerName = contract.partner;
           const contractNumber = contract.contractNumber;
           const startBalance = contract.startBalance;
-          const startBalanceDate = contract.startBalanceDate; // "YYYY-MM-DD"
+          const startBalanceDate = contract.startBalanceDate;
           const transactions = Array.isArray(contract.transactions)
             ? contract.transactions
             : [];
           const autoId = toNumber(contract.autoId);
 
-          // если нет даты стартового сальдо — пропускаем
-          if (!startBalanceDate) continue;
+          // Получаем данные партнера из загруженного объекта
+          const partnerInfo = partnersData[partnerName] || {};
 
-          // если стартовая дата после конца периода — контракт ещё не активен для отчета
-          // Сравнение строк: "YYYY-MM-DD"
+          // Дополнительные поля для детального модального окна из коллекции partners
+          const inn = partnerInfo.inn || contract.inn;
+          const director = partnerInfo.director || contract.director;
+          const shhr = partnerInfo.shhr || contract.shhr;
+          const bankAccount = partnerInfo.bankAccount || contract.bankAccount;
+          const partnerAddress = partnerInfo.address || contract.address;
+          const partnerPhone = partnerInfo.phone || contract.phone;
+          const files = contract.files || [];
+
+          if (!startBalanceDate) continue;
           if (startBalanceDate > endDate) continue;
 
           let currentBalance = toNumber(startBalance);
           let totalSoldAmount = 0;
           let totalPaid = 0;
 
-          // ВАЖНО: если reportDate отсутствует — пропускаем транзакцию
-          // 1) сначала применяем транзакции ДО периода, чтобы получить сальдо на начало периода
+          // Транзакции ДО периода
           for (const t of transactions) {
-            const d = t?.reportDate; // "YYYY-MM-DD"
+            const d = t?.reportDate;
             if (!d) continue;
 
             if (d < startDate) {
@@ -331,7 +382,7 @@ const ReportOnDebtsPartners = () => {
             }
           }
 
-          // 2) затем транзакции В периоде
+          // Транзакции В периоде
           for (const t of transactions) {
             const d = t?.reportDate;
             if (!d) continue;
@@ -346,20 +397,31 @@ const ReportOnDebtsPartners = () => {
             }
           }
 
-          // startBalance на начало периода = (конечный баланс) - продажи + оплаты
           const periodStartBalance =
             currentBalance - totalSoldAmount + totalPaid;
 
-          // у вас ключ = contractId (как было). Если нужно группировать по partnerId — скажите.
           partnerReportData[contractId] = {
             contractId,
-            partnerName: partner,
+            partnerName,
             contractNumber,
             startBalance: periodStartBalance,
             totalSoldAmount,
             totalPaid,
             endBalance: currentBalance,
             autoId: autoId || 0,
+            // Данные из partners коллекции
+            inn,
+            director,
+            shhr,
+            bankAccount,
+            partnerAddress,
+            partnerPhone,
+            contractDate: contract.contractDate,
+            contractEndDate: contract.contractEndDate,
+            startBalanceDate,
+            files,
+            stationName: contract.stationName,
+            stationId: contract.stationId,
           };
         }
 
@@ -389,7 +451,14 @@ const ReportOnDebtsPartners = () => {
     selectedQuarter,
     userData,
     contracts,
+    partnersData,
   ]);
+
+  // Обработчик клика по строке партнера
+  const handlePartnerClick = (partner) => {
+    setSelectedPartnerDetails(partner);
+    setIsPartnerModalOpen(true);
+  };
 
   // ---------- Экспорт в Excel ----------
   const exportToExcel = () => {
@@ -676,22 +745,20 @@ const ReportOnDebtsPartners = () => {
                     {reportData.map((partner, index) => (
                       <tr
                         key={partner.contractId}
-                        className="hover:bg-gray-50 transition-colors"
+                        className="hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => handlePartnerClick(partner)}
                       >
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                           {index + 1}
                         </td>
-
                         <td className="px-4 py-3 text-sm text-gray-900 max-w-[300px] break-words">
                           <div className="truncate" title={partner.partnerName}>
                             {partner.partnerName}
                           </div>
                         </td>
-
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                           {partner.contractNumber}
                         </td>
-
                         <td
                           className={`px-4 py-3 whitespace-nowrap text-sm font-semibold ${
                             toNumber(partner.startBalance) >= 0
@@ -701,15 +768,12 @@ const ReportOnDebtsPartners = () => {
                         >
                           {formatNumber(partner.startBalance)} сўм
                         </td>
-
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-semibold">
                           {formatNumber(partner.totalSoldAmount)} сўм
                         </td>
-
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600 font-semibold">
                           {formatNumber(partner.totalPaid)} сўм
                         </td>
-
                         <td
                           className={`px-4 py-3 whitespace-nowrap text-sm font-semibold ${
                             toNumber(partner.endBalance) >= 0
@@ -728,7 +792,6 @@ const ReportOnDebtsPartners = () => {
                         УМУМИЙСИ
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500"></td>
-
                       <td
                         className={`px-4 py-3 whitespace-nowrap text-sm ${
                           calculateTotals.totalStartBalance >= 0
@@ -738,15 +801,12 @@ const ReportOnDebtsPartners = () => {
                       >
                         {formatNumber(calculateTotals.totalStartBalance)} сўм
                       </td>
-
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600">
                         {formatNumber(calculateTotals.totalSoldAmount)} сўм
                       </td>
-
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600">
                         {formatNumber(calculateTotals.totalPaid)} сўм
                       </td>
-
                       <td
                         className={`px-4 py-3 whitespace-nowrap text-sm ${
                           calculateTotals.totalEndBalance >= 0
@@ -844,6 +904,18 @@ const ReportOnDebtsPartners = () => {
           </div>
         )}
       </div>
+
+      {/* Модальное окно с детальной информацией о партнере */}
+      <PartnerDetailsModal
+        isOpen={isPartnerModalOpen}
+        onClose={() => setIsPartnerModalOpen(false)}
+        partner={selectedPartnerDetails}
+        stationName={
+          stations.find((s) => s.id === selectedStation)?.stationName ||
+          selectedPartnerDetails?.stationName ||
+          "Заправка"
+        }
+      />
     </div>
   );
 };
