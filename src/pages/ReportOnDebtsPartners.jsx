@@ -11,6 +11,7 @@ const ReportOnDebtsPartners = () => {
 
   const [stations, setStations] = useState([]);
   const [contracts, setContracts] = useState([]);
+  console.log(contracts);
   const [partnersData, setPartnersData] = useState({}); // Хранилище данных партнеров
 
   const [selectedStation, setSelectedStation] = useState("");
@@ -20,6 +21,7 @@ const ReportOnDebtsPartners = () => {
   const [selectedYear, setSelectedYear] = useState("");
 
   const [reportData, setReportData] = useState([]);
+
   const [loading, setLoading] = useState(false);
 
   // Состояния для модального окна партнера
@@ -132,12 +134,21 @@ const ReportOnDebtsPartners = () => {
     });
   };
 
+  const formatNumberM3 = (number) => {
+    const num = toNumber(number);
+    return num.toLocaleString("ru-RU", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  };
+
   // Рассчет итоговых значений
   const calculateTotals = useMemo(() => {
     if (!reportData.length) {
       return {
         totalStartBalance: 0,
         totalSoldAmount: 0,
+        totalSoldVolume: 0,
         totalPaid: 0,
         totalEndBalance: 0,
         totalDebtStart: 0,
@@ -151,11 +162,13 @@ const ReportOnDebtsPartners = () => {
       (acc, partner) => {
         const startBalance = toNumber(partner.startBalance);
         const soldAmount = toNumber(partner.totalSoldAmount);
+        const soldVolume = toNumber(partner.totalSoldVolume);
         const paid = toNumber(partner.totalPaid);
         const endBalance = toNumber(partner.endBalance);
 
         acc.totalStartBalance += startBalance;
         acc.totalSoldAmount += soldAmount;
+        acc.totalSoldVolume += soldVolume;
         acc.totalPaid += paid;
         acc.totalEndBalance += endBalance;
 
@@ -171,6 +184,7 @@ const ReportOnDebtsPartners = () => {
       {
         totalStartBalance: 0,
         totalSoldAmount: 0,
+        totalSoldVolume: 0,
         totalPaid: 0,
         totalEndBalance: 0,
         totalDebtStart: 0,
@@ -368,6 +382,7 @@ const ReportOnDebtsPartners = () => {
 
           let currentBalance = toNumber(startBalance);
           let totalSoldAmount = 0;
+          let totalSoldVolume = 0;
           let totalPaid = 0;
 
           // Транзакции ДО периода
@@ -389,9 +404,12 @@ const ReportOnDebtsPartners = () => {
 
             if (d >= startDate && d <= endDate) {
               const soldAmount = toNumber(t.totalAmount);
+              const soldVolume =
+                toNumber(t.soldM3) || toNumber(t.quantity) || 0; // Добавляем объем газа
               const payment = toNumber(t.paymentSum);
 
               totalSoldAmount += soldAmount;
+              totalSoldVolume += soldVolume;
               totalPaid += payment;
               currentBalance += soldAmount - payment;
             }
@@ -406,6 +424,7 @@ const ReportOnDebtsPartners = () => {
             contractNumber,
             startBalance: periodStartBalance,
             totalSoldAmount,
+            totalSoldVolume,
             totalPaid,
             endBalance: currentBalance,
             autoId: autoId || 0,
@@ -507,6 +526,7 @@ const ReportOnDebtsPartners = () => {
         "Хамкор",
         "Шартнома",
         "Давр бошига сальдо",
+        "Сотилган газ (м³)",
         "Сотилган газ (сум)",
         "Тўланди",
         "Давр охирига сальдо",
@@ -516,6 +536,7 @@ const ReportOnDebtsPartners = () => {
         partner.partnerName,
         partner.contractNumber,
         partner.startBalance,
+        partner.totalSoldVolume,
         partner.totalSoldAmount,
         partner.totalPaid,
         partner.endBalance,
@@ -526,6 +547,7 @@ const ReportOnDebtsPartners = () => {
         "Жами",
         "",
         calculateTotals.totalStartBalance,
+        calculateTotals.totalSoldVolume,
         calculateTotals.totalSoldAmount,
         calculateTotals.totalPaid,
         calculateTotals.totalEndBalance,
@@ -537,6 +559,7 @@ const ReportOnDebtsPartners = () => {
         calculateTotals.totalDebtStart,
         "",
         "",
+        "",
         calculateTotals.totalDebtEnd,
       ],
       [
@@ -544,6 +567,7 @@ const ReportOnDebtsPartners = () => {
         "Жами олдидан тўлов",
         "",
         calculateTotals.totalPrepaymentStart,
+        "",
         "",
         "",
         calculateTotals.totalPrepaymentEnd,
@@ -559,6 +583,7 @@ const ReportOnDebtsPartners = () => {
       { wch: 40 },
       { wch: 15 },
       { wch: 20 },
+      { wch: 15 },
       { wch: 20 },
       { wch: 15 },
       { wch: 20 },
@@ -730,6 +755,9 @@ const ReportOnDebtsPartners = () => {
                         Давр бошига сальдо
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                        Сотилган газ (м³)
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         Сотилган газ (сум)
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
@@ -768,6 +796,9 @@ const ReportOnDebtsPartners = () => {
                         >
                           {formatNumber(partner.startBalance)} сўм
                         </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-purple-600 font-semibold">
+                          {formatNumberM3(partner.totalSoldVolume)} м³
+                        </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-semibold">
                           {formatNumber(partner.totalSoldAmount)} сўм
                         </td>
@@ -801,6 +832,9 @@ const ReportOnDebtsPartners = () => {
                       >
                         {formatNumber(calculateTotals.totalStartBalance)} сўм
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-purple-600">
+                        {formatNumberM3(calculateTotals.totalSoldVolume)} м³
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600">
                         {formatNumber(calculateTotals.totalSoldAmount)} сўм
                       </td>
@@ -829,6 +863,7 @@ const ReportOnDebtsPartners = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm"></td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm"></td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm"></td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-red-600">
                         {formatNumber(calculateTotals.totalDebtEnd)} сўм
                       </td>
@@ -843,6 +878,7 @@ const ReportOnDebtsPartners = () => {
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600">
                         {formatNumber(calculateTotals.totalPrepaymentStart)} сўм
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm"></td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm"></td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm"></td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-green-600">

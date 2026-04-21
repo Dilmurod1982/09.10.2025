@@ -21,7 +21,7 @@
     "clsx": "^2.1.1",
     "file-saver": "^2.0.5",
     "firebase": "^11.10.0",
-    "framer-motion": "^12.23.22",
+    "framer-motion": "^12.38.0",
     "lucide-react": "^0.545.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

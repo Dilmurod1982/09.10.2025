@@ -1,18 +1,9 @@
 import React, { useEffect, useState, useMemo } from "react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  doc,
-  getDoc,
-} from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { useAppStore } from "../lib/zustand";
 import AddGeneralReportModal from "../components/AddGeneralReportModal";
 import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
 import UnifiedReportModal from "../components/UnifiedReportModal";
 import DetailedReportModal from "../components/DetailedReportModal";
 
@@ -34,6 +25,16 @@ const GeneralDailyReport = () => {
     return userData?.role === "operator";
   }, [userData?.role]);
 
+  // Проверка прав на редактирование
+  const canEdit = useMemo(() => {
+    return userData?.email === "dilik@mail.ru";
+  }, [userData?.email]);
+
+  // Проверка, является ли пользователь администратором
+  const isAdmin = useMemo(() => {
+    return userData?.role === "admin";
+  }, [userData?.role]);
+
   // Функция для определения квартала по месяцу и году
   const getQuarterForMonth = (year, month) => {
     const monthNum = parseInt(month);
@@ -53,7 +54,7 @@ const GeneralDailyReport = () => {
   const monthOptions = useMemo(() => {
     const options = [];
     const currentDate = new Date();
-    const startDate = new Date(2025, 0, 1); // Январь 2025
+    const startDate = new Date(2025, 0, 1);
 
     for (
       let date = new Date(startDate);
@@ -61,7 +62,7 @@ const GeneralDailyReport = () => {
       date.setMonth(date.getMonth() + 1)
     ) {
       const year = date.getFullYear();
-      const month = date.getMonth() + 1; // 1-12
+      const month = date.getMonth() + 1;
       const value = `${year}-${String(month).padStart(2, "0")}`;
       const label = date.toLocaleDateString("ru-RU", {
         year: "numeric",
@@ -71,19 +72,34 @@ const GeneralDailyReport = () => {
       options.push({ value, label, year, month, quarter });
     }
 
-    return options.reverse(); // Новые месяцы первыми
+    return options.reverse();
   }, []);
 
-  // Загрузка станций
+  // Загрузка станций (исправлено для администратора)
   useEffect(() => {
     const fetchStations = async () => {
-      if (!userData?.stations?.length) return;
-
       try {
         const snapshot = await getDocs(collection(db, "stations"));
-        const matched = snapshot.docs
-          .filter((doc) => userData.stations.includes(doc.id))
-          .map((doc) => ({ id: doc.id, ...doc.data() }));
+
+        let matched = [];
+
+        if (isAdmin) {
+          // Для администратора загружаем ВСЕ станции
+          matched = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+        } else if (userData?.stations?.length) {
+          // Для оператора загружаем только его станции
+          matched = snapshot.docs
+            .filter((doc) => userData.stations.includes(doc.id))
+            .map((doc) => ({ id: doc.id, ...doc.data() }));
+        }
+
+        // Сортируем станции по названию
+        matched.sort((a, b) => {
+          return (a.stationName || "").localeCompare(b.stationName || "");
+        });
 
         setStations(matched);
       } catch (error) {
@@ -92,9 +108,9 @@ const GeneralDailyReport = () => {
     };
 
     fetchStations();
-  }, [userData]);
+  }, [userData, isAdmin]);
 
-  // Функция для загрузки отчетов из квартальных коллекций (без сложных индексов)
+  // Функция для загрузки отчетов из квартальных коллекций
   const fetchReportsData = async () => {
     if (!selectedStation || !selectedMonth) {
       setReports([]);
@@ -107,22 +123,16 @@ const GeneralDailyReport = () => {
       const startDate = `${year}-${month}-01`;
       const endDate = `${year}-${month}-31`;
 
-      // Получаем название коллекции для выбранного месяца
       const collectionName = getCollectionName(year, month);
 
-      // Пробуем загрузить все документы из коллекции и фильтруем локально
       try {
-        // Загружаем все документы из коллекции (без where для stationId)
         const reportsRef = collection(db, collectionName);
         const snapshot = await getDocs(reportsRef);
 
-        // Фильтруем локально по stationId и дате
         const reportsData = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
-          // Проверяем, что отчет принадлежит выбранной станции
           if (data.stationId === selectedStation.id) {
-            // Проверяем, что отчет входит в выбранный месяц
             const reportDate = data.reportDate;
             if (reportDate >= startDate && reportDate <= endDate) {
               reportsData.push({
@@ -134,7 +144,6 @@ const GeneralDailyReport = () => {
           }
         });
 
-        // Сортируем по дате
         reportsData.sort((a, b) => {
           if (a.reportDate < b.reportDate) return -1;
           if (a.reportDate > b.reportDate) return 1;
@@ -143,16 +152,14 @@ const GeneralDailyReport = () => {
 
         setReports(reportsData);
 
-        // Если в квартальной коллекции не нашли, пробуем старую коллекцию
         if (reportsData.length === 0) {
           await tryOldCollection(startDate, endDate);
         }
       } catch (firestoreError) {
         console.error(
           `Ошибка при загрузке из коллекции ${collectionName}:`,
-          firestoreError
+          firestoreError,
         );
-        // Пробуем загрузить из старой коллекции
         await tryOldCollection(startDate, endDate);
       }
     } catch (error) {
@@ -184,7 +191,6 @@ const GeneralDailyReport = () => {
         }
       });
 
-      // Сортируем по дате
       reportsData.sort((a, b) => {
         if (a.reportDate < b.reportDate) return -1;
         if (a.reportDate > b.reportDate) return 1;
@@ -237,29 +243,25 @@ const GeneralDailyReport = () => {
 
   // Функция для получения суммы наличных из новой структуры
   const getCashAmount = (report) => {
-    // Проверяем новую структуру (paymentData.zhisobot)
     if (report.paymentData && report.paymentData.zhisobot !== undefined) {
       return report.paymentData.zhisobot;
     }
-    // Старая структура (generalData.cashAmount)
     return report.generalData?.cashAmount || 0;
   };
 
-  // Функция для получения суммы электронных платежей (исключая uzcard и humo которые показываются отдельно)
+  // Функция для получения суммы электронных платежей (исключая uzcard и humo)
   const getElectronicPayments = (report) => {
     let total = 0;
 
-    // Новая структура
     if (report.paymentData) {
       const { zhisobot, uzcard, humo, ...otherElectronicPayments } =
         report.paymentData;
       total = Object.values(otherElectronicPayments).reduce(
         (sum, amount) => sum + (amount || 0),
-        0
+        0,
       );
     }
 
-    // Старая структура для обратной совместимости (только electronicPaymentSystem)
     if (total === 0 && report.generalData) {
       total = report.generalData.electronicPaymentSystem || 0;
     }
@@ -267,20 +269,18 @@ const GeneralDailyReport = () => {
     return total;
   };
 
-  // Функция для получения суммы всех электронных платежей (включая uzcard и humo)
+  // Функция для получения суммы всех электронных платежей
   const getAllElectronicPayments = (report) => {
     let total = 0;
 
-    // Новая структура
     if (report.paymentData) {
       const { zhisobot, ...allElectronicPayments } = report.paymentData;
       total = Object.values(allElectronicPayments).reduce(
         (sum, amount) => sum + (amount || 0),
-        0
+        0,
       );
     }
 
-    // Старая структура для обратной совместимости
     if (total === 0 && report.generalData) {
       total =
         (report.generalData.uzcardTerminal || 0) +
@@ -293,12 +293,10 @@ const GeneralDailyReport = () => {
 
   // Функция для получения суммы конкретного электронного платежа
   const getPaymentAmount = (report, paymentType) => {
-    // Новая структура
     if (report.paymentData && report.paymentData[paymentType] !== undefined) {
       return report.paymentData[paymentType];
     }
 
-    // Старая структура для обратной совместимости
     switch (paymentType) {
       case "uzcard":
         return report.generalData?.uzcardTerminal || 0;
@@ -317,18 +315,16 @@ const GeneralDailyReport = () => {
     }
   };
 
-  // Функция для получения списка всех электронных платежей с названиями (исключая uzcard и humo)
+  // Функция для получения списка всех электронных платежей с названиями
   const getPaymentMethodsList = (report) => {
     const methods = [];
 
-    // Добавляем основные методы из новой структуры
     if (report.paymentData) {
       const { zhisobot, uzcard, humo, ...otherElectronicPayments } =
         report.paymentData;
       Object.entries(otherElectronicPayments).forEach(([key, amount]) => {
         if (amount && amount > 0) {
           let name = key;
-          // Преобразуем ключи в читаемые названия
           switch (key) {
             case "click":
               name = "Click";
@@ -350,7 +346,6 @@ const GeneralDailyReport = () => {
       });
     }
 
-    // Добавляем методы из старой структуры (для обратной совместимости)
     if (methods.length === 0 && report.generalData) {
       if (report.generalData.electronicPaymentSystem > 0) {
         methods.push({
@@ -373,7 +368,6 @@ const GeneralDailyReport = () => {
   const exportToExcel = () => {
     if (!reports.length) return;
 
-    // Получаем список всех типов других электронных платежей (исключая uzcard и humo)
     const allPaymentTypes = new Set();
     reports.forEach((report) => {
       const methods = getPaymentMethodsList(report);
@@ -384,7 +378,6 @@ const GeneralDailyReport = () => {
     const hasOtherElectronicPayments = paymentTypesArray.length > 0;
 
     const worksheetData = [
-      // Заголовок
       ["Кунлик ҳисобот", "", "", "", "", "", "", "", "", "", "", "", ""],
       [
         `Станция: ${selectedStation?.stationName || "Ноъмалум заправка"}`,
@@ -419,9 +412,8 @@ const GeneralDailyReport = () => {
         "",
         "",
       ],
-      [], // Пустая строка
+      [],
 
-      // Заголовки таблицы
       [
         "№",
         "Сана",
@@ -437,11 +429,11 @@ const GeneralDailyReport = () => {
         ...(hasOtherElectronicPayments
           ? paymentTypesArray
           : ["Бошқа электрон"]),
-        ...(isOperator ? [] : ["Назорат суммаси"]),
+        ...(!isOperator ? ["Назорат суммаси"] : []),
         "Яратилди",
+        ...(canEdit ? ["Ўзгартирилди"] : []),
       ],
 
-      // Данные
       ...reports.map((report, index) => {
         const counterDiff = calculateCounterDiff(report);
         const coefficient = calculateCoefficient(report);
@@ -464,63 +456,67 @@ const GeneralDailyReport = () => {
           humoAmount,
         ];
 
-        // Добавляем другие электронные платежи
         if (hasOtherElectronicPayments) {
           paymentTypesArray.forEach((type) => {
             const method = paymentMethods.find((m) => m.name === type);
             row.push(method ? method.amount : 0);
           });
         } else {
-          // Если нет других типов, добавляем общую сумму
           row.push(getElectronicPayments(report));
         }
 
-        // Добавляем контрольную сумму только если пользователь не оператор
         if (!isOperator) {
           row.push(report.controlSum || 0);
         }
 
         row.push(report.createdBy || "Номаълум");
 
+        if (canEdit) {
+          row.push(
+            report.updatedBy
+              ? `${report.updatedBy} (${formatDate(report.updatedAt)})`
+              : "-",
+          );
+        }
+
         return row;
       }),
 
-      // Итоги
       [
         "ЖАМИ:",
         "",
         "",
         reports.reduce((sum, report) => sum + calculateCounterDiff(report), 0),
-        "", // Пусто для коэффициента
+        "",
         reports.reduce((sum, report) => sum + (report.hoseTotalGas || 0), 0),
         reports.reduce((sum, report) => sum + (report.partnerTotalM3 || 0), 0),
         "",
         reports.reduce((sum, report) => sum + getCashAmount(report), 0),
         reports.reduce(
           (sum, report) => sum + getPaymentAmount(report, "uzcard"),
-          0
+          0,
         ),
         reports.reduce(
           (sum, report) => sum + getPaymentAmount(report, "humo"),
-          0
+          0,
         ),
-        // Итоги по другим электронным платежам
         ...(hasOtherElectronicPayments
           ? paymentTypesArray.map((type) =>
               reports.reduce((sum, report) => {
                 const methods = getPaymentMethodsList(report);
                 const method = methods.find((m) => m.name === type);
                 return sum + (method ? method.amount : 0);
-              }, 0)
+              }, 0),
             )
           : [
               reports.reduce(
                 (sum, report) => sum + getElectronicPayments(report),
-                0
+                0,
               ),
             ]),
-        ...(isOperator ? [] : [""]),
+        ...(!isOperator ? [""] : []),
         "",
+        ...(canEdit ? [""] : []),
       ],
     ];
 
@@ -528,40 +524,41 @@ const GeneralDailyReport = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Умумий ҳисобот");
 
-    // Авто-ширина колонок
     const colWidths = [
-      { wch: 5 }, // №
-      { wch: 12 }, // Дата
-      { wch: 18 }, // Показание счетчика
-      { wch: 15 }, // Разница счетчика
-      { wch: 12 }, // Коэфф %
-      { wch: 15 }, // Свод шланги
-      { wch: 15 }, // Свод партнеры
-      { wch: 12 }, // Цена за м³
-      { wch: 18 }, // Наличные (Z)
-      { wch: 15 }, // Узкард
-      { wch: 15 }, // Хумо
+      { wch: 5 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 15 },
     ];
 
-    // Добавляем ширину для других электронных платежей
     if (hasOtherElectronicPayments) {
       paymentTypesArray.forEach(() => colWidths.push({ wch: 15 }));
     } else {
-      colWidths.push({ wch: 15 }); // Общая колонка для других электронных платежей
+      colWidths.push({ wch: 15 });
     }
 
-    // Добавляем ширину для контрольной суммы если нужно
     if (!isOperator) {
-      colWidths.push({ wch: 15 }); // Контрольная сумма
+      colWidths.push({ wch: 15 });
     }
 
-    colWidths.push({ wch: 20 }); // Создан
+    colWidths.push({ wch: 20 });
+
+    if (canEdit) {
+      colWidths.push({ wch: 25 });
+    }
 
     ws["!cols"] = colWidths;
 
     XLSX.writeFile(
       wb,
-      `Умумий_хисобот_${selectedStation?.stationName}_${selectedMonth}.xlsx`
+      `Умумий_хисобот_${selectedStation?.stationName}_${selectedMonth}.xlsx`,
     );
   };
 
@@ -576,6 +573,34 @@ const GeneralDailyReport = () => {
           <p className="text-gray-600">
             Кўрсаткичлар ва сотувлар бўйича йиғма ҳисобот
           </p>
+          {isAdmin && (
+            <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+              <svg
+                className="w-4 h-4 mr-1"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Админ режими (барча заправкалар кўринади)
+            </div>
+          )}
+          {canEdit && !isAdmin && (
+            <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
+              <svg
+                className="w-4 h-4 mr-1"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+              </svg>
+              Режим редактирования активен (dilik@mail.ru)
+            </div>
+          )}
         </div>
 
         {/* Панель управления */}
@@ -602,6 +627,13 @@ const GeneralDailyReport = () => {
                   </option>
                 ))}
               </select>
+              {stations.length === 0 && !loading && (
+                <p className="mt-2 text-sm text-red-600">
+                  {isAdmin
+                    ? "Ҳеч қандай заправка топилмади. Илтимос, заправкаларни қўшинг."
+                    : "Сизга бириктирилган заправкалар мавжуд эмас. Администраторга мурожаат қилинг."}
+                </p>
+              )}
             </div>
 
             {/* Выбор месяца */}
@@ -627,7 +659,6 @@ const GeneralDailyReport = () => {
 
             {/* Кнопки действий */}
             <div className="flex gap-3 lg:ml-auto">
-              {/* Показываем кнопку "Ягона ҳисобот" только для операторов */}
               {isOperator && (
                 <button
                   className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -731,9 +762,14 @@ const GeneralDailyReport = () => {
                           Назорат суммаси
                         </th>
                       )}
-                      {/* <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                         Яратилди
-                      </th> */}
+                      </th>
+                      {canEdit && (
+                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                          Ўзгартирилди
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -743,8 +779,8 @@ const GeneralDailyReport = () => {
                       const cashAmount = getCashAmount(report);
                       const uzcardAmount = getPaymentAmount(report, "uzcard");
                       const humoAmount = getPaymentAmount(report, "humo");
-                      const electronicTotal = getElectronicPayments(report); // Без uzcard и humo
-                      const paymentMethods = getPaymentMethodsList(report); // Только другие электронные платежи
+                      const electronicTotal = getElectronicPayments(report);
+                      const paymentMethods = getPaymentMethodsList(report);
 
                       return (
                         <tr
@@ -787,7 +823,7 @@ const GeneralDailyReport = () => {
                               "ru-RU",
                               {
                                 minimumFractionDigits: 2,
-                              }
+                              },
                             ) || "0.00"}{" "}
                             сўм
                           </td>
@@ -838,9 +874,23 @@ const GeneralDailyReport = () => {
                               сўм
                             </td>
                           )}
-                          {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {report.createdBy || "Ноъмалум"}
-                          </td> */}
+                          </td>
+                          {canEdit && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
+                              {report.updatedBy ? (
+                                <div className="flex flex-col">
+                                  <span>{report.updatedBy}</span>
+                                  <span className="text-xs text-gray-500">
+                                    {formatDate(report.updatedAt)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -875,7 +925,7 @@ const GeneralDailyReport = () => {
         )}
 
         {/* Сообщение о выборе параметров */}
-        {!selectedStation && (
+        {!selectedStation && stations.length > 0 && (
           <div className="text-center py-12">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md mx-auto">
               <svg
@@ -896,6 +946,35 @@ const GeneralDailyReport = () => {
               </h3>
               <p className="mt-2 text-sm text-gray-500">
                 Ҳисоботни кўриш учун юқорида заправкани танланг.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Сообщение о загрузке станций */}
+        {stations.length === 0 && !loading && (
+          <div className="text-center py-12">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md mx-auto">
+              <svg
+                className="mx-auto h-12 w-12 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                />
+              </svg>
+              <h3 className="mt-4 text-lg font-medium text-gray-900">
+                Заправкалар топилмади
+              </h3>
+              <p className="mt-2 text-sm text-gray-500">
+                {isAdmin
+                  ? "Тизимда заправкалар мавжуд эмас. Илтимос, аввал заправкаларни қўшинг."
+                  : "Сизга бириктирилган заправкалар мавжуд эмас. Администраторга мурожаат қилинг."}
               </p>
             </div>
           </div>
@@ -960,6 +1039,8 @@ const GeneralDailyReport = () => {
             setSelectedReport(null);
           }}
           report={selectedReport}
+          collectionName={selectedReport.collection}
+          onSaved={refreshReports}
         />
       )}
     </div>

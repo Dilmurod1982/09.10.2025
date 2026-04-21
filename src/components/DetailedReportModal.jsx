@@ -1,7 +1,21 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAppStore } from "../lib/zustand";
+import EditReportModal from "./EditReportModal";
 
-const DetailedReportModal = ({ isOpen, onClose, report }) => {
+const DetailedReportModal = ({
+  isOpen,
+  onClose,
+  report,
+  collectionName,
+  onSaved,
+}) => {
+  const [showEditModal, setShowEditModal] = useState(false);
+  const userData = useAppStore((state) => state.userData);
+
+  // Проверка прав на редактирование
+  const canEdit = userData?.email === "dilik@mail.ru";
+
   if (!isOpen || !report) return null;
 
   // Форматирование даты
@@ -16,10 +30,19 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
   // Форматирование времени
   const formatTime = (timestamp) => {
     if (!timestamp) return "Неизвестно";
-    const date = timestamp.toDate();
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${hours}:${minutes}`;
+    if (timestamp.toDate) {
+      const date = timestamp.toDate();
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${hours}:${minutes}`;
+    }
+    if (typeof timestamp === "string") {
+      const date = new Date(timestamp);
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${hours}:${minutes}`;
+    }
+    return "Неизвестно";
   };
 
   // Фильтрация партнеров для печати (только с soldM3 > 0)
@@ -34,13 +57,20 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
     return {
       totalM3: filteredPartners.reduce(
         (sum, partner) => sum + (partner.soldM3 || 0),
-        0
+        0,
       ),
       totalAmount: filteredPartners.reduce(
         (sum, partner) => sum + (partner.totalAmount || 0),
-        0
+        0,
       ),
     };
+  };
+
+  // Расчет разницы для отображения на экране
+  const calculateDifference = () => {
+    const autopilotReading = report.generalData?.autopilotReading || 0;
+    const hoseTotalGas = report.hoseTotalGas || 0;
+    return hoseTotalGas - autopilotReading;
   };
 
   // Функция для печати
@@ -174,19 +204,11 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
 
   // Генерация контента для печати
   const generatePrintContent = (filteredPartnerData, partnerTotals) => {
-    const calculateDifference = () => {
-      const autopilotReading = report.generalData?.autopilotReading || 0;
-      const hoseTotalGas = report.hoseTotalGas || 0;
-      return hoseTotalGas - autopilotReading;
-    };
-
     return `
       <div class="header">
         <h1> ${formatDate(report.reportDate)} санага батафсил ҳисобот</h1>
         <h2>${report.stationName} заправкаси</h2>
-        <p>Ҳисобот яратилган: ${formatDate(
-          report.reportDate
-        )} кун соат ${formatTime(report.createdAt)}</p>
+        <p>Ҳисобот яратилган: ${formatDate(report.reportDate)} кун соат ${formatTime(report.createdAt)}</p>
       </div>
 
       <div class="section">
@@ -210,7 +232,7 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                 <td>${hose.current?.toLocaleString() || "0"}</td>
                 <td>${hose.diff?.toLocaleString() || "0"}</td>
               </tr>
-            `
+            `,
               )
               .join("")}
           </tbody>
@@ -251,7 +273,7 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                 <td>${partner.soldM3?.toLocaleString() || "0"}</td>
                 <td>${partner.totalAmount?.toLocaleString() || "0"}</td>
               </tr>
-            `
+            `,
               )
               .join("")}
           </tbody>
@@ -304,6 +326,12 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                 report.partnerTotalAmount?.toLocaleString() || "0"
               } сўм</strong></span>
             </div>
+             <div class="data-row">
+              <span>Oson:</span>
+              <span><strong>${
+                report.paymentData?.oson?.toLocaleString() || "0"
+              } сўм</strong></span>
+            </div>
           </div>
           <div>
             <div class="data-row">
@@ -352,18 +380,25 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
             report.createdBy || "Неизвестно"
           }</span>
           <span><strong>Ҳисобот яратилган вақт:</strong> ${formatDate(
-            report.reportDate
+            report.reportDate,
           )} в ${formatTime(report.createdAt)}</span>
         </div>
+        ${
+          report.updatedBy
+            ? `
+        <div style="display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+          <span><strong>Ўзгартирди:</strong> ${report.updatedBy}</span>
+          <span><strong>Ўзгартирилган вақт:</strong> ${formatDate(report.updatedAt)} в ${formatTime(report.updatedAt)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+          <span><strong>Компьютер:</strong> ${report.updatedComputerName || "Unknown"}</span>
+          <span><strong>Device ID:</strong> ${report.updatedDeviceId?.substring(0, 15) || "Unknown"}...</span>
+        </div>
+        `
+            : ""
+        }
       </div>
     `;
-  };
-
-  // Расчет разницы для отображения на экране
-  const calculateDifference = () => {
-    const autopilotReading = report.generalData?.autopilotReading || 0;
-    const hoseTotalGas = report.hoseTotalGas || 0;
-    return hoseTotalGas - autopilotReading;
   };
 
   return (
@@ -394,6 +429,18 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                     <p className="text-blue-100 text-lg">
                       {report.stationName} заправкаси
                     </p>
+                    {report.updatedBy && (
+                      <p className="text-blue-200 text-sm mt-2">
+                        📝 Ўзгартирилган: {report.updatedBy} -{" "}
+                        {formatDate(report.updatedAt)}{" "}
+                        {formatTime(report.updatedAt)}
+                      </p>
+                    )}
+                    {report.updatedComputerName && (
+                      <p className="text-blue-200 text-xs mt-1">
+                        💻 Компьютер: {report.updatedComputerName}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={onClose}
@@ -484,85 +531,91 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                   </div>
 
                   {/* Часть партнеров */}
-                  {report.hasPartnerData && (
-                    <div className="bg-white border border-gray-200 rounded-xl">
-                      <div className="bg-gray-50 p-4 border-b">
-                        <h3 className="text-lg font-semibold text-gray-800">
-                          Хамкорлар бўйича ҳисобот:
-                        </h3>
-                      </div>
-                      <div className="p-4">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead className="bg-gray-100">
-                              <tr>
-                                <th className="px-4 py-2 text-left font-semibold text-gray-700 border-b">
-                                  №
-                                </th>
-                                <th className="px-4 py-2 text-left font-semibold text-gray-700 border-b">
-                                  Хамкор номи
-                                </th>
-                                <th className="px-4 py-2 text-left font-semibold text-gray-700 border-b">
-                                  1 м³ нархи (сўм)
-                                </th>
-                                <th className="px-4 py-2 text-left font-semibold text-gray-700 border-b">
-                                  Сотилган газ (м³)
-                                </th>
-                                <th className="px-4 py-2 text-left font-semibold text-gray-700 border-b">
-                                  Жами сотилган суммаси (сўм)
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {report.partnerData?.map((partner, index) => (
-                                <tr
-                                  key={partner.partnerId}
-                                  className="border-b hover:bg-gray-50"
-                                >
-                                  <td className="px-4 py-2">{index + 1}</td>
-                                  <td className="px-4 py-2 font-medium">
-                                    {partner.partnerName}
+                  {report.hasPartnerData &&
+                    report.partnerData &&
+                    report.partnerData.length > 0 && (
+                      <div className="bg-white border border-gray-200 rounded-xl">
+                        <div className="bg-gray-50 p-4 border-b">
+                          <h3 className="text-lg font-semibold text-gray-800">
+                            Хамкорлар бўйича ҳисобот:
+                          </h3>
+                        </div>
+                        <div className="p-4">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead className="bg-gray-100">
+                                <tr>
+                                  <th className="px-4 py-2 text-left font-semibold text-gray-700 border-b">
+                                    №
+                                  </th>
+                                  <th className="px-4 py-2 text-left font-semibold text-gray-700 border-b">
+                                    Хамкор номи
+                                  </th>
+                                  <th className="px-4 py-2 text-left font-semibold text-gray-700 border-b">
+                                    1 м³ нархи (сўм)
+                                  </th>
+                                  <th className="px-4 py-2 text-left font-semibold text-gray-700 border-b">
+                                    Сотилган газ (м³)
+                                  </th>
+                                  <th className="px-4 py-2 text-left font-semibold text-gray-700 border-b">
+                                    Жами сотилган суммаси (сўм)
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {report.partnerData?.map((partner, index) => {
+                                  if ((partner.soldM3 || 0) === 0) return null;
+                                  return (
+                                    <tr
+                                      key={partner.partnerId}
+                                      className="border-b hover:bg-gray-50"
+                                    >
+                                      <td className="px-4 py-2">{index + 1}</td>
+                                      <td className="px-4 py-2 font-medium">
+                                        {partner.partnerName}
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        {partner.pricePerM3?.toLocaleString() ||
+                                          "0"}
+                                      </td>
+                                      <td className="px-4 py-2">
+                                        {partner.soldM3?.toLocaleString() ||
+                                          "0"}
+                                      </td>
+                                      <td className="px-4 py-2 text-blue-600 font-semibold">
+                                        {partner.totalAmount?.toLocaleString() ||
+                                          "0"}{" "}
+                                        сўм
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                              <tfoot className="bg-gray-50">
+                                <tr>
+                                  <td
+                                    colSpan="3"
+                                    className="px-4 py-2 font-semibold text-right"
+                                  >
+                                    Жами:
                                   </td>
-                                  <td className="px-4 py-2">
-                                    {partner.pricePerM3?.toLocaleString() ||
-                                      "0"}
+                                  <td className="px-4 py-2 font-semibold">
+                                    {report.partnerTotalM3?.toLocaleString() ||
+                                      "0"}{" "}
+                                    м³
                                   </td>
-                                  <td className="px-4 py-2">
-                                    {partner.soldM3?.toLocaleString() || "0"}
-                                  </td>
-                                  <td className="px-4 py-2 text-blue-600 font-semibold">
-                                    {partner.totalAmount?.toLocaleString() ||
+                                  <td className="px-4 py-2 font-semibold text-blue-600">
+                                    {report.partnerTotalAmount?.toLocaleString() ||
                                       "0"}{" "}
                                     сўм
                                   </td>
                                 </tr>
-                              ))}
-                            </tbody>
-                            <tfoot className="bg-gray-50">
-                              <tr>
-                                <td
-                                  colSpan="3"
-                                  className="px-4 py-2 font-semibold text-right"
-                                >
-                                  Жами:
-                                </td>
-                                <td className="px-4 py-2 font-semibold">
-                                  {report.partnerTotalM3?.toLocaleString() ||
-                                    "0"}{" "}
-                                  м³
-                                </td>
-                                <td className="px-4 py-2 font-semibold text-blue-600">
-                                  {report.partnerTotalAmount?.toLocaleString() ||
-                                    "0"}{" "}
-                                  сўм
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </table>
+                              </tfoot>
+                            </table>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {/* Общие данные */}
                   <div className="bg-white border border-gray-200 rounded-xl">
@@ -620,6 +673,16 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                             </span>
                             <span className="font-semibold text-blue-600">
                               {report.partnerTotalAmount?.toLocaleString() ||
+                                "0"}{" "}
+                              сўм
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium text-gray-700">
+                              Oson:
+                            </span>
+                            <span className="font-semibold text-purple-600">
+                              {report.paymentData?.oson?.toLocaleString() ||
                                 "0"}{" "}
                               сўм
                             </span>
@@ -712,6 +775,57 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                         </span>
                       </div>
                     </div>
+                    {report.updatedBy && (
+                      <>
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-sm mt-3 pt-3 border-t border-gray-200">
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Ўзгартирди:{" "}
+                            </span>
+                            <span className="text-orange-700 font-medium">
+                              {report.updatedBy}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Ўзгартирилган вақт:{" "}
+                            </span>
+                            <span className="text-gray-900">
+                              {formatDate(report.updatedAt)} в{" "}
+                              {formatTime(report.updatedAt)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs mt-2 pt-2 border-t border-gray-200">
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Компьютер:{" "}
+                            </span>
+                            <span className="text-gray-600">
+                              {report.updatedComputerName || "Unknown"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Device ID:{" "}
+                            </span>
+                            <span className="text-gray-600 font-mono">
+                              {report.updatedDeviceId?.substring(0, 15) ||
+                                "Unknown"}
+                              ...
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              IP адрес:{" "}
+                            </span>
+                            <span className="text-gray-600">
+                              {report.updatedIp || "Unknown"}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -720,7 +834,8 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
               <div className="p-6 border-t bg-gray-50 flex justify-between items-center">
                 <div className="text-sm text-gray-600">
                   Шланглар: {report.hoseData?.length || 0} • Хамкорлар:{" "}
-                  {report.partnerData?.length || 0}
+                  {report.partnerData?.filter((p) => (p.soldM3 || 0) > 0)
+                    .length || 0}
                 </div>
                 <div className="flex gap-3">
                   <button
@@ -729,6 +844,27 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
                   >
                     Ёпиш
                   </button>
+                  {canEdit && (
+                    <button
+                      onClick={() => setShowEditModal(true)}
+                      className="px-5 py-2 rounded-xl bg-orange-600 text-white hover:bg-orange-700 transition-colors flex items-center gap-2"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
+                      </svg>
+                      Таҳрирлаш
+                    </button>
+                  )}
                   <button
                     onClick={handlePrint}
                     className="px-5 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-2"
@@ -754,6 +890,24 @@ const DetailedReportModal = ({ isOpen, onClose, report }) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Модальное окно редактирования */}
+      {showEditModal && (
+        <EditReportModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+          }}
+          report={report}
+          collectionName={collectionName}
+          onSaved={() => {
+            setShowEditModal(false);
+            if (onSaved) {
+              onSaved();
+            }
+          }}
+        />
+      )}
     </>
   );
 };

@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 
 const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
   const [turnoverData, setTurnoverData] = useState([]);
+  const [paymentsData, setPaymentsData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [contractData, setContractData] = useState(null);
 
@@ -125,6 +126,18 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     return `${day}.${month}.${year}`;
   };
 
+  const formatDateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return "—";
+    const date = new Date(dateTimeStr);
+    return date.toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const pad2 = (n) => String(n).padStart(2, "0");
 
   const getLastDayOfMonth = (year, month) => {
@@ -197,6 +210,33 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     return dates;
   };
 
+  // Получение фильтрованных платежей за период
+  const getFilteredPayments = (transactions, startDate, endDate) => {
+    if (!transactions || transactions.length === 0) return [];
+
+    const payments = [];
+    for (const t of transactions) {
+      const paymentSum = toNumber(t.paymentSum);
+      if (paymentSum > 0) {
+        const reportDate = t.reportDate;
+        if (reportDate && reportDate >= startDate && reportDate <= endDate) {
+          payments.push({
+            amount: paymentSum,
+            paymentDate: reportDate,
+            createdAt: t.createdAt,
+            createdBy: t.createdBy || t.paymentCreatedBy || "—",
+            updatedBy: t.paymentUpdatedBy,
+            updatedAt: t.paymentUpdatedAt,
+          });
+        }
+      }
+    }
+
+    // Сортируем по дате платежа
+    payments.sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
+    return payments;
+  };
+
   // Расчет ежедневного оборота
   const calculateDailyTurnover = (
     dateRange,
@@ -243,10 +283,8 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
       let dayStartBalance;
 
       if (i === 0 && startBalanceDate && date === startBalanceDate) {
-        // Если это дата начального сальдо, используем его
         dayStartBalance = toNumber(startBalance);
       } else if (i === 0) {
-        // Для первого дня периода, если это не дата сальдо, нужно рассчитать
         let balance = toNumber(startBalance);
         for (const t of sortedTransactions) {
           const tDate = t.reportDate;
@@ -256,16 +294,12 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
         }
         dayStartBalance = balance;
       } else {
-        // Для остальных дней - это конечное сальдо предыдущего дня
         dayStartBalance = turnover[i - 1].dayEndBalance;
       }
 
-      // Данные за день
       const soldM3 = dayTransactions.soldM3;
       const soldAmount = dayTransactions.totalAmount;
       const paid = dayTransactions.paymentSum;
-
-      // Конечное сальдо дня
       const dayEndBalance = dayStartBalance + soldAmount - paid;
 
       turnover.push({
@@ -283,37 +317,42 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     return turnover;
   };
 
-  // Загрузка оборотных данных
+  // Загрузка оборотных данных и платежей
   useEffect(() => {
     if (!isOpen || !contractData) return;
     if (periodType === "month" && !selectedMonth) return;
     if (periodType === "quarter" && !selectedQuarter) return;
     if (!selectedYear) return;
 
-    const loadTurnover = async () => {
+    const loadData = async () => {
       setLoading(true);
       try {
         const transactions = contractData.transactions || [];
 
-        // Получаем максимальную дату из транзакций
+        // Получаем даты периода
         const maxTransactionDate = getMaxTransactionDate(transactions);
-
-        // Если нет ни одной транзакции, показываем только дату начального сальдо
-        if (!maxTransactionDate && !contractData.startBalanceDate) {
-          setTurnoverData([]);
-          setLoading(false);
-          return;
-        }
-
-        // Получаем диапазон дат, ограниченный максимальной датой транзакций
         const dateRange = getDateRange(maxTransactionDate);
 
         if (dateRange.length === 0) {
           setTurnoverData([]);
+          setPaymentsData([]);
           setLoading(false);
           return;
         }
 
+        // Получаем start и end даты для фильтрации платежей
+        const startDate = dateRange[0];
+        const endDate = dateRange[dateRange.length - 1];
+
+        // Фильтруем платежи за период
+        const filteredPayments = getFilteredPayments(
+          transactions,
+          startDate,
+          endDate,
+        );
+        setPaymentsData(filteredPayments);
+
+        // Рассчитываем оборот
         const startBalance = contractData.startBalance || 0;
         const startBalanceDate = contractData.startBalanceDate;
 
@@ -325,15 +364,16 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
         );
         setTurnoverData(turnover);
       } catch (error) {
-        console.error("Error calculating turnover:", error);
-        toast.error("Оборот маълумотларини ҳисоблашда хатолик");
+        console.error("Error calculating data:", error);
+        toast.error("Маълумотларни ҳисоблашда хатолик");
         setTurnoverData([]);
+        setPaymentsData([]);
       } finally {
         setLoading(false);
       }
     };
 
-    loadTurnover();
+    loadData();
   }, [
     isOpen,
     contractData,
@@ -355,6 +395,11 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
       { totalSoldM3: 0, totalSoldAmount: 0, totalPaid: 0 },
     );
   }, [turnoverData]);
+
+  // Подсчет итогов платежей
+  const paymentsTotal = useMemo(() => {
+    return paymentsData.reduce((sum, payment) => sum + payment.amount, 0);
+  }, [paymentsData]);
 
   // Печать
   const handlePrint = () => {
@@ -402,6 +447,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
             margin-bottom: 10px;
             padding-bottom: 8px;
             border-bottom: 2px solid #2563eb;
+            page-break-after: avoid;
           }
           .header h1 { 
             font-size: 14px; 
@@ -420,6 +466,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
             border-radius: 4px;
             padding: 8px;
             page-break-inside: avoid;
+            page-break-after: avoid;
           }
           .info-title {
             font-size: 11px;
@@ -445,11 +492,35 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
             color: #374151;
             word-break: break-word;
           }
+          .table-container {
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+          }
+          .table-title {
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #2563eb;
+            background-color: #f3f4f6;
+            padding: 6px;
+            border-radius: 4px;
+            page-break-after: avoid;
+          }
           table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 8px;
             font-size: 8px;
+            page-break-inside: auto;
+          }
+          thead {
+            display: table-header-group;
+          }
+          tbody {
+            display: table-row-group;
+          }
+          tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
           }
           th, td {
             border: 1px solid #9ca3af;
@@ -473,11 +544,36 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
             background-color: #f3f4f6;
             font-weight: bold;
           }
+          .payments-table th:first-child,
+          .payments-table td:first-child {
+            text-align: center;
+            width: 30px;
+          }
+          .payments-table th:nth-child(2),
+          .payments-table td:nth-child(2) {
+            text-align: right;
+            width: 100px;
+          }
+          .payments-table th:nth-child(3),
+          .payments-table td:nth-child(3) {
+            text-align: center;
+            width: 70px;
+          }
+          .payments-table th:nth-child(4),
+          .payments-table td:nth-child(4) {
+            text-align: center;
+            width: 100px;
+          }
+          .payments-table th:nth-child(5),
+          .payments-table td:nth-child(5) {
+            text-align: left;
+          }
           .footer {
             margin-top: 15px;
             text-align: center;
             font-size: 8px;
             color: #6b7280;
+            page-break-before: avoid;
           }
           @media print {
             body {
@@ -486,13 +582,18 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
             }
             .info-section {
               break-inside: avoid;
+              page-break-inside: avoid;
             }
-            table {
-              break-inside: auto;
+            .table-container {
+              break-inside: avoid;
+              page-break-inside: avoid;
+            }
+            thead {
+              display: table-header-group;
             }
             tr {
               break-inside: avoid;
-              break-after: auto;
+              page-break-inside: avoid;
             }
           }
         </style>
@@ -523,8 +624,8 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
             </div>
           </div>
           
-          <div class="info-section">
-            <div class="info-title">📊 Кунлик оборот (${getPeriodLabel()})</div>
+          <div class="table-container">
+            <div class="table-title">📊 Кунлик оборот (${getPeriodLabel()})</div>
             <table>
               <thead>
                 <tr>
@@ -566,12 +667,52 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
             </table>
           </div>
           
+          <div class="table-container">
+            <div class="table-title">💳 Тўловлар ҳисоботи (${getPeriodLabel()})</div>
+            <table class="payments-table">
+              <thead>
+                <tr>
+                  <th>№</th>
+                  <th>Сумма (сўм)</th>
+                  <th>Тўлов санаси</th>
+                  <th>Базага киритилган сана</th>
+                  <th>Ким томонидан киритилган</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${paymentsData
+                  .map(
+                    (payment, idx) => `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td>${formatNumber(payment.amount)}</td>
+                    <td>${formatDate(payment.paymentDate)}</td>
+                    <td>${formatDateTime(payment.createdAt)}</td>
+                    <td>${payment.createdBy || "—"}</td>
+                  </tr>
+                `,
+                  )
+                  .join("")}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="1" style="text-align: right;">Жами:</td>
+                  <td style="font-weight: bold;">${formatNumber(paymentsTotal)} сўм</td>
+                  <td colspan="3"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          
           <div class="footer">
             <p>Ҳисобот автоматик тарзда яратилди | ${new Date().toLocaleString()}</p>
           </div>
         </div>
         <script>
-          window.onload = function() { window.print(); setTimeout(() => window.close(), 500); }
+          window.onload = function() { 
+            window.print(); 
+            setTimeout(() => window.close(), 500); 
+          }
         </script>
       </body>
     </html>
@@ -795,7 +936,12 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
               </div>
 
               {/* Таблица оборота */}
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
+                <div className="bg-gray-50 px-4 py-2 border-b">
+                  <h3 className="font-semibold text-gray-800">
+                    📊 Кунлик оборот
+                  </h3>
+                </div>
                 {loading ? (
                   <div className="flex justify-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -881,12 +1027,84 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                   </div>
                 )}
               </div>
+
+              {/* Таблица платежей */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b">
+                  <h3 className="font-semibold text-gray-800">
+                    💳 Тўловлар ҳисоботи
+                  </h3>
+                </div>
+                {loading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : paymentsData.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-center">№</th>
+                          <th className="px-3 py-2 text-right">Сумма (сўм)</th>
+                          <th className="px-3 py-2 text-center">
+                            Тўлов санаси
+                          </th>
+                          <th className="px-3 py-2 text-center">
+                            Базага киритилган сана
+                          </th>
+                          <th className="px-3 py-2 text-left">
+                            Ким томонидан киритилган
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paymentsData.map((payment, idx) => (
+                          <tr key={idx} className="border-t hover:bg-gray-50">
+                            <td className="px-3 py-2 text-center">{idx + 1}</td>
+                            <td className="px-3 py-2 text-right text-green-600 font-semibold">
+                              {formatNumber(payment.amount)} сўм
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {formatDate(payment.paymentDate)}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {formatDateTime(payment.createdAt)}
+                            </td>
+                            <td className="px-3 py-2 text-left">
+                              {payment.createdBy}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-gray-50 font-semibold">
+                        <tr>
+                          <td colSpan="1" className="px-3 py-2 text-right">
+                            Жами:
+                          </td>
+                          <td className="px-3 py-2 text-right text-green-600">
+                            {formatNumber(paymentsTotal)} сўм
+                          </td>
+                          <td colSpan="3" className="px-3 py-2"></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    {!contractData
+                      ? "Маълумотлар юкланмоқда..."
+                      : "Тўловлар топилмади"}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Кнопки */}
             <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
               <div className="text-sm text-gray-500">
                 {turnoverData.length > 0 && `${turnoverData.length} кун`}
+                {paymentsData.length > 0 &&
+                  ` | ${paymentsData.length} та тўлов`}
               </div>
               <div className="flex gap-3">
                 <button
