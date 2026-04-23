@@ -23,14 +23,14 @@ import { useAppStore } from "../lib/zustand";
 // Функция для определения номера квартала по дате
 const getQuarterFromDate = (dateString) => {
   const date = new Date(dateString);
-  const month = date.getMonth() + 1; // Январь = 1
+  const month = date.getMonth() + 1;
 
   if (month >= 1 && month <= 3) return "I";
   if (month >= 4 && month <= 6) return "II";
   if (month >= 7 && month <= 9) return "III";
   if (month >= 10 && month <= 12) return "IV";
 
-  return "I"; // fallback
+  return "I";
 };
 
 // Функция для получения имени коллекции по кварталу и году
@@ -38,7 +38,6 @@ const getCollectionNameByDate = (reportDate) => {
   const date = new Date(reportDate);
   const year = date.getFullYear();
   const quarter = getQuarterFromDate(reportDate);
-
   return `unifiedDailyReports_${quarter}_${year}`;
 };
 
@@ -46,7 +45,7 @@ const getCollectionNameByDate = (reportDate) => {
 const checkExistingReportInQuarterCollection = async (
   db,
   stationId,
-  reportDate
+  reportDate,
 ) => {
   try {
     const collectionName = getCollectionNameByDate(reportDate);
@@ -55,19 +54,18 @@ const checkExistingReportInQuarterCollection = async (
     const reportQuery = query(
       collectionRef,
       where("stationId", "==", stationId),
-      where("reportDate", "==", reportDate)
+      where("reportDate", "==", reportDate),
     );
 
     const snapshot = await getDocs(reportQuery);
     return !snapshot.empty;
   } catch (error) {
-    // Если коллекция не существует, значит отчета точно нет
     if (error.code === "not-found") {
       return false;
     }
     console.error(
       "Error checking existing report in quarter collection:",
-      error
+      error,
     );
     return false;
   }
@@ -77,7 +75,6 @@ const checkExistingReportInQuarterCollection = async (
 const saveReportToQuarterCollection = async (db, reportData) => {
   const collectionName = getCollectionNameByDate(reportData.reportDate);
   const collectionRef = collection(db, collectionName);
-
   return await addDoc(collectionRef, reportData);
 };
 
@@ -88,25 +85,18 @@ const getLastReportFromAllQuarterCollections = async (db, stationId) => {
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth() + 1;
 
-    // Определяем текущий квартал
     let currentQuarter;
     if (currentMonth >= 1 && currentMonth <= 3) currentQuarter = "I";
     else if (currentMonth >= 4 && currentMonth <= 6) currentQuarter = "II";
     else if (currentMonth >= 7 && currentMonth <= 9) currentQuarter = "III";
     else currentQuarter = "IV";
 
-    // console.log("🔍 Поиск последнего отчета для станции:", stationId);
-    // console.log("📅 Текущий период:", currentQuarter, "квартал", currentYear);
-
-    // Создаем массив всех возможных коллекций для поиска
     const collectionsToSearch = [];
 
-    // Добавляем текущий и предыдущие кварталы (достаточно 8 кварталов назад)
     for (let i = 0; i < 8; i++) {
       let quarter = currentQuarter;
       let year = currentYear;
 
-      // Отматываем на i кварталов назад
       for (let j = 0; j < i; j++) {
         if (quarter === "I") {
           quarter = "IV";
@@ -116,7 +106,6 @@ const getLastReportFromAllQuarterCollections = async (db, stationId) => {
         } else if (quarter === "III") {
           quarter = "II";
         } else {
-          // quarter === 'IV'
           quarter = "III";
         }
       }
@@ -127,37 +116,23 @@ const getLastReportFromAllQuarterCollections = async (db, stationId) => {
       }
     }
 
-    // console.log("📋 Коллекции для поиска:", collectionsToSearch);
-
     let latestReport = null;
     let latestReportDate = null;
 
-    // Ищем отчеты во всех коллекциях
     for (const collectionName of collectionsToSearch) {
       try {
-        // console.log(`🔎 Поиск в коллекции: ${collectionName}`);
-
         const collectionRef = collection(db, collectionName);
-
-        // Ищем ВСЕ отчеты для этой станции (без orderBy чтобы избежать ошибки индекса)
         const reportQuery = query(
           collectionRef,
-          where("stationId", "==", stationId)
+          where("stationId", "==", stationId),
         );
-
         const snapshot = await getDocs(reportQuery);
 
         if (!snapshot.empty) {
-          // console.log(
-          //   `✅ Найдено ${snapshot.docs.length} отчетов в ${collectionName}`
-          // );
-
-          // Вручную ищем самый последний отчет по дате
           snapshot.docs.forEach((doc) => {
             const reportData = doc.data();
             const reportDate = reportData.reportDate;
 
-            // Если это первый найденный отчет или дата позже чем у current latest
             if (!latestReportDate || reportDate > latestReportDate) {
               latestReportDate = reportDate;
               latestReport = {
@@ -167,43 +142,20 @@ const getLastReportFromAllQuarterCollections = async (db, stationId) => {
               };
             }
           });
-        } else {
-          // console.log(
-          //   `📭 В коллекции ${collectionName} нет отчетов для станции ${stationId}`
-          // );
         }
       } catch (error) {
-        // console.log(
-        //   // `⚠️ Ошибка при доступе к ${collectionName}:`,
-        //   error.code || error.message
-        // );
-
-        // Если коллекция не существует, просто пропускаем
         if (
           error.code === "not-found" ||
           error.code === "failed-precondition"
         ) {
-          // console.log(
-          //   `📭 Коллекция ${collectionName} не существует или нет индекса`
-          // );
+          // Пропускаем
         }
       }
     }
 
-    if (latestReport) {
-      // console.log("🎯 Найден последний отчет:", {
-      //   reportDate: latestReport.reportDate,
-      //   collection: latestReport.collectionName,
-      //   hoseData: latestReport.hoseData?.length || 0,
-      //   stationName: latestReport.stationName,
-      // });
-    } else {
-      // console.log("📭 Отчеты не найдены ни в одной коллекции");
-    }
-
     return latestReport;
   } catch (error) {
-    console.error("❌ Критическая ошибка при поиске отчетов:", error);
+    console.error("Ошибка при поиске отчетов:", error);
     return null;
   }
 };
@@ -212,7 +164,7 @@ const getLastReportFromAllQuarterCollections = async (db, stationId) => {
 const deleteReportFromQuarterCollection = async (
   db,
   collectionName,
-  reportId
+  reportId,
 ) => {
   try {
     const reportRef = doc(db, collectionName, reportId);
@@ -224,7 +176,7 @@ const deleteReportFromQuarterCollection = async (
   }
 };
 
-// Новый компонент модального окна для установки цены
+// ОБНОВЛЕННЫЙ компонент модального окна для установки цены
 const PriceSetupModal = ({
   isOpen,
   onClose,
@@ -237,44 +189,53 @@ const PriceSetupModal = ({
   const [priceDate, setPriceDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [existingPriceToday, setExistingPriceToday] = useState(false);
+  const [existingPriceForDate, setExistingPriceForDate] = useState(false);
 
   // Инициализация при открытии
   useEffect(() => {
     if (isOpen && partnerData) {
-      // Устанавливаем цену из данных партнера
       setPrice(partnerData.currentPrice || "");
 
-      // Устанавливаем сегодняшнюю дату по умолчанию
-      const today = new Date().toISOString().split("T")[0];
-      setPriceDate(today);
+      // Устанавливаем дату по умолчанию: следующий день после последнего отчета
+      let defaultDate;
+      if (previousReportDate) {
+        const nextDay = new Date(previousReportDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        defaultDate = nextDay.toISOString().split("T")[0];
+      } else {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        defaultDate = yesterday.toISOString().split("T")[0];
+      }
+
+      setPriceDate(defaultDate);
       setError("");
-      setExistingPriceToday(false);
+      setExistingPriceForDate(false);
 
-      // Проверяем, есть ли уже цена на сегодня
-      checkExistingPriceForToday(partnerData.partnerId);
+      // Проверяем, есть ли уже цена на выбранную дату
+      checkExistingPriceForDate(partnerData.partnerId, defaultDate);
     }
-  }, [isOpen, partnerData]);
+  }, [isOpen, partnerData, previousReportDate]);
 
-  // Функция для проверки существующей цены на сегодня
-  const checkExistingPriceForToday = async (partnerId) => {
+  // Функция для проверки существующей цены на конкретную дату
+  const checkExistingPriceForDate = async (partnerId, date) => {
     try {
       const contractRef = doc(db, "contracts", partnerId);
       const contractDoc = await getDoc(contractRef);
 
       if (contractDoc.exists()) {
         const contractData = contractDoc.data();
-        const today = new Date().toISOString().split("T")[0];
 
         if (contractData.prices && Array.isArray(contractData.prices)) {
-          // Проверяем, есть ли цена на сегодня
-          const priceToday = contractData.prices.find(
-            (price) => price.priceDate === today
+          const priceForDate = contractData.prices.find(
+            (price) => price.priceDate === date,
           );
 
-          if (priceToday) {
-            setExistingPriceToday(true);
-            toast.error("Бугун учун нарх аллакачон ўрнатилган");
+          if (priceForDate) {
+            setExistingPriceForDate(true);
+            toast.error(`${date} сана учун нарх аллакачон ўрнатилган`);
+          } else {
+            setExistingPriceForDate(false);
           }
         }
       }
@@ -294,7 +255,6 @@ const PriceSetupModal = ({
       return stringValue.slice(0, -1);
     }
 
-    // Ограничиваем 2 знаками после запятой
     const parts = stringValue.split(".");
     if (parts.length > 1 && parts[1].length > 2) {
       return parts[0] + "." + parts[1].substring(0, 2);
@@ -303,22 +263,16 @@ const PriceSetupModal = ({
     return stringValue;
   };
 
-  // Валидация даты - цена устанавливается только на сегодня или будущие даты
+  // ОБНОВЛЕННАЯ валидация даты - теперь можно на любую дату, если нет отчета
   const validateDate = (date) => {
     if (!date) return "Санани киритинг";
-
-    const today = new Date().toISOString().split("T")[0];
-
-    // Цена устанавливается только на сегодня или будущие даты
-    if (date < today) {
-      return "Нарх фақат бугунги ёки келажаги саналар учун ўрнатилиши мумкин";
-    }
 
     // Проверяем, чтобы дата не была раньше предыдущего отчета
     if (previousReportDate && date <= previousReportDate) {
       return `Сана ${previousReportDate} дан кейинги булиши керак`;
     }
 
+    // Убираем проверку на сегодняшнюю дату
     return "";
   };
 
@@ -326,10 +280,14 @@ const PriceSetupModal = ({
     setPrice(formatNumberInput(value));
   };
 
-  const handleDateChange = (date) => {
+  const handleDateChange = async (date) => {
     setPriceDate(date);
     const errorMsg = validateDate(date);
     setError(errorMsg);
+
+    if (!errorMsg && partnerData) {
+      await checkExistingPriceForDate(partnerData.partnerId, date);
+    }
   };
 
   const handleSave = async () => {
@@ -350,11 +308,8 @@ const PriceSetupModal = ({
       return;
     }
 
-    if (
-      existingPriceToday &&
-      priceDate === new Date().toISOString().split("T")[0]
-    ) {
-      toast.error("Бугун учун нарх аллакачон ўрнатилган");
+    if (existingPriceForDate) {
+      toast.error(`${priceDate} сана учун нарх аллакачон ўрнатилган`);
       return;
     }
 
@@ -390,7 +345,6 @@ const PriceSetupModal = ({
             exit={{ scale: 0.9 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Заголовок */}
             <div className="p-6 border-b bg-gradient-to-r from-purple-600 to-purple-700 text-white flex-shrink-0">
               <div className="flex justify-between items-center">
                 <div>
@@ -404,10 +358,8 @@ const PriceSetupModal = ({
               </div>
             </div>
 
-            {/* Содержимое с прокруткой */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="space-y-6">
-                {/* Информация о партнере */}
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                   <div className="grid grid-cols-1 gap-3 text-sm">
                     <div>
@@ -436,16 +388,13 @@ const PriceSetupModal = ({
                       <span className="text-gray-600">Жорий нарх:</span>
                       <div className="font-semibold mt-1 text-lg">
                         {partnerData.currentPrice
-                          ? `${parseFloat(
-                              partnerData.currentPrice
-                            ).toLocaleString("ru-RU")} сўм`
+                          ? `${parseFloat(partnerData.currentPrice).toLocaleString("ru-RU")} сўм`
                           : "Ўрнатилмаган"}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Поле для цены */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     1 м³ нархи (сўм) *
@@ -457,18 +406,11 @@ const PriceSetupModal = ({
                     onChange={(e) => handlePriceChange(e.target.value)}
                     className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 no-spinner text-lg text-right font-semibold"
                     placeholder="Например: 5200"
-                    disabled={loading || existingPriceToday}
+                    disabled={loading}
                     autoFocus
                   />
-                  {existingPriceToday && (
-                    <p className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded">
-                      ⚠️ Бугун учун нарх аллакачон ўрнатилган. Фақат келажаги
-                      саналар учун нарх ўрнатиш мумкин.
-                    </p>
-                  )}
                 </div>
 
-                {/* Поле для даты */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Нархни ўрнатиш санаси *
@@ -477,7 +419,6 @@ const PriceSetupModal = ({
                     type="date"
                     value={priceDate}
                     onChange={(e) => handleDateChange(e.target.value)}
-                    min={new Date().toISOString().split("T")[0]} // Минимум сегодня
                     className={`w-full px-3 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
                       error
                         ? "border-red-500 ring-2 ring-red-200"
@@ -495,47 +436,29 @@ const PriceSetupModal = ({
                       Охирги ҳисобот санаси: {previousReportDate}
                     </p>
                   )}
-                  <p className="mt-1 text-sm text-blue-600">
-                    Минимал сана: {new Date().toISOString().split("T")[0]}
-                  </p>
                 </div>
 
-                {/* Подсказки */}
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <div className="flex items-start">
-                    <div className="mr-3 text-yellow-600">
-                      <svg
-                        className="w-5 h-5"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
+                    <div className="mr-3 text-yellow-600">⚠️</div>
                     <div>
                       <p className="text-sm font-medium text-yellow-800 mb-1">
                         Эслатма:
                       </p>
                       <ul className="text-xs text-yellow-700 space-y-1">
-                        <li>• Нарх фақат 1 марта ўрнатилади</li>
-                        <li>• Нарх ўрнатилган санадан бошлаб қўлланилади</li>
+                        <li>• Нарх ҳар қандай санага ўрнатилиши мумкин</li>
                         <li>
-                          • Бугун учун нарх ўрнатилган бўлса, фақат келажаги
-                          саналар учун ўрнатиш мумкин
+                          • Нарх фақат ҳисобот яратилмаган саналар учун
+                          ўзгартирилиши мумкин
                         </li>
                         <li>
-                          • Нархни ўзгартириш учун аввалги нархни ўчириш керак
+                          • Ҳар бир сана учун фақат 1 марта нарх ўрнатилади
                         </li>
                       </ul>
                     </div>
                   </div>
                 </div>
 
-                {/* Информация о последних ценах */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <h4 className="text-sm font-semibold text-blue-800 mb-2">
                     Охирги нархлар:
@@ -558,7 +481,7 @@ const PriceSetupModal = ({
                           </div>
                           <div className="font-bold text-blue-700">
                             {parseFloat(priceItem.pricePerM3).toLocaleString(
-                              "ru-RU"
+                              "ru-RU",
                             )}{" "}
                             сўм
                           </div>
@@ -574,7 +497,6 @@ const PriceSetupModal = ({
               </div>
             </div>
 
-            {/* Кнопки */}
             <div className="p-6 border-t bg-gray-50 flex justify-end gap-3 flex-shrink-0">
               <button
                 onClick={onClose}
@@ -585,9 +507,9 @@ const PriceSetupModal = ({
               </button>
               <button
                 onClick={handleSave}
-                disabled={loading || existingPriceToday}
+                disabled={loading || existingPriceForDate}
                 className={`px-5 py-2 rounded-xl font-semibold ${
-                  existingPriceToday
+                  existingPriceForDate
                     ? "bg-gray-400 text-gray-700 cursor-not-allowed"
                     : "bg-purple-600 text-white hover:bg-purple-700"
                 } disabled:opacity-50`}
@@ -602,7 +524,7 @@ const PriceSetupModal = ({
   );
 };
 
-// Компонент для полей ввода платежных систем с оптимизацией
+// Компонент для полей ввода платежных систем
 const PaymentInputField = React.memo(
   ({ method, value, onChange, disabled, required }) => {
     const inputRef = useRef(null);
@@ -613,7 +535,6 @@ const PaymentInputField = React.memo(
     };
 
     const handleFocus = (e) => {
-      // Выделяем весь текст при фокусе для удобства
       e.target.select();
     };
 
@@ -639,9 +560,6 @@ const PaymentInputField = React.memo(
               <div className="mt-1 text-xs">
                 Статус: {method.isActive === 1 ? "Актив" : "Неактив"}
               </div>
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                <div className="w-2 h-2 bg-gray-800 rotate-45"></div>
-              </div>
             </div>
           </div>
           {disabled && (
@@ -662,15 +580,12 @@ const PaymentInputField = React.memo(
             disabled
               ? "bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed"
               : required && (!value || value.trim() === "")
-              ? "border-red-300 bg-red-50 focus:bg-white"
-              : "border-gray-300 hover:border-blue-400"
+                ? "border-red-300 bg-red-50 focus:bg-white"
+                : "border-gray-300 hover:border-blue-400"
           }`}
           placeholder="0"
           required={required}
         />
-        {required && (!value || value.trim() === "") && (
-          <div className="mt-1 text-xs text-red-600"></div>
-        )}
         {disabled && (
           <div className="mt-1 text-xs text-gray-500">
             Автоматически установлено в 0 (неактивный метод)
@@ -678,7 +593,7 @@ const PaymentInputField = React.memo(
         )}
       </div>
     );
-  }
+  },
 );
 
 PaymentInputField.displayName = "PaymentInputField";
@@ -691,14 +606,10 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   const [savedReportCollection, setSavedReportCollection] = useState("");
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-
-  // Состояние для модального окна установки цены
   const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
   const [selectedPartnerData, setSelectedPartnerData] = useState(null);
   const [previousReportDateForPartner, setPreviousReportDateForPartner] =
     useState("");
-
-  // Данные для всех отчетов
   const [partnerData, setPartnerData] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [hoseRows, setHoseRows] = useState([]);
@@ -708,14 +619,11 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     autopilotReading: "",
     gasPrice: "",
   });
-
-  // Новое состояние для платежных систем
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentValues, setPaymentValues] = useState({});
 
   const userData = useAppStore((state) => state.userData);
 
-  // Получаем количество шлангов
   const hosesCount = React.useMemo(() => {
     const d = Array.isArray(station?.dispensers)
       ? station.dispensers.length
@@ -723,59 +631,37 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     return d * 2;
   }, [station?.dispensers]);
 
-  // Создаем имена шлангов
   const hoseNames = React.useMemo(() => {
     return Array.from({ length: hosesCount }, (_, i) => `Шланг-${i + 1}`);
   }, [hosesCount]);
 
-  // Оптимизация: только активные методы платежа
   const activePaymentMethods = React.useMemo(() => {
     return paymentMethods.filter((method) => method.isActive === 1);
   }, [paymentMethods]);
 
-  // Функция для добавления дней к дате
   const addDays = useCallback((dateString, days) => {
     const date = new Date(dateString);
     date.setDate(date.getDate() + days);
     return date.toISOString().split("T")[0];
   }, []);
 
-  // Функция для загрузки платежных систем (упрощенная версия)
   const loadPaymentMethods = useCallback(async () => {
     try {
-      // Упрощенный запрос без сложных условий для избежания ошибок индекса
       const paymentMethodsCollection = collection(db, "paymentMethods");
       const snapshot = await getDocs(paymentMethodsCollection);
-
-      let methods = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      // Фильтруем и сортируем на клиенте
-      // Сначала активные, потом неактивные
+      let methods = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       methods.sort((a, b) => {
-        // Сначала по активности (активные выше)
-        if (a.isActive !== b.isActive) {
-          return b.isActive - a.isActive;
-        }
-        // Затем по имени
+        if (a.isActive !== b.isActive) return b.isActive - a.isActive;
         return (a.name || "").localeCompare(b.name || "");
       });
-
-      // Создаем начальные значения для каждого метода платежа
       const initialValues = {};
       methods.forEach((method) => {
-        // Если метод неактивен, сразу устанавливаем 0
         initialValues[method.dbFieldName] = method.isActive === 1 ? "" : "0";
       });
-
       setPaymentMethods(methods);
       setPaymentValues(initialValues);
-
       return methods;
     } catch (error) {
-      // Fallback: фиксированный список платежных систем для тестирования
       const fallbackMethods = [
         {
           id: "humo_terminal_fallback",
@@ -783,8 +669,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           name: "Хумо терминал",
           description: "Терминал платёжной системы Хумо",
           isActive: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
         },
         {
           id: "uzcard_terminal_fallback",
@@ -792,8 +676,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           name: "Узкард терминал",
           description: "Терминал платёжной системы Узкард",
           isActive: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
         },
         {
           id: "electronic_payment_system_fallback",
@@ -801,8 +683,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           name: "Электрон тўлов тизими",
           description: "Электронные платежи через мобильные приложения",
           isActive: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
         },
         {
           id: "zhisobot_fallback",
@@ -810,170 +690,109 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           name: "Z-ҳисобот",
           description: "Наличные деньги (Z-отчет)",
           isActive: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
         },
       ];
-
       const initialValues = {};
       fallbackMethods.forEach((method) => {
         initialValues[method.dbFieldName] = method.isActive === 1 ? "" : "0";
       });
-
       setPaymentMethods(fallbackMethods);
       setPaymentValues(initialValues);
-
       return fallbackMethods;
     }
   }, []);
 
-  // Функция для получения данных об обнулениях счетчиков
   const getMeterResetData = useCallback(async (stationId, reportDate) => {
-    if (!stationId || !reportDate) {
-      return [];
-    }
-
+    if (!stationId || !reportDate) return [];
     try {
-      // Конвертируем дату отчета из YYYY-MM-DD в DD-MM-YYYY для поиска
       const [year, month, day] = reportDate.split("-");
       const resetDateFormatted = `${day}-${month}-${year}`;
-
-      // Ищем события обнуления для этой станции на дату отчета
       const resetQuery = query(
         collection(db, "meterResetEvents"),
         where("stationId", "==", stationId),
-        where("resetDate", "==", resetDateFormatted)
+        where("resetDate", "==", resetDateFormatted),
       );
-
       const snapshot = await getDocs(resetQuery);
-      const resetEvents = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      return resetEvents;
+      return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     } catch (error) {
       return [];
     }
   }, []);
 
-  // Улучшенная функция для ввода чисел с минусом
   const formatNumberInput = useCallback((value) => {
     if (value === "" || value === null || value === undefined) return "";
-
     const stringValue = String(value);
-
-    // Разрешаем: цифры, запятая, точка, минус в начале
     const validChars = /^-?[\d,.]*$/;
-
-    if (!validChars.test(stringValue)) {
-      return stringValue.slice(0, -1);
-    }
-
-    // Убираем лишние минусы
-    if (stringValue.includes("-") && stringValue.indexOf("-") > 0) {
+    if (!validChars.test(stringValue)) return stringValue.slice(0, -1);
+    if (stringValue.includes("-") && stringValue.indexOf("-") > 0)
       return stringValue.replace(/-/g, "");
-    }
-
-    // Ограничиваем 2 знаками после запятой
     const parts = stringValue.split(".");
-    if (parts.length > 1 && parts[1].length > 2) {
+    if (parts.length > 1 && parts[1].length > 2)
       return parts[0] + "." + parts[1].substring(0, 2);
-    }
-
     return stringValue;
   }, []);
 
-  // Функция для отображения отформатированного числа
   const formatNumberForDisplay = useCallback((value) => {
     try {
       if (value === "" || value === null || value === undefined) return "";
       if (value === "-") return "-";
-
       const stringValue = String(value);
       const hasMinus = stringValue.startsWith("-");
       const numberString = hasMinus ? stringValue.substring(1) : stringValue;
-
       if (numberString === "" || numberString === "0")
         return hasMinus ? "-0" : "0";
-
-      // Заменяем запятую на точку для корректного парсинга
       const cleanNumberString = numberString.replace(",", ".");
       const number = parseFloat(cleanNumberString);
-
       if (isNaN(number)) return stringValue;
-
       const formatted = number.toLocaleString("ru-RU", {
         maximumFractionDigits: 2,
         minimumFractionDigits: 0,
       });
-
       return hasMinus ? `-${formatted}` : formatted;
     } catch (error) {
       return String(value);
     }
   }, []);
 
-  // Улучшенная функция для парсинга форматированного числа
   const parseFormattedNumber = useCallback((value) => {
     if (!value || value === "-" || value.trim() === "") return 0;
-
     try {
       const stringValue = String(value);
       const hasMinus = stringValue.startsWith("-");
-
-      // Удаляем все пробелы и заменяем запятые на точки
       const cleaned = stringValue.replace(/\s/g, "").replace(/,/g, ".");
-
       const numberString = hasMinus ? cleaned.substring(1) : cleaned;
       const number = parseFloat(numberString) || 0;
-
       return hasMinus ? -number : number;
     } catch (error) {
-      console.error("Error parsing number:", value, error);
       return 0;
     }
   }, []);
 
-  // Проверка существующего отчета в квартальной коллекции
   const checkExistingReport = useCallback(async () => {
     if (!station?.id || !reportDate) return false;
-
     try {
       const exists = await checkExistingReportInQuarterCollection(
         db,
         station.id,
-        reportDate
+        reportDate,
       );
-
-      if (exists) {
-        toast.error("Бу санага ҳисобот мавжуд");
-        return true;
-      }
-
-      return false;
+      if (exists) toast.error("Бу санага ҳисобот мавжуд");
+      return exists;
     } catch (error) {
       console.error("Error checking existing report:", error);
       return false;
     }
   }, [station?.id, reportDate]);
 
-  // Функция для получения даты последнего отчета партнера из квартальных коллекций
   const getLatestPartnerReportDate = async (partnerId) => {
     try {
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear();
       const currentQuarter = getQuarterFromDate(
-        currentDate.toISOString().split("T")[0]
+        currentDate.toISOString().split("T")[0],
       );
-
-      const quartersToSearch = [];
+      const quartersToSearch = [currentQuarter];
       const yearsToSearch = [currentYear];
-
-      // Текущий квартал
-      quartersToSearch.push(currentQuarter);
-
-      // Предыдущий квартал
       if (currentQuarter === "I") {
         quartersToSearch.push("IV");
         yearsToSearch.push(currentYear - 1);
@@ -984,13 +803,10 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       } else {
         quartersToSearch.push("III");
       }
-
       let latestReportDate = null;
-
       for (const year of yearsToSearch) {
         for (const quarter of quartersToSearch) {
           const collectionName = `unifiedDailyReports_${quarter}_${year}`;
-
           try {
             const collectionRef = collection(db, collectionName);
             const reportQuery = query(
@@ -1001,20 +817,16 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                 value: partnerId,
               }),
               orderBy("reportDate", "desc"),
-              limit(1)
+              limit(1),
             );
-
             const snapshot = await getDocs(reportQuery);
             if (!snapshot.empty) {
               const report = snapshot.docs[0];
               const reportDate = report.data().reportDate;
-
-              if (!latestReportDate || reportDate > latestReportDate) {
+              if (!latestReportDate || reportDate > latestReportDate)
                 latestReportDate = reportDate;
-              }
             }
           } catch (error) {
-            // Если коллекция не существует, продолжаем
             if (
               error.code !== "not-found" &&
               error.code !== "failed-precondition"
@@ -1024,7 +836,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           }
         }
       }
-
       return latestReportDate;
     } catch (error) {
       console.error("Error getting partner report date:", error);
@@ -1032,137 +843,96 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     }
   };
 
-  // Функция для загрузки и применения данных обнулений
-  // Функция для загрузки и применения данных обнулений
   const loadAndApplyResetData = useCallback(
     async (stationId, reportDate, hasPreviousReport, lastReport) => {
-      if (!stationId || !reportDate) {
-        return [];
-      }
-
-      // console.log("🔄 Загрузка данных обнулений для даты:", reportDate);
-
+      if (!stationId || !reportDate) return [];
       const resetEvents = await getMeterResetData(stationId, reportDate);
-
       if (resetEvents.length > 0) {
-        // console.log("🔄 Найдены обнуления:", resetEvents.length);
-
-        // Обновляем данные шлангов с учетом обнулений
         setHoseRows((prevRows) =>
           prevRows.map((row) => {
-            // Находим обнуления для этого конкретного шланга
             const hoseResetEvents = resetEvents.filter(
-              (event) => event.hose === row.hose
+              (event) => event.hose === row.hose,
             );
-
             if (hoseResetEvents.length > 0) {
               const latestReset = hoseResetEvents[0];
-              // console.log(`🔄 Обнуление для ${row.hose}:`, latestReset);
-
               return {
                 ...row,
                 prev: latestReset.newReadingAfterReset,
                 hasReset: true,
                 resetInfo: latestReset,
-                prevDisabled: true, // При обнулении поле должно быть заблокировано
+                prevDisabled: true,
               };
             } else {
-              // Если обнулений нет, проверяем есть ли данные из предыдущего отчета
               if (hasPreviousReport && lastReport && lastReport.hoseData) {
                 const lastHose = lastReport.hoseData.find(
-                  (h) => h.hose === row.hose
+                  (h) => h.hose === row.hose,
                 );
-                if (lastHose) {
+                if (lastHose)
                   return {
                     ...row,
                     prev: lastHose.current || 0,
                     hasReset: false,
                     resetInfo: null,
-                    prevDisabled: true, // Данные из отчета - поле заблокировано
+                    prevDisabled: true,
                   };
-                }
               }
-              // Если нет ни обнулений, ни данных из отчета, поле должно быть доступно
               return {
                 ...row,
                 hasReset: false,
                 resetInfo: null,
-                prevDisabled: false, // Нет данных - поле доступно для ручного ввода
+                prevDisabled: false,
               };
             }
-          })
+          }),
         );
       } else {
-        // console.log("📭 Обнулений не найдено");
-
-        // Если нет обнулений, но есть предыдущий отчет - используем данные из отчета
         if (hasPreviousReport && lastReport && lastReport.hoseData) {
-          // console.log("🔄 Используем данные из предыдущего отчета");
           setHoseRows((prevRows) =>
             prevRows.map((row) => {
               const lastHose = lastReport.hoseData.find(
-                (h) => h.hose === row.hose
+                (h) => h.hose === row.hose,
               );
-              if (lastHose) {
+              if (lastHose)
                 return {
                   ...row,
                   prev: lastHose.current || 0,
-                  prevDisabled: true, // Данные из отчета - поле заблокировано
+                  prevDisabled: true,
                 };
-              }
               return row;
-            })
+            }),
           );
         }
       }
-
       return resetEvents;
     },
-    [getMeterResetData]
+    [getMeterResetData],
   );
 
-  // Функция для получения последней цены партнера из массива prices
   const getLatestPartnerPrice = async (partnerId) => {
     try {
       const contractRef = doc(db, "contracts", partnerId);
       const contractDoc = await getDoc(contractRef);
-
-      if (!contractDoc.exists()) {
-        return 0;
-      }
-
+      if (!contractDoc.exists()) return 0;
       const contractData = contractDoc.data();
-
-      // Проверяем наличие массива prices
       if (contractData.prices && Array.isArray(contractData.prices)) {
-        // Сортируем по дате (от новых к старым)
         const sortedPrices = [...contractData.prices].sort((a, b) => {
           const dateA = a.priceDate ? new Date(a.priceDate) : new Date(0);
           const dateB = b.priceDate ? new Date(b.priceDate) : new Date(0);
           return dateB - dateA;
         });
-
-        if (sortedPrices.length > 0) {
-          // Берем самую последнюю цену
-          return sortedPrices[0].pricePerM3 || 0;
-        }
+        if (sortedPrices.length > 0) return sortedPrices[0].pricePerM3 || 0;
       }
-
-      // Если нет массива prices, проверяем transactions как fallback
       if (contractData.transactions && contractData.transactions.length > 0) {
         const sortedTransactions = [...contractData.transactions].sort(
           (a, b) => {
             const dateA = a.reportDate ? new Date(a.reportDate) : new Date(0);
             const dateB = b.reportDate ? new Date(b.reportDate) : new Date(0);
             return dateB - dateA;
-          }
+          },
         );
-
-        if (sortedTransactions.length > 0) {
+        if (sortedTransactions.length > 0)
           return sortedTransactions[0].pricePerM3 || 0;
-        }
       }
-
       return 0;
     } catch (error) {
       console.error("Error getting partner price:", error);
@@ -1170,32 +940,21 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     }
   };
 
-  // Функция для получения истории цен партнера
   const getPartnerPriceHistory = async (partnerId) => {
     try {
       const contractRef = doc(db, "contracts", partnerId);
       const contractDoc = await getDoc(contractRef);
-
-      if (!contractDoc.exists()) {
-        return [];
-      }
-
+      if (!contractDoc.exists()) return [];
       const contractData = contractDoc.data();
-
-      // Проверяем наличие массива prices
       if (contractData.prices && Array.isArray(contractData.prices)) {
-        // Сортируем по дате (от новых к старым) и берем последние 5
-        const sortedPrices = [...contractData.prices]
+        return [...contractData.prices]
           .sort((a, b) => {
             const dateA = a.priceDate ? new Date(a.priceDate) : new Date(0);
             const dateB = b.priceDate ? new Date(b.priceDate) : new Date(0);
             return dateB - dateA;
           })
           .slice(0, 5);
-
-        return sortedPrices;
       }
-
       return [];
     } catch (error) {
       console.error("Error getting price history:", error);
@@ -1203,29 +962,20 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     }
   };
 
-  // Функция для сохранения новой цены партнера
   const savePartnerPrice = async (partnerId, price, priceDate) => {
     try {
       const contractRef = doc(db, "contracts", partnerId);
       const contractDoc = await getDoc(contractRef);
-
-      if (!contractDoc.exists()) {
-        throw new Error("Contract not found");
-      }
-
+      if (!contractDoc.exists()) throw new Error("Contract not found");
       const contractData = contractDoc.data();
       const currentPrices = contractData.prices || [];
-
-      // Проверяем, есть ли уже цена на эту дату
       const existingPriceForDate = currentPrices.find(
-        (p) => p.priceDate === priceDate
+        (p) => p.priceDate === priceDate,
       );
       if (existingPriceForDate) {
         toast.error("Ушбу сана учун нарх аллакачон мавжуд");
         return;
       }
-
-      // Создаем новую запись о цене
       const newPriceEntry = {
         pricePerM3: price,
         priceDate: priceDate,
@@ -1234,32 +984,20 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         stationId: station.id,
         stationName: station.stationName,
       };
-
-      // Добавляем новую цену в массив
       const updatedPrices = [...currentPrices, newPriceEntry];
-
-      // Сортируем по дате
       updatedPrices.sort(
-        (a, b) => new Date(b.priceDate) - new Date(a.priceDate)
+        (a, b) => new Date(b.priceDate) - new Date(a.priceDate),
       );
-
-      // Обновляем документ
       await updateDoc(contractRef, {
         prices: updatedPrices,
         lastUpdated: serverTimestamp(),
       });
-
-      // Обновляем локальное состояние
       setPartnerData((prev) =>
         prev.map((partner) => {
-          if (partner.partnerId === partnerId) {
-            return {
-              ...partner,
-              pricePerM3: price,
-            };
-          }
+          if (partner.partnerId === partnerId)
+            return { ...partner, pricePerM3: price };
           return partner;
-        })
+        }),
       );
     } catch (error) {
       console.error("Error saving price:", error);
@@ -1267,92 +1005,43 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     }
   };
 
-  // Оптимизированный обработчик изменения значений платежных систем
   const handlePaymentValueChange = useCallback(
     (dbFieldName, value) => {
       const formattedValue = formatNumberInput(value);
-
       setPaymentValues((prev) => {
-        // Оптимизация: только обновляем если значение изменилось
-        if (prev[dbFieldName] === formattedValue) {
-          return prev;
-        }
-        return {
-          ...prev,
-          [dbFieldName]: formattedValue,
-        };
+        if (prev[dbFieldName] === formattedValue) return prev;
+        return { ...prev, [dbFieldName]: formattedValue };
       });
     },
-    [formatNumberInput]
+    [formatNumberInput],
   );
 
-  // Обработчик изменения общих данных
   const handleGeneralInputChange = useCallback(
     (field, value) => {
       const formattedValue = formatNumberInput(value);
-
       setGeneralData((prev) => {
-        if (prev[field] === formattedValue) {
-          return prev;
-        }
-        return {
-          ...prev,
-          [field]: formattedValue,
-        };
+        if (prev[field] === formattedValue) return prev;
+        return { ...prev, [field]: formattedValue };
       });
     },
-    [formatNumberInput]
+    [formatNumberInput],
   );
 
-  // Полная функция initializeData
   const initializeData = async () => {
     if (!isOpen || !station?.id) return;
-
     try {
       setLoading(true);
-      // console.log(
-      //   "🔄 Начинаем инициализацию данных для станции:",
-      //   station.id,
-      //   station.stationName
-      // );
-
-      // Загружаем платежные системы
       await loadPaymentMethods();
-      // console.log("✅ Платежные системы загружены");
-
-      // Загружаем последний объединенный отчет из всех квартальных коллекций
       const lastReport = await getLastReportFromAllQuarterCollections(
         db,
-        station.id
+        station.id,
       );
       const hasPreviousReport = lastReport !== null;
-
-      // console.log("📊 Результат поиска:", {
-      //   found: hasPreviousReport,
-      //   reportDate: lastReport?.reportDate,
-      //   collection: lastReport?.collectionName,
-      //   hoseCount: lastReport?.hoseData?.length || 0,
-      // });
-
       let nextDate = "";
       if (hasPreviousReport) {
-        // Используем дату из найденного отчета
         nextDate = addDays(lastReport.reportDate, 1);
         setReportDate(nextDate);
         setDateDisabled(true);
-
-        // console.log("📅 Установлена следующая дата:", nextDate);
-        // console.log("📝 Данные из предыдущего отчета:", {
-        //   date: lastReport.reportDate,
-        //   autopilot: lastReport.generalData?.autopilotReading,
-        //   gasPrice: lastReport.generalData?.gasPrice,
-        //   hoseData: lastReport.hoseData?.map((h) => ({
-        //     hose: h.hose,
-        //     current: h.current,
-        //   })),
-        // });
-
-        // Загружаем значения платежей из последнего отчета
         if (lastReport.paymentData) {
           const newPaymentValues = {};
           paymentMethods.forEach((method) => {
@@ -1362,53 +1051,31 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
             }
           });
           setPaymentValues((prev) => ({ ...prev, ...newPaymentValues }));
-          // console.log("✅ Данные платежей загружены");
         }
       } else {
-        // Если нет предыдущего отчета, устанавливаем сегодняшнюю дату
         const today = new Date().toISOString().split("T")[0];
         setReportDate(today);
         setDateDisabled(false);
-        // console.log(
-        //   "📅 Нет предыдущего отчета, установлена сегодняшняя дата:",
-        //   today
-        // );
       }
-
-      // Загружаем договоры
-      // console.log("📄 Загружаем договоры...");
       const contractsQuery = query(
         collection(db, "contracts"),
-        where("stationId", "==", station.id)
+        where("stationId", "==", station.id),
       );
-
       const contractsSnapshot = await getDocs(contractsQuery);
       const contractsData = contractsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-
-      // СОРТИРОВКА контрактов по autoId
       const sortedContracts = [...contractsData].sort((a, b) => {
         const autoIdA = a.autoId || 0;
         const autoIdB = b.autoId || 0;
-
-        if (autoIdA !== autoIdB) {
-          return autoIdA - autoIdB;
-        }
-
+        if (autoIdA !== autoIdB) return autoIdA - autoIdB;
         return (a.partner || "").localeCompare(b.partner || "");
       });
-
       setContracts(sortedContracts);
-      // console.log(`✅ Загружено ${sortedContracts.length} договоров`);
-
-      // Инициализируем данные партнеров
-      // console.log("👥 Инициализируем данные партнеров...");
       const initializedPartnerData = await Promise.all(
         sortedContracts.map(async (contract) => {
           const latestPrice = await getLatestPartnerPrice(contract.id);
-
           return {
             partnerId: contract.id,
             partnerName: contract.partner,
@@ -1418,56 +1085,38 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
             totalAmount: 0,
             autoId: contract.autoId || 0,
           };
-        })
+        }),
       );
-
       setPartnerData(initializedPartnerData);
-      // console.log("✅ Данные партнеров инициализированы");
-
-      // Инициализируем базовые данные шлангов
-      // console.log("🔧 Инициализируем данные шлангов...");
-      const initializedHoseRows = hoseNames.map((name, index) => {
+      const initializedHoseRows = hoseNames.map((name) => {
         let prev = 0;
         let price = 0;
         let prevDisabled = false;
-
         if (hasPreviousReport && lastReport.hoseData) {
-          // Ищем данные для этого шланга в предыдущем отчете
           const lastHose = lastReport.hoseData.find((h) => h.hose === name);
-
           if (lastHose) {
             prev = lastHose.current || 0;
             price = lastHose.price || 0;
             prevDisabled = true;
-            // console.log(
-            //   `✅ Шланг ${name}: prev=${prev}, price=${price} (автоматически)`
-            // );
           } else {
-            // console.log(`⚠️ Шланг ${name}: данных нет в отчете (ручной ввод)`);
             prevDisabled = false;
           }
         } else {
-          console.log(`📝 Шланг ${name}: нет предыдущего отчета (ручной ввод)`);
           prevDisabled = false;
         }
-
         return {
           hose: name,
-          prev: prev,
+          prev,
           current: "",
-          price: price,
+          price,
           diff: 0,
           sum: 0,
-          prevDisabled: prevDisabled,
+          prevDisabled,
           hasReset: false,
           resetInfo: null,
         };
       });
-
       setHoseRows(initializedHoseRows);
-      console.log("✅ Данные шлангов инициализированы");
-
-      // Инициализируем общие данные
       if (hasPreviousReport) {
         setGeneralData((prev) => ({
           ...prev,
@@ -1478,32 +1127,21 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
             ? lastReport.generalData.gasPrice.toString()
             : "",
         }));
-        console.log("✅ Общие данные загружены из отчета");
-      } else {
-        console.log("📝 Общие данные: устанавливаем пустые значения");
       }
-
-      // Загружаем обнуления если есть дата
       if (nextDate) {
-        // console.log("🔄 Загружаем данные об обнулениях для даты:", nextDate);
         await loadAndApplyResetData(
           station.id,
           nextDate,
           hasPreviousReport,
-          lastReport
+          lastReport,
         );
       }
-
-      console.log("✅ Инициализация данных завершена");
-
-      // Показываем пользователю информацию
       if (hasPreviousReport) {
         toast.success(`${lastReport.reportDate} кунги хисобот юкланди`);
       } else {
         toast.info("Базада олдинги хисобот топилмади. Узингиз тулдиринг.");
       }
     } catch (error) {
-      // console.error("❌ Ошибка инициализации данных:", error);
       toast.error("Маълумотлар юкланишида хатолик");
     } finally {
       setLoading(false);
@@ -1511,80 +1149,52 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
   };
 
   useEffect(() => {
-    if (isOpen) {
-      initializeData();
-    }
+    if (isOpen) initializeData();
   }, [isOpen, station?.id, hoseNames]);
 
-  // Загружаем платежные системы при открытии модального окна
   useEffect(() => {
-    if (isOpen) {
-      loadPaymentMethods();
-    }
+    if (isOpen) loadPaymentMethods();
   }, [isOpen]);
 
-  // Перезагрузка данных об обнулениях при изменении даты отчета
   useEffect(() => {
     if (isOpen && station?.id && reportDate) {
       const reloadResetData = async () => {
         try {
           await loadAndApplyResetData(station.id, reportDate, true, null);
-        } catch (error) {
-          // Ошибка перезагрузки данных обнулений
-        }
+        } catch (error) {}
       };
-
       reloadResetData();
     }
   }, [reportDate, isOpen, station?.id]);
 
-  // ========== ФУНКЦИИ ДЛЯ ОТЧЕТА ПО ПАРТНЕРАМ ==========
-
-  // Обработчик двойного клика по полю цены партнера
   const handlePartnerPriceDoubleClick = (partner) => {
     handlePriceSetup(partner);
   };
 
-  // Обработчик изменения проданных м³
   const handlePartnerSoldM3Change = (partnerId, soldM3) => {
     if (soldM3 === "") {
       setPartnerData((prev) =>
         prev.map((partner) => {
-          if (partner.partnerId === partnerId) {
-            const totalAmount = 0;
-
-            return {
-              ...partner,
-              soldM3: "",
-              totalAmount: totalAmount,
-            };
-          }
+          if (partner.partnerId === partnerId)
+            return { ...partner, soldM3: "", totalAmount: 0 };
           return partner;
-        })
+        }),
       );
       return;
     }
-
     const formattedValue = formatNumberInput(soldM3);
     const numericValue = parseFormattedNumber(formattedValue);
-
     setPartnerData((prev) =>
       prev.map((partner) => {
         if (partner.partnerId === partnerId) {
           const totalAmount = numericValue * partner.pricePerM3;
-
-          return {
-            ...partner,
-            soldM3: formattedValue,
-            totalAmount: totalAmount,
-          };
+          return { ...partner, soldM3: formattedValue, totalAmount };
         }
         return partner;
-      })
+      }),
     );
   };
 
-  // Подсчет итогов для партнеров
   const partnerTotals = partnerData.reduce(
     (acc, partner) => {
       const soldM3Value =
@@ -1593,231 +1203,116 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
       acc.totalAmount += partner.totalAmount;
       return acc;
     },
-    { totalM3: 0, totalAmount: 0 }
+    { totalM3: 0, totalAmount: 0 },
   );
 
-  // Проверка, есть ли данные для сохранения у партнеров
-  const hasPartnerData = () => {
-    return partnerData.some((partner) => {
-      if (partner.soldM3 === "") return false;
-      const numericValue = parseFormattedNumber(partner.soldM3);
-      return numericValue > 0;
-    });
-  };
-
-  // ========== ФУНКЦИИ ДЛЯ ОТЧЕТА ПО ШЛАНГАМ ==========
-
-  // Расчет разницы и суммы для шланга с учетом обнулений
   const calculateHoseRowDiff = useCallback(
     (row) => {
       const prev = Number(row.prev) || 0;
       const current =
         row.current === "" ? 0 : parseFormattedNumber(row.current);
       const price = Number(row.price) || 0;
-
       let diff = 0;
-
       if (row.hasReset && row.resetInfo) {
-        // Если есть обнуление, используем специальную формулу:
-        // diff = (lastReadingBeforeReset - lastReadingFromReport) + (current - newReadingAfterReset)
         const lastReadingBeforeReset = row.resetInfo.lastReadingBeforeReset;
         const lastReadingFromReport = row.resetInfo.lastReadingFromReport;
         const newReadingAfterReset = row.resetInfo.newReadingAfterReset;
-
-        // Расчет по вашей формуле:
         diff =
           lastReadingBeforeReset -
           lastReadingFromReport +
           (current - newReadingAfterReset);
       } else {
-        // Базовая разница без обнулений
-        if (current >= prev) {
-          diff = current - prev;
-        } else {
-          // Если текущее меньше предыдущего, но нет обнуления - это ошибка
-          diff = 0;
-        }
+        if (current >= prev) diff = current - prev;
+        else diff = 0;
       }
-
       const sum = diff * price;
-
       return {
         ...row,
-        diff: Math.max(0, isNaN(diff) ? 0 : diff), // Не допускаем отрицательные значения
+        diff: Math.max(0, isNaN(diff) ? 0 : diff),
         sum: Math.max(0, isNaN(sum) ? 0 : sum),
       };
     },
-    [parseFormattedNumber]
+    [parseFormattedNumber],
   );
 
-  // Обработчик изменения текущего показания шланга
   const handleHoseCurrentChange = (index, value) => {
     const formattedValue = formatNumberInput(value);
-
     setHoseRows((prev) => {
       const newRows = [...prev];
-      const updatedRow = {
-        ...newRows[index],
-        current: formattedValue,
-      };
-
+      const updatedRow = { ...newRows[index], current: formattedValue };
       const rowWithDiff = calculateHoseRowDiff(updatedRow);
       newRows[index] = rowWithDiff;
-
       const totals = newRows.reduce(
-        (acc, row) => {
-          const diff = Number(row.diff) || 0;
-          const sum = Number(row.sum) || 0;
-          return {
-            totalGas: acc.totalGas + (diff > 0 ? diff : 0),
-            totalSum: acc.totalSum + sum,
-          };
-        },
-        { totalGas: 0, totalSum: 0 }
+        (acc, row) => ({
+          totalGas:
+            acc.totalGas + (Number(row.diff) > 0 ? Number(row.diff) : 0),
+          totalSum: acc.totalSum + Number(row.sum),
+        }),
+        { totalGas: 0, totalSum: 0 },
       );
-
       setHoseTotal(totals.totalGas);
       setHoseTotalSum(totals.totalSum);
-
       return newRows;
     });
   };
 
-  // Обработчик изменения цены шланга
-  const handleHosePriceChange = (index, value) => {
-    const formattedValue = formatNumberInput(value);
-    const numericValue = parseFormattedNumber(formattedValue);
-
-    setHoseRows((prev) => {
-      const newRows = [...prev];
-      const updatedRow = {
-        ...newRows[index],
-        price: numericValue,
-      };
-
-      const rowWithDiff = calculateHoseRowDiff(updatedRow);
-      newRows[index] = rowWithDiff;
-
-      const totals = newRows.reduce(
-        (acc, row) => {
-          const diff = Number(row.diff) || 0;
-          const sum = Number(row.sum) || 0;
-          return {
-            totalGas: acc.totalGas + (diff > 0 ? diff : 0),
-            totalSum: acc.totalSum + sum,
-          };
-        },
-        { totalGas: 0, totalSum: 0 }
-      );
-
-      setHoseTotal(totals.totalGas);
-      setHoseTotalSum(totals.totalSum);
-
-      return newRows;
-    });
-  };
-
-  // Валидация отчета по шлангам (СТРОГАЯ)
   const isHoseReportValid = () => {
-    // Проверяем, что все шланги имеют заполненные текущие показания
     const allCurrentFilled = hoseRows.every(
       (row) =>
         row.current !== "" &&
         row.current !== null &&
         row.current !== undefined &&
-        !isNaN(parseFormattedNumber(row.current))
+        !isNaN(parseFormattedNumber(row.current)),
     );
-
-    if (!allCurrentFilled) {
-      return false;
-    }
-
-    // Проверяем, что текущее показание >= предыдущего (если нет обнуления)
+    if (!allCurrentFilled) return false;
     const hasInvalidCurrent = hoseRows.some((row) => {
       const current = parseFormattedNumber(row.current);
       const prev = Number(row.prev);
       return current < prev && !row.hasReset;
     });
-
-    if (hasInvalidCurrent) {
-      return false;
-    }
-
+    if (hasInvalidCurrent) return false;
     return true;
   };
 
-  // ========== ФУНКЦИИ ДЛЯ ОБЩЕГО ОТЧЕТА ==========
-
-  // Расчет наличных с динамическими платежными системами
   const calculateCashAmount = () => {
     const gasPrice = parseFormattedNumber(generalData.gasPrice);
     let totalPaymentMethods = 0;
-
-    // Суммируем все активные платежные системы кроме "zhisobot"
     paymentMethods.forEach((method) => {
       if (method.dbFieldName !== "zhisobot" && method.isActive === 1) {
         const value = parseFormattedNumber(
-          paymentValues[method.dbFieldName] || 0
+          paymentValues[method.dbFieldName] || 0,
         );
         totalPaymentMethods += value;
       }
     });
-
     const cashAmount =
       (hoseTotal - partnerTotals.totalM3) * gasPrice - totalPaymentMethods;
-
     return cashAmount > 0 ? cashAmount : 0;
   };
 
-  // Валидация платежных систем (СТРОГАЯ, но исключая Z-отчет)
   const arePaymentMethodsValid = useCallback(() => {
     return activePaymentMethods.every((method) => {
-      // Z-отчет рассчитывается автоматически, не проверяем его заполнение
-      if (method.dbFieldName === "zhisobot") {
-        return true;
-      }
-
+      if (method.dbFieldName === "zhisobot") return true;
       const value = paymentValues[method.dbFieldName];
-
-      // Проверяем, что поле заполнено
-      if (value === "" || value === null || value === undefined) {
-        return false;
-      }
-
+      if (value === "" || value === null || value === undefined) return false;
       const numericValue = parseFormattedNumber(value);
-      const isValid = !isNaN(numericValue) && numericValue >= 0;
-
-      return isValid;
+      return !isNaN(numericValue) && numericValue >= 0;
     });
   }, [activePaymentMethods, paymentValues, parseFormattedNumber]);
 
-  // Валидация общего отчета (СТРОГАЯ)
   const isGeneralReportValid = useCallback(() => {
-    // Проверяем обязательные поля
     const autopilotValid =
       generalData.autopilotReading &&
       generalData.autopilotReading.trim() !== "" &&
       !isNaN(parseFormattedNumber(generalData.autopilotReading));
-
-    if (!autopilotValid) {
-      return false;
-    }
-
+    if (!autopilotValid) return false;
     const gasPriceValid =
       generalData.gasPrice &&
       generalData.gasPrice.trim() !== "" &&
       !isNaN(parseFormattedNumber(generalData.gasPrice));
-
-    if (!gasPriceValid) {
-      return false;
-    }
-
+    if (!gasPriceValid) return false;
     const paymentMethodsValid = arePaymentMethodsValid();
-
-    if (!paymentMethodsValid) {
-      return false;
-    }
-
+    if (!paymentMethodsValid) return false;
     return true;
   }, [
     generalData.autopilotReading,
@@ -1826,60 +1321,32 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     parseFormattedNumber,
   ]);
 
-  // Валидация партнеров (СТРОГАЯ)
   const arePartnersValid = useCallback(() => {
-    // Если нет партнеров, считаем валидным
-    if (partnerData.length === 0) {
-      return true;
-    }
-
+    if (partnerData.length === 0) return true;
     return partnerData.every((partner) => {
-      // Проверяем, что у партнера есть цена (если он указан в списке)
       if (
         partner.pricePerM3 === 0 ||
         partner.pricePerM3 === null ||
         partner.pricePerM3 === undefined
-      ) {
+      )
         return false;
-      }
-
-      // Проверяем, что поле продаж заполнено
       if (
         partner.soldM3 === "" ||
         partner.soldM3 === null ||
         partner.soldM3 === undefined
-      ) {
+      )
         return false;
-      }
-
       const soldM3Value = parseFormattedNumber(partner.soldM3);
-      const isValid = !isNaN(soldM3Value) && soldM3Value >= 0;
-
-      return isValid;
+      return !isNaN(soldM3Value) && soldM3Value >= 0;
     });
   }, [partnerData, parseFormattedNumber]);
 
-  // Общая валидация всего отчета (СТРОГАЯ ВЕРСИЯ)
   const isReportValid = useCallback(() => {
-    // 1. Проверка шлангов
-    if (!isHoseReportValid()) {
-      return false;
-    }
-
-    // 2. Проверка партнеров
-    if (!arePartnersValid()) {
-      return false;
-    }
-
-    // 3. Проверка общего отчета
-    if (!isGeneralReportValid()) {
-      return false;
-    }
-
+    if (!isHoseReportValid()) return false;
+    if (!arePartnersValid()) return false;
+    if (!isGeneralReportValid()) return false;
     return true;
   }, [isHoseReportValid, arePartnersValid, isGeneralReportValid]);
-
-  // ========== ФУНКЦИИ СОХРАНЕНИЯ ==========
 
   const getClientIP = async () => {
     try {
@@ -1891,182 +1358,85 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     }
   };
 
-  // Функция для сохранения данных партнеров в коллекцию contracts
   const savePartnerDataToContracts = async (partnerDataToSave) => {
     try {
       const savePromises = partnerDataToSave.map(async (partner) => {
         const contractRef = doc(db, "contracts", partner.partnerId);
-
-        // Сначала получаем текущий документ контракта
         const contractDoc = await getDoc(contractRef);
         const currentContract = contractDoc.data();
-
         const partnerTransactionData = {
           reportDate: reportDate,
           soldM3: partner.soldM3,
           pricePerM3: partner.pricePerM3,
           totalAmount: partner.totalAmount,
-          paymentSum: 0, // Добавляем поле для оплаты
+          paymentSum: 0,
           stationId: station.id,
           stationName: station.stationName,
           createdAt: new Date().toISOString(),
           createdBy: auth?.currentUser?.email || "unknown",
         };
-
-        // Получаем текущие транзакции или создаем пустой массив
         const currentTransactions = currentContract.transactions || [];
-
-        // Добавляем новую транзакцию
         const updatedTransactions = [
           ...currentTransactions,
           partnerTransactionData,
         ];
-
         await updateDoc(contractRef, {
           transactions: updatedTransactions,
           lastUpdated: serverTimestamp(),
         });
       });
-
       await Promise.all(savePromises);
     } catch (error) {
       throw error;
     }
   };
 
-  // Функция для отладки валидации
-  const checkValidationStatus = () => {
-    // console.log("=== ПОДРОБНАЯ ПРОВЕРКА ВАЛИДАЦИИ ===");
-    // console.log("1. Отчет по шлангам валиден:", isHoseReportValid());
-    // console.log("2. Партнеры валидны:", arePartnersValid());
-    // console.log("3. Общий отчет валиден:", isGeneralReportValid());
-    // console.log("4. Всего отчет валиден:", isReportValid());
-
-    // console.log("--- ШЛАНГИ ---");
-    hoseRows.forEach((row, idx) => {
-      // console.log(
-      //   `${idx + 1}. ${row.hose}:`,
-      //   `Текущий: "${row.current}"`,
-      //   `Заполнено: ${row.current !== ""}`,
-      //   `Валидно: ${!isNaN(parseFormattedNumber(row.current))}`
-      // );
-    });
-
-    // console.log("--- ПАРТНЕРЫ ---");
-    partnerData.forEach((partner, idx) => {
-      // console.log(
-      //   `${idx + 1}. ${partner.partnerName}:`,
-      //   `Цена: ${partner.pricePerM3}`,
-      //   `SoldM3: "${partner.soldM3}"`,
-      //   `Цена установлена: ${partner.pricePerM3 !== 0}`,
-      //   `Продажи заполнены: ${partner.soldM3 !== ""}`
-      // );
-    });
-
-    // console.log("--- ОБЩИЕ ДАННЫЕ ---");
-    // console.log(
-    //   "autopilotReading:",
-    //   generalData.autopilotReading,
-    //   "- заполнено:",
-    //   !!generalData.autopilotReading &&
-    //     generalData.autopilotReading.trim() !== ""
-    // );
-    // console.log(
-    //   "gasPrice:",
-    //   generalData.gasPrice,
-    //   "- заполнено:",
-    //   !!generalData.gasPrice && generalData.gasPrice.trim() !== ""
-    // );
-
-    // console.log("--- ПЛАТЕЖНЫЕ СИСТЕМЫ ---");
-    activePaymentMethods.forEach((method) => {
-      const value = paymentValues[method.dbFieldName];
-      // Для Z-отчета показываем особую информацию
-      if (method.dbFieldName === "zhisobot") {
-        const cashAmount = calculateCashAmount();
-        // console.log(
-        //   `${method.name}:`,
-        //   `(автоматически)`,
-        //   `Расчетное значение: ${formatNumberForDisplay(cashAmount)} сўм`
-        // );
-      } else {
-        // console.log(
-        //   `${method.name}:`,
-        //   `Значение: "${value}"`,
-        //   `Заполнено: ${value !== "" && value !== null && value !== undefined}`
-        // );
-      }
-    });
-  };
-
-  // Функция для открытия модального окна подтверждения
   const handleSaveClick = () => {
     if (!isReportValid()) {
       toast.error("Барча мажбурий майдонларни тўлдиринг");
       return;
     }
-
     setIsConfirmModalOpen(true);
   };
 
-  // Сохранение объединенного отчета в квартальную коллекцию
-  // Сохранение объединенного отчета в квартальную коллекцию
   const saveUnifiedReport = async () => {
     try {
       setLoading(true);
-
-      // Проверяем существующие отчеты перед сохранением
       const hasExistingReport = await checkExistingReport();
       if (hasExistingReport) {
         setIsConfirmModalOpen(false);
         setLoading(false);
         return;
       }
-
-      // Конвертируем дату отчета для поиска обнулений
       const [year, month, day] = reportDate.split("-");
       const resetDateFormatted = `${day}-${month}-${year}`;
-
-      // Загружаем актуальные данные об обнулениях
       const resetQuery = query(
         collection(db, "meterResetEvents"),
         where("stationId", "==", station.id),
-        where("resetDate", "==", resetDateFormatted)
+        where("resetDate", "==", resetDateFormatted),
       );
-
       const resetSnapshot = await getDocs(resetQuery);
       const resetEvents = resetSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-
       const ip = await getClientIP();
       const userEmail = auth?.currentUser?.email || "unknown";
-
       const cashAmount = calculateCashAmount();
-
-      // Подготавливаем данные шлангов с учетом обнулений
       const hoseData = hoseRows.map((row) => {
         let finalDiff = Number(row.diff) || 0;
         let resetCalculation = null;
-
-        // Проверяем, есть ли обнуления для этого шланга на дату отчета
         const hoseResetEvents = resetEvents.filter(
-          (event) => event.hose === row.hose
+          (event) => event.hose === row.hose,
         );
-
         if (hoseResetEvents.length > 0) {
           const latestReset = hoseResetEvents[0];
-
-          // Применяем формулу коррекции для финального diff
           const calculatedDiff =
             latestReset.lastReadingBeforeReset -
             latestReset.lastReadingFromReport +
             (parseFormattedNumber(row.current) -
               latestReset.newReadingAfterReset);
-
           finalDiff = Math.max(0, calculatedDiff);
-
           resetCalculation = {
             lastReadingBeforeReset: latestReset.lastReadingBeforeReset,
             lastReadingFromReport: latestReset.lastReadingFromReport,
@@ -2075,7 +1445,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
             finalDiff: finalDiff,
           };
         }
-
         return {
           hose: row.hose,
           prev: Number(row.prev) || 0,
@@ -2088,65 +1457,41 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           resetNote: hoseResetEvents.length > 0 ? "Кўрсаткич нўлланган" : null,
         };
       });
-
-      // Подготавливаем данные партнеров (все партнеры должны быть заполнены)
       const partnerDataToSave = partnerData.map((partner) => ({
         ...partner,
         soldM3: parseFormattedNumber(partner.soldM3),
-        paymentSum: 0, // Добавляем поле для оплаты
-        autoId: partner.autoId, // Сохраняем autoId для сохранения порядка
+        paymentSum: 0,
+        autoId: partner.autoId,
       }));
-
-      // Сохраняем данные партнеров в коллекцию contracts
-      if (partnerDataToSave.length > 0) {
+      if (partnerDataToSave.length > 0)
         await savePartnerDataToContracts(partnerDataToSave);
-      }
-
-      // Подготавливаем данные платежных систем
       const paymentData = {};
       paymentMethods.forEach((method) => {
         let value = 0;
-
-        if (method.isActive === 1) {
+        if (method.isActive === 1)
           value = parseFormattedNumber(paymentValues[method.dbFieldName] || 0);
-        }
-
         paymentData[method.dbFieldName] = value;
       });
-
-      // Добавляем Z-отчет в данные платежей (рассчитанное значение)
       paymentData.zhisobot = cashAmount;
-
-      // Определяем имя коллекции для сохранения
       const collectionName = getCollectionNameByDate(reportDate);
       const quarter = getQuarterFromDate(reportDate);
-      const reportYear = new Date(reportDate).getFullYear(); // Изменили переменную с year на reportYear
-
-      // Создаем объединенный отчет
+      const reportYear = new Date(reportDate).getFullYear();
       const reportData = {
         reportDate,
         stationId: station.id,
         stationName: station.stationName || "Неизвестная станция",
-
-        // Данные партнеров (уже отсортированы по autoId)
         partnerData: partnerDataToSave,
         partnerTotalM3: partnerTotals.totalM3,
         partnerTotalAmount: partnerTotals.totalAmount,
         partnerTotalPaymentSum: 0,
         hasPartnerData: partnerData.length > 0,
-
-        // Данные шлангов
         hoseData: hoseData,
         hoseTotalGas: hoseTotal,
         hoseTotalSum: hoseTotalSum,
-
-        // Общие данные
         generalData: {
           autopilotReading: parseFormattedNumber(generalData.autopilotReading),
           gasPrice: parseFormattedNumber(generalData.gasPrice),
         },
-
-        // Динамические данные платежей
         paymentData: paymentData,
         paymentMethods: paymentMethods.map((method) => ({
           id: method.id,
@@ -2155,32 +1500,19 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
           description: method.description,
           isActive: method.isActive,
         })),
-
-        // Метаданные
         createdBy: userEmail,
         createdAt: serverTimestamp(),
         createdIp: ip,
         status: "completed",
         hasMeterResets: resetEvents.length > 0,
         meterResetEventsCount: resetEvents.length,
-
-        // Информация о квартале для удобства
         quarter: quarter,
-        year: reportYear, // Используем reportYear вместо year
+        year: reportYear,
         collectionName: collectionName,
       };
-
-      // Сохраняем отчет в соответствующую квартальную коллекцию
       const docRef = await saveReportToQuarterCollection(db, reportData);
-
-      // Сохраняем информацию о сохраненном отчете (для возможности удаления при отмене)
       setSavedReportId(docRef.id);
       setSavedReportCollection(collectionName);
-
-      // console.log(`✅ Отчет сохранен в коллекцию: ${collectionName}`);
-      // console.log(`📅 Квартал: ${quarter} квартал ${reportYear} года`); // Используем reportYear
-
-      // Закрываем модальное окно подтверждения и открываем окно успеха
       setIsConfirmModalOpen(false);
       setIsSuccessModalOpen(true);
     } catch (error) {
@@ -2191,52 +1523,35 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     }
   };
 
-  // Завершение работы с отчетом
   const handleFinish = () => {
     setIsSuccessModalOpen(false);
-    // Сбрасываем состояние и закрываем модальное окно
     setPartnerData([]);
     setHoseRows([]);
-    setGeneralData({
-      autopilotReading: "",
-      gasPrice: "",
-    });
+    setGeneralData({ autopilotReading: "", gasPrice: "" });
     setPaymentValues({});
     setSavedReportId(null);
     setSavedReportCollection("");
     setSelectedPartnerData(null);
     setPreviousReportDateForPartner("");
-
-    // Вызываем callback для обновления списка отчетов
-    if (onSaved) {
-      onSaved();
-    }
-
+    if (onSaved) onSaved();
     onClose();
   };
 
-  // Сброс формы при отмене
   const handleClose = async () => {
-    // Если отчет был сохранен (но пользователь нажал "Бекор" после сохранения), удаляем его
     if (savedReportId && savedReportCollection) {
       try {
         await deleteReportFromQuarterCollection(
           db,
           savedReportCollection,
-          savedReportId
+          savedReportId,
         );
-        // console.log(`🗑️ Отчет удален из коллекции: ${savedReportCollection}`);
       } catch (error) {
         console.error("Error deleting report:", error);
       }
     }
-
     setPartnerData([]);
     setHoseRows([]);
-    setGeneralData({
-      autopilotReading: "",
-      gasPrice: "",
-    });
+    setGeneralData({ autopilotReading: "", gasPrice: "" });
     setPaymentValues({});
     setSavedReportId(null);
     setSavedReportCollection("");
@@ -2248,25 +1563,16 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
     onClose();
   };
 
-  // Обработчик открытия модального окна для установки цены
   const handlePriceSetup = async (partner) => {
     try {
       setLoading(true);
-
       const latestReportDate = await getLatestPartnerReportDate(
-        partner.partnerId
+        partner.partnerId,
       );
       setPreviousReportDateForPartner(latestReportDate || "");
-
       const currentPrice = await getLatestPartnerPrice(partner.partnerId);
       const priceHistory = await getPartnerPriceHistory(partner.partnerId);
-
-      const partnerFullData = {
-        ...partner,
-        currentPrice: currentPrice,
-        priceHistory: priceHistory,
-      };
-
+      const partnerFullData = { ...partner, currentPrice, priceHistory };
       setSelectedPartnerData(partnerFullData);
       setIsPriceModalOpen(true);
     } catch (error) {
@@ -2297,7 +1603,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
               exit={{ scale: 0.9 }}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Заголовок */}
               <div className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white">
                 <div className="flex justify-between items-center">
                   <div>
@@ -2313,7 +1618,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
               </div>
 
               <div className="flex-1 overflow-auto p-6">
-                {/* Общее поле даты */}
                 <div className="mb-6 bg-blue-50 p-4 rounded-lg">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Ҳисобот санаси *
@@ -2328,20 +1632,15 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                   />
                   {reportDate && (
                     <div className="mt-2 text-sm text-blue-700">
-                      {/* Коллекция:{" "} */}
-                      {/* <span className="font-semibold">
-                        {getCollectionNameByDate(reportDate)}
-                      </span> */}
                       <div className="text-xs text-gray-600 mt-1">
                         {new Date(reportDate).getFullYear()} йил{" "}
-                        {getQuarterFromDate(reportDate)} квартал{" "}
+                        {getQuarterFromDate(reportDate)} квартал
                       </div>
                     </div>
                   )}
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  {/* Правая колонка: Отчет по шлангам */}
                   <div className="space-y-6">
                     <div className="bg-white border border-gray-200 rounded-xl">
                       <div className="p-4 border-b bg-gray-50">
@@ -2374,20 +1673,17 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                             <tbody className="bg-white divide-y divide-gray-200">
                               {hoseRows.map((row, index) => {
                                 const currentNum = parseFormattedNumber(
-                                  row.current
+                                  row.current,
                                 );
                                 const prevNum = Number(row.prev);
                                 const isInvalid =
                                   row.current !== "" &&
                                   currentNum < prevNum &&
                                   !row.hasReset;
-
                                 return (
                                   <tr
                                     key={row.hose}
-                                    className={`hover:bg-gray-50 transition-colors ${
-                                      row.hasReset ? "bg-yellow-50" : ""
-                                    }`}
+                                    className={`hover:bg-gray-50 transition-colors ${row.hasReset ? "bg-yellow-50" : ""}`}
                                   >
                                     <td className="px-3 py-2">
                                       <div className="flex items-center">
@@ -2395,10 +1691,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                           {row.hose}
                                         </span>
                                         {row.hasReset && (
-                                          <span
-                                            className="ml-2 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full"
-                                            title="Кўрсаткич нўлланган"
-                                          >
+                                          <span className="ml-2 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
                                             🔄 Нўлланган
                                           </span>
                                         )}
@@ -2414,16 +1707,12 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                             const newRows = [...hoseRows];
                                             newRows[index].prev =
                                               parseFormattedNumber(
-                                                e.target.value
+                                                e.target.value,
                                               ) || 0;
                                             setHoseRows(newRows);
                                           }}
                                           disabled={row.prevDisabled || loading}
-                                          className={`w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 no-spinner text-xs md:text-sm ${
-                                            row.prevDisabled
-                                              ? "bg-gray-100 text-gray-600"
-                                              : "bg-white"
-                                          }`}
+                                          className={`w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 no-spinner text-xs md:text-sm ${row.prevDisabled ? "bg-gray-100 text-gray-600" : "bg-white"}`}
                                           placeholder="0"
                                         />
                                         {row.prevDisabled && (
@@ -2434,11 +1723,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                           </div>
                                         )}
                                       </div>
-                                      <div className="mt-1 text-xs text-gray-500">
-                                        {row.prevDisabled
-                                          ? ""
-                                          : "Биринчи марта курсаткични узингиз киритинг"}
-                                      </div>
                                     </td>
                                     <td className="px-2 py-3 md:px-3 md:w-1/6">
                                       <input
@@ -2448,41 +1732,27 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                         onChange={(e) =>
                                           handleHoseCurrentChange(
                                             index,
-                                            e.target.value
+                                            e.target.value,
                                           )
                                         }
                                         className={`w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 no-spinner text-xs md:text-sm ${
                                           row.current === ""
                                             ? "border-red-300 bg-red-50 focus:bg-white"
                                             : isInvalid
-                                            ? "border-red-500 ring-2 ring-red-200"
-                                            : "border-gray-300"
+                                              ? "border-red-500 ring-2 ring-red-200"
+                                              : "border-gray-300"
                                         }`}
                                         disabled={loading}
                                         required
                                         placeholder="0"
                                       />
-                                      {row.current === "" && (
-                                        <div className="mt-1 text-xs text-red-600"></div>
-                                      )}
                                     </td>
                                     <td className="px-2 py-3 md:px-3 md:w-1/6">
-                                      <div className="flex flex-col">
-                                        <span
-                                          className={`font-semibold text-xs md:text-sm ${
-                                            row.diff > 0
-                                              ? "text-green-600"
-                                              : "text-gray-500"
-                                          }`}
-                                        >
-                                          {formatNumberForDisplay(row.diff)}
-                                        </span>
-                                        {row.hasReset && (
-                                          <span className="text-xs text-orange-600 mt-1">
-                                            Нўлланиш ҳисоби б-н
-                                          </span>
-                                        )}
-                                      </div>
+                                      <span
+                                        className={`font-semibold text-xs md:text-sm ${row.diff > 0 ? "text-green-600" : "text-gray-500"}`}
+                                      >
+                                        {formatNumberForDisplay(row.diff)}
+                                      </span>
                                     </td>
                                   </tr>
                                 );
@@ -2490,8 +1760,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                             </tbody>
                           </table>
                         </div>
-
-                        {/* Итоги по шлангам */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                           <div className="bg-blue-50 w-full border border-blue-200 rounded-lg p-3">
                             <div className="flex justify-between items-center">
@@ -2515,9 +1783,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                     </div>
                   </div>
 
-                  {/* Левая колонка: Партнеры и Общий отчет */}
                   <div className="space-y-6">
-                    {/* Отчет по партнерам с отображением номера */}
                     <div className="bg-white border border-gray-200 rounded-xl">
                       <div className="p-4 border-b bg-gray-50">
                         <h4 className="text-lg font-semibold">
@@ -2535,7 +1801,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                         {partnerData.length === 0 ? (
                           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
                             <p className="text-yellow-700">
-                              Бу заправкада хамкорлар мавжуд эмас
+                              Бу заправкада хамкорлар мавжуд емас
                             </p>
                           </div>
                         ) : (
@@ -2563,7 +1829,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                     className="border-t hover:bg-gray-50 group"
                                   >
                                     <td className="p-2 text-center text-gray-500 font-medium">
-                                      {/* Отображаем autoId или порядковый номер */}
                                       {partner.autoId || idx + 1}
                                     </td>
                                     <td className="p-2">
@@ -2599,38 +1864,9 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                               {partner.pricePerM3 === 0
                                                 ? "Ўрнатилмаган"
                                                 : formatNumberForDisplay(
-                                                    partner.pricePerM3
+                                                    partner.pricePerM3,
                                                   )}
                                             </span>
-                                            {partner.pricePerM3 === 0 ? (
-                                              <svg
-                                                className="w-4 h-4 text-red-500"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                                                />
-                                              </svg>
-                                            ) : (
-                                              <svg
-                                                className="w-4 h-4 text-green-500"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                                />
-                                              </svg>
-                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -2643,7 +1879,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                         onChange={(e) =>
                                           handlePartnerSoldM3Change(
                                             partner.partnerId,
-                                            e.target.value
+                                            e.target.value,
                                           )
                                         }
                                         className={`w-full text-right border rounded p-2 no-spinner text-sm ${
@@ -2655,13 +1891,10 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                         disabled={loading}
                                         required
                                       />
-                                      {partner.soldM3 === "" && (
-                                        <div className="mt-1 text-xs text-red-600"></div>
-                                      )}
                                     </td>
                                     <td className="p-2 text-right font-semibold text-sm">
                                       {formatNumberForDisplay(
-                                        partner.totalAmount
+                                        partner.totalAmount,
                                       )}
                                     </td>
                                   </tr>
@@ -2678,13 +1911,13 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                                     </td>
                                     <td className="p-2 text-right font-semibold text-sm">
                                       {formatNumberForDisplay(
-                                        partnerTotals.totalM3
+                                        partnerTotals.totalM3,
                                       )}{" "}
                                       м³
                                     </td>
                                     <td className="p-2 text-right font-semibold text-sm">
                                       {formatNumberForDisplay(
-                                        partnerTotals.totalAmount
+                                        partnerTotals.totalAmount,
                                       )}{" "}
                                       сўм
                                     </td>
@@ -2701,7 +1934,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                       </div>
                     </div>
 
-                    {/* Общий отчет с динамическими платежными системами */}
                     <div className="bg-white border border-gray-200 rounded-xl">
                       <div className="p-4 border-b bg-gray-50">
                         <h4 className="text-lg font-semibold">
@@ -2713,7 +1945,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                         </div>
                       </div>
                       <div className="p-4 space-y-4">
-                        {/* Базовые поля */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -2726,7 +1957,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                               onChange={(e) =>
                                 handleGeneralInputChange(
                                   "autopilotReading",
-                                  e.target.value
+                                  e.target.value,
                                 )
                               }
                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 no-spinner ${
@@ -2738,13 +1969,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                               placeholder="0"
                               required
                             />
-                            {generalData.autopilotReading === "" && (
-                              <div className="mt-1 text-xs text-red-600">
-                                Мажбурий тўлдириш майдони
-                              </div>
-                            )}
                           </div>
-
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
                               1 м³ газ нархи (сўм) *
@@ -2756,7 +1981,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                               onChange={(e) =>
                                 handleGeneralInputChange(
                                   "gasPrice",
-                                  e.target.value
+                                  e.target.value,
                                 )
                               }
                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 no-spinner ${
@@ -2768,19 +1993,13 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                               placeholder="0"
                               required
                             />
-                            {generalData.gasPrice === "" && (
-                              <div className="mt-1 text-xs text-red-600">
-                                Мажбурий тўлдириш майдони
-                              </div>
-                            )}
                           </div>
                         </div>
 
-                        {/* Динамические платежные системы (только активные, исключая Z-отчет) */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {activePaymentMethods
                             .filter(
-                              (method) => method.dbFieldName !== "zhisobot"
+                              (method) => method.dbFieldName !== "zhisobot",
                             )
                             .map((method) => (
                               <PaymentInputField
@@ -2794,7 +2013,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                             ))}
                         </div>
 
-                        {/* Z-отчет (рассчитывается автоматически) */}
                         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center">
@@ -2847,7 +2065,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                   </div>
                 </div>
 
-                {/* Сводная информация */}
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 mt-6">
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">
                     Йиғма маълумот
@@ -2887,87 +2104,8 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                     </div>
                   </div>
                 </div>
-
-                {/* Информация о сохранении */}
-                {/* {reportDate && (
-                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center">
-                      <svg
-                        className="w-5 h-5 text-blue-600 mr-2"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <div className="text-sm text-blue-800">
-                        <div className="font-semibold">
-                          Отчет будет сохранен в коллекцию:
-                        </div>
-                        <div className="font-mono text-xs mt-1 bg-white p-2 rounded border">
-                          {getCollectionNameByDate(reportDate)}
-                        </div>
-                        <div className="text-xs text-blue-600 mt-1">
-                          {getQuarterFromDate(reportDate)} квартал{" "}
-                          {new Date(reportDate).getFullYear()} года
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )} */}
-
-                {/* Отладочная информация */}
-                {/* <div className="mt-4 p-4 bg-gray-100 rounded-lg">
-                  <button
-                    onClick={checkValidationStatus}
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                  >
-                    Проверить валидацию (отладка)
-                  </button>
-                  <div className="mt-2 text-sm text-gray-700">
-                    Статус:{" "}
-                    {isReportValid()
-                      ? "✅ Все проверки пройдены"
-                      : "❌ Требуются исправления"}
-                  </div>
-                  <div className="mt-2 text-xs text-gray-600">
-                    • Шланги: {hoseRows.filter((r) => r.current !== "").length}/
-                    {hoseRows.length} заполнено
-                    <br />• Партнеры:{" "}
-                    {
-                      partnerData.filter(
-                        (p) => p.soldM3 !== "" && p.pricePerM3 !== 0
-                      ).length
-                    }
-                    /{partnerData.length} заполнено
-                    <br />• Общие поля:{" "}
-                    {(generalData.autopilotReading !== "" ? 1 : 0) +
-                      (generalData.gasPrice !== "" ? 1 : 0)}
-                    /2 заполнено
-                    <br />• Платежные системы (кроме Z-отчета):{" "}
-                    {
-                      activePaymentMethods
-                        .filter((m) => m.dbFieldName !== "zhisobot")
-                        .filter((m) => paymentValues[m.dbFieldName] !== "")
-                        .length
-                    }
-                    /
-                    {
-                      activePaymentMethods.filter(
-                        (m) => m.dbFieldName !== "zhisobot"
-                      ).length
-                    }{" "}
-                    заполнено
-                    <br />• Коллекция для сохранения:{" "}
-                    {reportDate ? getCollectionNameByDate(reportDate) : "—"}
-                  </div>
-                </div> */}
               </div>
 
-              {/* Кнопки управления */}
               <div className="p-6 border-t bg-gray-50 flex justify-between items-center">
                 <div className="text-sm text-gray-600">
                   Хамкорлар: {partnerData.length} • Шланглар: {hoseRows.length}
@@ -2987,7 +2125,7 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                     • Тўлов методлари:{" "}
                     {
                       activePaymentMethods.filter(
-                        (m) => m.dbFieldName !== "zhisobot"
+                        (m) => m.dbFieldName !== "zhisobot",
                       ).length
                     }{" "}
                     та (Z-отчет не считается)
@@ -3018,7 +2156,6 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         )}
       </AnimatePresence>
 
-      {/* Модальное окно установки цены */}
       <PriceSetupModal
         isOpen={isPriceModalOpen}
         onClose={() => {
@@ -3031,7 +2168,8 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
         stationId={station?.id}
       />
 
-      {/* Модальное окно подтверждения сохранения */}
+      {/* ОБНОВЛЕННОЕ модальное окно подтверждения сохранения - показывает только партнеров с soldM3 > 0 */}
+      {/* Модальное окно подтверждения сохранения - ГОРИЗОНТАЛЬНОЕ с 2 КОЛОНКАМИ */}
       <AnimatePresence>
         {isConfirmModalOpen && (
           <motion.div
@@ -3041,16 +2179,17 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-2"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
             >
-              <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-t-2xl">
+              {/* Заголовок */}
+              <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-5 rounded-t-2xl flex-shrink-0">
                 <div className="flex items-center justify-center">
-                  <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                  <div className="bg-white bg-opacity-20 p-2 rounded-full">
                     <svg
-                      className="w-8 h-8 text-white"
+                      className="w-6 h-6 text-white"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -3064,131 +2203,197 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-xl font-bold text-white text-center mt-4">
+                <h3 className="text-xl font-bold text-white text-center mt-3">
                   Сақлашни тасдиқлайсизми?
                 </h3>
               </div>
 
-              <div className="p-6">
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              {/* Содержимое с прокруткой */}
+              <div className="flex-1 overflow-y-auto p-5">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 flex-shrink-0">
                   <p className="text-sm text-yellow-800 text-center font-medium">
                     ⚠️ Сақланганингизда сўнг ҳисоботни ўзгартириб бўлмайди!
                   </p>
-                  {/* <div className="mt-2 text-xs text-yellow-700 text-center">
-                    Отчет будет сохранен в коллекцию:{" "}
-                    <span className="font-semibold">
-                      {getCollectionNameByDate(reportDate)}
-                    </span>
-                  </div> */}
                 </div>
 
-                <div className="space-y-3 text-sm text-gray-700">
-                  <div className="flex justify-between">
-                    <span className="font-medium">Сана:</span>
-                    <span>{reportDate}</span>
-                  </div>
-                  {/* <div className="flex justify-between">
-                    <span className="font-medium">Коллекция:</span>
-                    <span className="font-mono text-xs">
-                      {getCollectionNameByDate(reportDate)}
-                    </span>
-                  </div> */}
-                  {/* <div className="flex justify-between">
-                    <span className="font-medium">Квартал:</span>
-                    <span>
-                      {getQuarterFromDate(reportDate)} квартал{" "}
-                      {new Date(reportDate).getFullYear()} года
-                    </span>
-                  </div> */}
-                  <div className="flex justify-between">
-                    <span className="font-medium">Автопилот:</span>
-                    <span>
-                      {formatNumberForDisplay(generalData.autopilotReading)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium">1м³ нархи:</span>
-                    <span>
-                      {formatNumberForDisplay(generalData.gasPrice)} сўм
-                    </span>
+                {/* 2 колонки */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Левая колонка */}
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-gray-800 pb-2 border-b">
+                      📋 Асосий маълумотлар
+                    </h4>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-gray-600">Сана:</span>
+                      <span className="font-semibold">{reportDate}</span>
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-gray-600">
+                        Автопилот:
+                      </span>
+                      <span className="font-semibold">
+                        {formatNumberForDisplay(generalData.autopilotReading)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-gray-600">
+                        1м³ газ нархи:
+                      </span>
+                      <span className="font-semibold">
+                        {formatNumberForDisplay(generalData.gasPrice)} сўм
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-gray-600">
+                        Шланглар орқали сотилди:
+                      </span>
+                      <span className="font-semibold text-green-600">
+                        {formatNumberForDisplay(hoseTotal)} м³
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-gray-600">
+                        Хамкорларга сотилди (жами):
+                      </span>
+                      <span className="font-semibold text-blue-600">
+                        {formatNumberForDisplay(partnerTotals.totalM3)} м³
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-sm pt-2 border-t">
+                      <span className="font-bold text-gray-800">
+                        Z-ҳисобот (наличные):
+                      </span>
+                      <span className="font-bold text-orange-600 text-lg">
+                        {formatNumberForDisplay(calculateCashAmount())} сўм
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Платежные системы (кроме Z-отчета) */}
-                  {activePaymentMethods
-                    .filter((method) => method.dbFieldName !== "zhisobot")
-                    .map((method) => {
-                      const value = parseFormattedNumber(
-                        paymentValues[method.dbFieldName] || 0
-                      );
-                      return (
-                        <div key={method.id} className="flex justify-between">
-                          <span className="font-medium">{method.name}:</span>
-                          <span>{formatNumberForDisplay(value)} сўм</span>
+                  {/* Правая колонка */}
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-gray-800 pb-2 border-b">
+                      💰 Тўлов тизимлари
+                    </h4>
+
+                    {activePaymentMethods
+                      .filter((method) => method.dbFieldName !== "zhisobot")
+                      .map((method) => {
+                        const value = parseFormattedNumber(
+                          paymentValues[method.dbFieldName] || 0,
+                        );
+                        return (
+                          <div
+                            key={method.id}
+                            className="flex justify-between text-sm"
+                          >
+                            <span className="font-medium text-gray-600">
+                              {method.name}:
+                            </span>
+                            <span className="font-semibold">
+                              {formatNumberForDisplay(value)} сўм
+                            </span>
+                          </div>
+                        );
+                      })}
+
+                    {/* Партнеры с продажами > 0 */}
+                    {partnerData.filter(
+                      (p) => parseFormattedNumber(p.soldM3) > 0,
+                    ).length > 0 && (
+                      <div className="pt-3 mt-2 border-t">
+                        <h4 className="font-semibold text-gray-800 pb-2 mb-2">
+                          🤝 Хамкорлар (газ олган)
+                        </h4>
+                        <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                          {partnerData
+                            .filter((p) => parseFormattedNumber(p.soldM3) > 0)
+                            .map((partner) => (
+                              <div
+                                key={partner.partnerId}
+                                className="flex justify-between text-xs py-1 border-b border-gray-100"
+                              >
+                                <span
+                                  className="text-gray-700 truncate max-w-[150px]"
+                                  title={partner.partnerName}
+                                >
+                                  {partner.partnerName.substring(0, 25)}:
+                                </span>
+                                <span className="font-medium text-gray-800 whitespace-nowrap">
+                                  {formatNumberForDisplay(partner.soldM3)} м³ ×{" "}
+                                  {formatNumberForDisplay(partner.pricePerM3)} ={" "}
+                                  {formatNumberForDisplay(partner.totalAmount)}{" "}
+                                  сўм
+                                </span>
+                              </div>
+                            ))}
                         </div>
-                      );
-                    })}
-
-                  <div className="flex justify-between">
-                    <span className="font-medium">
-                      Шланглар орқали сотилди:
-                    </span>
-                    <span>{formatNumberForDisplay(hoseTotal)} м³</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium">Хамкорларга сотилди:</span>
-                    <span>
-                      {formatNumberForDisplay(partnerTotals.totalM3)} м³
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-t border-gray-200 pt-2">
-                    <span className="font-bold">Z-ҳисобот (наличные):</span>
-                    <span className="font-bold text-orange-600">
-                      {formatNumberForDisplay(calculateCashAmount())} сўм
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                  <button
-                    onClick={() => setIsConfirmModalOpen(false)}
-                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium flex-1"
-                  >
-                    Бекор
-                  </button>
-                  <button
-                    onClick={saveUnifiedReport}
-                    disabled={loading}
-                    className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium flex-1 flex items-center justify-center disabled:bg-orange-300"
-                  >
-                    {loading ? (
-                      "Сақланмоқда..."
-                    ) : (
-                      <>
-                        <svg
-                          className="w-5 h-5 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                        Сақлашни тасдиқлаш
-                      </>
+                      </div>
                     )}
-                  </button>
+
+                    {/* Информация о партнерах с нулевыми продажами */}
+                    {partnerData.filter(
+                      (p) => parseFormattedNumber(p.soldM3) === 0,
+                    ).length > 0 && (
+                      <div className="text-xs text-gray-500 pt-2">
+                        📌{" "}
+                        {
+                          partnerData.filter(
+                            (p) => parseFormattedNumber(p.soldM3) === 0,
+                          ).length
+                        }{" "}
+                        та хамкор 0 м³ сотилган
+                      </div>
+                    )}
+                  </div>
                 </div>
+              </div>
+
+              {/* Кнопки */}
+              <div className="p-5 border-t bg-gray-50 flex flex-col sm:flex-row gap-3 justify-end flex-shrink-0">
+                <button
+                  onClick={() => setIsConfirmModalOpen(false)}
+                  className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-100 transition-colors font-medium"
+                >
+                  Бекор
+                </button>
+                <button
+                  onClick={saveUnifiedReport}
+                  disabled={loading}
+                  className="px-5 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors font-medium flex items-center justify-center gap-2 disabled:bg-orange-300"
+                >
+                  {loading ? (
+                    "Сақланмоқда..."
+                  ) : (
+                    <>
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      Сақлашни тасдиқлаш
+                    </>
+                  )}
+                </button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Модальное окно успешного сохранения */}
       <AnimatePresence>
         {isSuccessModalOpen && (
           <motion.div
@@ -3227,29 +2432,23 @@ const UnifiedReportModal = ({ isOpen, onClose, station, onSaved }) => {
                     </svg>
                     <span>Барча маълумотлар сақланди</span>
                   </div>
-                  {/* <div className="mt-2 text-sm text-green-600">
-                    • Коллекция:{" "}
-                    <span className="font-semibold">
-                      {getCollectionNameByDate(reportDate)}
-                    </span>
-                  </div> */}
-                  {/* <div className="mt-2 text-sm text-green-600">
-                    • Квартал:{" "}
-                    <span className="font-semibold">
-                      {getQuarterFromDate(reportDate)} квартал
-                    </span>
-                  </div> */}
-                  <div className="text-sm text-green-600">
+                  <div className="text-sm text-green-600 mt-2">
                     • {hoseRows.length} шланг
                   </div>
                   <div className="text-sm text-green-600">
-                    • {partnerData.length} хамкор
+                    •{" "}
+                    {
+                      partnerData.filter(
+                        (p) => parseFormattedNumber(p.soldM3) > 0,
+                      ).length
+                    }{" "}
+                    хамкор (газ олган)
                   </div>
                   <div className="text-sm text-green-600">
                     •{" "}
                     {
                       activePaymentMethods.filter(
-                        (m) => m.dbFieldName !== "zhisobot"
+                        (m) => m.dbFieldName !== "zhisobot",
                       ).length
                     }{" "}
                     тўлов усули (Z-отчет алохида)
