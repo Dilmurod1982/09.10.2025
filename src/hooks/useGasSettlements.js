@@ -27,7 +27,6 @@ export const useGasSettlements = () => {
       const docSnap = await getDoc(gasSettlementsRef);
 
       if (!docSnap.exists()) {
-        // console.log("Creating new gasSettlements document...");
         await setDoc(gasSettlementsRef, {
           mainData: [],
           data: [],
@@ -35,11 +34,9 @@ export const useGasSettlements = () => {
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
         });
-        // console.log("Document created successfully");
       }
       return true;
     } catch (err) {
-      // console.error("Error ensuring document exists:", err);
       throw err;
     }
   };
@@ -50,27 +47,16 @@ export const useGasSettlements = () => {
     setError(null);
 
     try {
-      // console.log("=== Loading gas settlements data ===");
-
-      // Убеждаемся, что документ существует
       await ensureDocumentExists();
 
-      // Загружаем основные данные из gasSettlements
       const gasSettlementsRef = doc(db, "gasSettlements", "main");
       const gasSettlementsSnap = await getDoc(gasSettlementsRef);
 
       if (gasSettlementsSnap.exists()) {
         const data = gasSettlementsSnap.data();
-        // console.log("Loaded gas settlements data:", data);
-
-        // Убедимся, что данные есть и они в правильном формате
         const mainData = Array.isArray(data.mainData) ? data.mainData : [];
         const settlements = Array.isArray(data.data) ? data.data : [];
         const prices = Array.isArray(data.priceOfGas) ? data.priceOfGas : [];
-
-        // console.log("Main data count:", mainData.length);
-        // console.log("Settlements data count:", settlements.length);
-        // console.log("Price data count:", prices.length);
 
         setStations(mainData);
         setSettlementsData(settlements);
@@ -79,7 +65,6 @@ export const useGasSettlements = () => {
 
       // Загружаем регионы
       try {
-        // console.log("Loading regions...");
         const regionsCollection = collection(db, "regions");
         const regionsSnapshot = await getDocs(regionsCollection);
 
@@ -91,7 +76,6 @@ export const useGasSettlements = () => {
           });
         });
 
-        // console.log("Loaded regions:", regionsList.length, regionsList);
         setRegions(regionsList);
       } catch (regionErr) {
         console.warn("Could not load regions:", regionErr.message);
@@ -100,7 +84,6 @@ export const useGasSettlements = () => {
 
       // Загружаем банки
       try {
-        // console.log("Loading banks...");
         const banksCollection = collection(db, "banks");
         const banksSnapshot = await getDocs(banksCollection);
 
@@ -112,7 +95,6 @@ export const useGasSettlements = () => {
           });
         });
 
-        // console.log("Loaded banks:", banksList.length, banksList);
         setBanks(banksList);
       } catch (bankErr) {
         console.warn("Could not load banks:", bankErr.message);
@@ -120,12 +102,10 @@ export const useGasSettlements = () => {
       }
 
       setLastUpdated(new Date());
-      // console.log("=== Data loading completed ===");
     } catch (err) {
-      // console.error("Error loading data:", err);
+      console.error("Error loading data:", err);
       setError(`Ошибка загрузки данных: ${err.message}`);
 
-      // Устанавливаем пустые массивы в случае ошибки
       setStations([]);
       setSettlementsData([]);
       setPriceOfGas([]);
@@ -140,20 +120,12 @@ export const useGasSettlements = () => {
   const saveData = async (fieldName, data) => {
     setLoading(true);
     try {
-      // console.log(`Saving data to ${fieldName}:`, data);
-
       const docRef = doc(db, "gasSettlements", "main");
-
-      // Убеждаемся, что документ существует
       await ensureDocumentExists();
-
-      // Теперь обновляем документ
       await updateDoc(docRef, {
         [fieldName]: data,
         updatedAt: Timestamp.now(),
       });
-
-      // console.log(`Data saved to ${fieldName} successfully`);
       return true;
     } catch (err) {
       console.error("Error saving data:", err);
@@ -164,10 +136,10 @@ export const useGasSettlements = () => {
     }
   };
 
-  // Добавление новой заправки
+  // Добавление новой заправки (ИСПРАВЛЕНАЯ ВЕРСИЯ)
   const addNewStation = async (stationData) => {
     try {
-      // console.log("Adding new station:", stationData);
+      console.log("Adding new station:", stationData);
 
       // Генерируем новый ID
       const newId =
@@ -179,15 +151,20 @@ export const useGasSettlements = () => {
         ...stationData,
         id: newId.toString(),
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const newStations = [...stations, newStation];
       const success = await saveData("mainData", newStations);
 
       if (success) {
+        // ВАЖНО: Обновляем состояние stations
         setStations(newStations);
-        // console.log("Station added successfully:", newStation);
-        return { success: true, id: newId };
+        console.log("Station added successfully:", newStation);
+        console.log("Total stations now:", newStations.length);
+        console.log("All stations:", newStations);
+
+        return { success: true, data: newStation, id: newId };
       }
 
       return { success: false, error: "Не удалось сохранить заправку" };
@@ -198,11 +175,30 @@ export const useGasSettlements = () => {
     }
   };
 
+  // ПРИНУДИТЕЛЬНАЯ ПЕРЕЗАГРУЗКА СТАНЦИЙ
+  const reloadStations = async () => {
+    try {
+      console.log("Reloading stations...");
+      const gasSettlementsRef = doc(db, "gasSettlements", "main");
+      const gasSettlementsSnap = await getDoc(gasSettlementsRef);
+
+      if (gasSettlementsSnap.exists()) {
+        const data = gasSettlementsSnap.data();
+        const mainData = Array.isArray(data.mainData) ? data.mainData : [];
+        setStations(mainData);
+        console.log("Stations reloaded:", mainData.length);
+        return mainData;
+      }
+      return [];
+    } catch (err) {
+      console.error("Error reloading stations:", err);
+      return [];
+    }
+  };
+
   // Обновление заправки
   const updateStation = async (stationId, updatedData) => {
     try {
-      // console.log("Updating station:", stationId, updatedData);
-
       const newStations = stations.map((station) =>
         station.id.toString() === stationId.toString()
           ? {
@@ -217,7 +213,6 @@ export const useGasSettlements = () => {
 
       if (success) {
         setStations(newStations);
-        // console.log("Station updated successfully");
         return true;
       }
 
@@ -232,8 +227,6 @@ export const useGasSettlements = () => {
   // Удаление заправки
   const deleteStation = async (stationId) => {
     try {
-      // console.log("Deleting station:", stationId);
-
       const newStations = stations.filter(
         (station) => station.id.toString() !== stationId.toString(),
       );
@@ -242,7 +235,6 @@ export const useGasSettlements = () => {
 
       if (success) {
         setStations(newStations);
-        // console.log("Station deleted successfully");
         return true;
       }
 
@@ -257,11 +249,8 @@ export const useGasSettlements = () => {
   // Добавление данных по заправкам
   const addSettlementData = async (newData) => {
     try {
-      // console.log("Adding settlement data:", newData);
-
       const newSettlements = [...settlementsData];
 
-      // Проверяем, нет ли уже данных за этот период для этой заправки
       const existingIndex = newSettlements.findIndex(
         (item) =>
           item.period === newData.period &&
@@ -269,27 +258,22 @@ export const useGasSettlements = () => {
       );
 
       if (existingIndex !== -1) {
-        // Обновляем существующие данные
         newSettlements[existingIndex] = {
           ...newSettlements[existingIndex],
           ...newData,
           updatedAt: new Date().toISOString(),
         };
-        // console.log("Updated existing settlement record");
       } else {
-        // Добавляем новые данные
         newSettlements.push({
           ...newData,
           createdAt: new Date().toISOString(),
         });
-        // console.log("Added new settlement record");
       }
 
       const success = await saveData("data", newSettlements);
 
       if (success) {
         setSettlementsData(newSettlements);
-        // console.log("Settlement data saved successfully");
         return true;
       }
 
@@ -304,8 +288,6 @@ export const useGasSettlements = () => {
   // Добавление нескольких записей данных
   const addMultipleSettlementData = async (dataArray) => {
     try {
-      // console.log("Adding multiple settlement data:", dataArray);
-
       const newSettlements = [...settlementsData];
 
       dataArray.forEach((newData) => {
@@ -333,7 +315,6 @@ export const useGasSettlements = () => {
 
       if (success) {
         setSettlementsData(newSettlements);
-        // console.log("Multiple settlement data saved successfully");
         return true;
       }
 
@@ -348,8 +329,6 @@ export const useGasSettlements = () => {
   // Обновление данных по заправке
   const updateSettlementData = async (updatedData) => {
     try {
-      // console.log("Updating settlement data:", updatedData);
-
       const newSettlements = settlementsData.map((item) => {
         if (
           item.period === updatedData.period &&
@@ -368,7 +347,6 @@ export const useGasSettlements = () => {
 
       if (success) {
         setSettlementsData(newSettlements);
-        // console.log("Settlement data updated successfully");
         return true;
       }
 
@@ -383,8 +361,6 @@ export const useGasSettlements = () => {
   // Удаление данных по заправке
   const deleteSettlementData = async (period, stationId) => {
     try {
-      // console.log("Deleting settlement data:", period, stationId);
-
       const newSettlements = settlementsData.filter(
         (item) =>
           !(
@@ -397,7 +373,6 @@ export const useGasSettlements = () => {
 
       if (success) {
         setSettlementsData(newSettlements);
-        // console.log("Settlement data deleted successfully");
         return true;
       }
 
@@ -412,46 +387,33 @@ export const useGasSettlements = () => {
   // Добавление новой цены
   const addNewPrice = async (priceData) => {
     try {
-      // console.log("Adding new price:", priceData);
-
-      // Создаем копию массива цен
       const newPrices = [...priceOfGas];
 
-      // Если есть предыдущая цена, обновляем ее endDate
       if (newPrices.length > 0) {
         const lastPrice = newPrices[newPrices.length - 1];
 
-        // Проверяем, что у последней цены нет endDate
         if (!lastPrice.endDate) {
-          // Устанавливаем endDate предыдущей цены на день перед началом новой цены
           const newStartDate = new Date(priceData.startDate);
           const prevEndDate = new Date(newStartDate);
           prevEndDate.setDate(prevEndDate.getDate() - 1);
 
-          // Форматируем дату как YYYY-MM
           const prevEndYear = prevEndDate.getFullYear();
           const prevEndMonth = (prevEndDate.getMonth() + 1)
             .toString()
             .padStart(2, "0");
           lastPrice.endDate = `${prevEndYear}-${prevEndMonth}`;
-
-          // console.log("Updated end date of previous price:", lastPrice);
         }
       }
 
-      // Добавляем новую цену
       newPrices.push({
         ...priceData,
         createdAt: new Date().toISOString(),
       });
 
-      // console.log("New prices array:", newPrices);
-
       const success = await saveData("priceOfGas", newPrices);
 
       if (success) {
         setPriceOfGas(newPrices);
-        // console.log("Price added successfully");
         return true;
       }
 
@@ -466,8 +428,6 @@ export const useGasSettlements = () => {
   // Обновление цены
   const updatePrice = async (oldStartDate, updatedPriceData) => {
     try {
-      // console.log("Updating price:", oldStartDate, updatedPriceData);
-
       const newPrices = priceOfGas.map((price) => {
         if (price.startDate === oldStartDate) {
           return {
@@ -483,7 +443,6 @@ export const useGasSettlements = () => {
 
       if (success) {
         setPriceOfGas(newPrices);
-        // console.log("Price updated successfully");
         return true;
       }
 
@@ -498,8 +457,6 @@ export const useGasSettlements = () => {
   // Удаление цены
   const deletePrice = async (startDate) => {
     try {
-      // console.log("Deleting price:", startDate);
-
       const priceIndex = priceOfGas.findIndex(
         (price) => price.startDate === startDate,
       );
@@ -513,7 +470,6 @@ export const useGasSettlements = () => {
         (price) => price.startDate !== startDate,
       );
 
-      // Если удаляем не последнюю цену, нужно обновить endDate предыдущей
       if (priceIndex > 0 && priceIndex < priceOfGas.length) {
         const previousPrice = newPrices[priceIndex - 1];
         const nextPrice = priceOfGas[priceIndex + 1];
@@ -521,7 +477,6 @@ export const useGasSettlements = () => {
         if (previousPrice && nextPrice) {
           previousPrice.endDate = nextPrice.startDate;
         } else if (previousPrice) {
-          // Если это была последняя цена, у предыдущей убираем endDate
           previousPrice.endDate = null;
         }
       }
@@ -530,7 +485,6 @@ export const useGasSettlements = () => {
 
       if (success) {
         setPriceOfGas(newPrices);
-        // console.log("Price deleted successfully");
         return true;
       }
 
@@ -603,11 +557,9 @@ export const useGasSettlements = () => {
   // Получение текущей цены на определенную дату
   const getPriceForDate = (date) => {
     if (!priceOfGas || !priceOfGas.length) {
-      // console.log("No price data available");
       return 0;
     }
 
-    // Преобразуем дату в формат YYYY-MM для сравнения
     let targetDateStr;
     if (typeof date === "string") {
       targetDateStr = date;
@@ -616,13 +568,9 @@ export const useGasSettlements = () => {
       const month = (date.getMonth() + 1).toString().padStart(2, "0");
       targetDateStr = `${year}-${month}`;
     } else {
-      // console.log("Invalid date format:", date);
       return 0;
     }
 
-    // console.log("Looking for price on date:", targetDateStr);
-
-    // Находим актуальную цену на заданную дату
     const price = priceOfGas.find((p) => {
       if (!p.startDate) return false;
 
@@ -633,10 +581,7 @@ export const useGasSettlements = () => {
       return targetDate >= startDate && targetDate <= endDate;
     });
 
-    const result = price ? price.price : 0;
-    // console.log(`Found price: ${result} for date ${targetDateStr}`);
-
-    return result;
+    return price ? price.price : 0;
   };
 
   // Получение следующего периода для добавления данных
@@ -687,6 +632,7 @@ export const useGasSettlements = () => {
 
     // Основные методы
     reloadData: loadAllData,
+    reloadStations, // НОВЫЙ МЕТОД для перезагрузки станций
     clearError,
 
     // Методы для работы с заправками
@@ -712,7 +658,6 @@ export const useGasSettlements = () => {
     getPriceForDate,
 
     // Утилиты
-    getPriceForDate,
     getUniquePeriods,
 
     // Для отладки

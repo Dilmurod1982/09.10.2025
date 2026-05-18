@@ -13,9 +13,10 @@ import * as XLSX from "xlsx";
 
 const GasSettlements = () => {
   const navigate = useNavigate();
-  const { stations, settlementsData, loading } = useGasSettlements();
+  const { stations, settlementsData, loading, reloadStations } =
+    useGasSettlements();
 
-  // Получаем пользователя из localStorage или контекста
+  // Получаем пользователя из localStorage
   const [currentUser, setCurrentUser] = useState(null);
 
   const currentYear = new Date().getFullYear();
@@ -32,18 +33,17 @@ const GasSettlements = () => {
   const [stationDetailsModal, setStationDetailsModal] = useState(false);
   const [tableData, setTableData] = useState([]);
   const [exporting, setExporting] = useState(false);
-  // console.log(currentUser);
+
   // Получаем данные пользователя при загрузке
   useEffect(() => {
     try {
       const userStr = localStorage.getItem("userData");
-
       if (userStr) {
         const user = JSON.parse(userStr);
         setCurrentUser(user);
       }
     } catch (error) {
-      console.error("Error parsing user data:", error);
+      // console.error("Error parsing user data:", error);
     }
   }, []);
 
@@ -52,7 +52,6 @@ const GasSettlements = () => {
     try {
       setExporting(true);
 
-      // Создаем рабочую книгу
       const workbook = XLSX.utils.book_new();
       const filterInfo = [
         ["Маълумот:"],
@@ -74,7 +73,7 @@ const GasSettlements = () => {
         ["Ёзувлар сони:", data.length],
         ["Экспорта санаси:", new Date().toLocaleString("ru-RU")],
       ];
-      // Подготовка данных для экспорта
+
       const exportData = data.map((row, index) => ({
         "№": index + 1,
         "Заправка номи": row.stationName,
@@ -92,7 +91,6 @@ const GasSettlements = () => {
         "Ой охирига сальдо": row.endBalance,
       }));
 
-      // Добавляем итоговую строку
       const totals = {
         "№": "ИТОГО",
         "Заправка номи": "",
@@ -119,215 +117,170 @@ const GasSettlements = () => {
       };
 
       exportData.push(totals);
-
-      // Создаем лист
       const worksheet = XLSX.utils.json_to_sheet(exportData);
-
-      // Добавляем информацию о фильтрах
-
-      // Добавляем информацию о фильтрах ниже данных
       const wsData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      wsData.push([]); // Пустая строка
+      wsData.push([]);
       filterInfo.forEach((row) => wsData.push(row));
+      const newWorksheet = XLSX.utils.aoa_to_sheet(wsData);
 
-      // Обновляем лист с добавленной информацией
-      XLSX.utils.sheet_add_json(worksheet, wsData, { skipHeader: true });
-
-      // Добавляем лист в книгу
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Учет газа");
-
-      // Генерируем имя файла
+      XLSX.utils.book_append_sheet(workbook, newWorksheet, "Учет газа");
       const fileName = `gas_settlements_${filters.year}-${filters.month.toString().padStart(2, "0")}_${new Date().getTime()}.xlsx`;
-
-      // Сохраняем файл
       XLSX.writeFile(workbook, fileName);
 
       return true;
     } catch (error) {
-      console.error("Экспортда хатолик:", error);
+      // console.error("Экспортда хатолик:", error);
       throw error;
     } finally {
       setExporting(false);
     }
   };
 
-  // Для отладки
+  // ОСНОВНОЙ ЭФФЕКТ - ИСПРАВЛЕННЫЙ
   useEffect(() => {
-    // console.log("=== GAS SETTLEMENTS DEBUG ===");
-    // console.log("Filters:", filters);
-    // console.log("Stations count:", stations.length);
-    // console.log("Settlements data count:", settlementsData.length);
-    // console.log("Loading:", loading);
-
-    if (settlementsData.length > 0) {
-      // console.log("Sample settlements data:", settlementsData[0]);
-      // console.log("Sample period:", settlementsData[0]?.period);
-    }
-  }, [filters, stations, settlementsData, loading]);
-
-  // Основной эффект для расчета данных
-  useEffect(() => {
-    if (stations.length > 0 && settlementsData.length > 0) {
-      calculateTableData();
-    } else {
-      setTableData([]);
-    }
+    calculateTableData();
   }, [filters, stations, settlementsData]);
 
   const calculateTableData = () => {
-    // console.log("Calculating table data...");
+    // console.log("=== CALCULATING TABLE DATA ===");
+    // console.log("Stations count:", stations.length);
+    // console.log("Settlements data count:", settlementsData.length);
 
     // Форматируем выбранный период
     const selectedPeriod = `${filters.year}-${filters.month.toString().padStart(2, "0")}`;
-    // console.log("Selected period for filtering:", selectedPeriod);
+    // console.log("Selected period:", selectedPeriod);
 
-    // Фильтруем данные
-    const filteredData = settlementsData.filter((item) => {
-      if (!item.period) {
-        // console.log("Item has no period:", item);
-        return false;
-      }
-
-      // console.log(
-      //   `Checking item: period=${item.period}, stationId=${item.stationId}`,
-      // );
-
-      // Проверяем период
-      const periodMatches = item.period === selectedPeriod;
-
-      // Проверяем станцию
-      const stationMatches =
-        filters.stationId === "all" ||
-        item.stationId.toString() === filters.stationId.toString();
-
-      // console.log(
-      //   `Matches: period=${periodMatches}, station=${stationMatches}`,
-      // );
-
-      return periodMatches && stationMatches;
+    // Фильтруем settlements данные по выбранному периоду
+    const periodData = settlementsData.filter((item) => {
+      if (!item.period) return false;
+      return item.period === selectedPeriod;
     });
 
-    // console.log("Filtered data count:", filteredData.length);
-    // console.log("Filtered data:", filteredData);
+    // console.log("Period data count:", periodData.length);
 
-    if (filteredData.length === 0) {
-      setTableData([]);
-      return;
-    }
+    // Создаем Map для быстрого доступа к данным по stationId
+    const dataByStation = {};
+    periodData.forEach((item) => {
+      const stationId = item.stationId.toString();
+      dataByStation[stationId] = item;
+    });
 
-    // Создаем карту для группировки данных по станциям
-    const stationsMap = {};
+    // console.log(
+    //   "Stations with data in this period:",
+    //   Object.keys(dataByStation),
+    // );
 
-    // Если выбрана конкретная станция
+    // Определяем, какие станции показывать
+    let stationsToShow = [];
+
     if (filters.stationId !== "all") {
-      const stationId = filters.stationId.toString();
-      const station = stations.find((s) => s.id.toString() === stationId);
-
-      if (station) {
-        const stationData = filteredData.filter(
-          (item) => item.stationId.toString() === stationId,
-        );
-
-        stationsMap[stationId] = {
-          station,
-          data: stationData,
-        };
+      // Показываем только выбранную станцию
+      const selectedStation = stations.find(
+        (s) => s.id.toString() === filters.stationId.toString(),
+      );
+      if (selectedStation) {
+        stationsToShow = [selectedStation];
       }
     } else {
-      // Для всех станций
-      filteredData.forEach((dataItem) => {
-        const stationId = dataItem.stationId.toString();
-
-        if (!stationsMap[stationId]) {
-          const station = stations.find((s) => s.id.toString() === stationId);
-          stationsMap[stationId] = {
-            station,
-            data: [],
-          };
-        }
-
-        stationsMap[stationId].data.push(dataItem);
-      });
+      // Показываем ВСЕ станции
+      stationsToShow = [...stations];
     }
 
-    // console.log("Stations map:", stationsMap);
+    // console.log("Stations to show:", stationsToShow.length);
+    // console.log(
+    //   "Station IDs to show:",
+    //   stationsToShow.map((s) => s.id),
+    // );
 
     const calculatedData = [];
 
-    // Проходим по всем станциям в карте
-    Object.keys(stationsMap).forEach((stationId) => {
-      const { station, data } = stationsMap[stationId];
+    // Проходим по всем станциям, которые нужно показать
+    stationsToShow.forEach((station) => {
+      const stationId = station.id.toString();
 
-      if (!station) return;
+      // Получаем данные для этой станции за выбранный период (если есть)
+      const dataItem = dataByStation[stationId];
 
-      // Для каждой записи данных этой станции
-      data.forEach((dataItem) => {
-        const selectedDate = new Date(filters.year, filters.month - 1, 1);
+      const selectedDate = new Date(filters.year, filters.month - 1, 1);
 
-        // Рассчитываем стартовый баланс
-        const startBalance = calculateStartBalance(
-          [station],
-          settlementsData,
-          selectedDate,
-          stationId,
-        );
+      // Рассчитываем стартовый баланс
+      const startBalance = calculateStartBalance(
+        [station],
+        settlementsData,
+        selectedDate,
+        stationId,
+      );
 
-        // Рассчитываем конечный баланс
-        const endBalance = calculateEndBalance(
-          startBalance,
-          dataItem.amountOfGas || 0,
-          dataItem.amountOfLimit || 0,
-          dataItem.payment || 0,
-        );
+      // Если есть данные за период - используем их, иначе нули
+      const limit = dataItem?.limit || 0;
+      const amountOfLimit = dataItem?.amountOfLimit || 0;
+      const totalGas = dataItem?.totalGas || 0;
+      const gasByMeter = dataItem?.gasByMeter || 0;
+      const confError = dataItem?.confError || 0;
+      const lowPress = dataItem?.lowPress || 0;
+      const gasAct = dataItem?.gasAct || 0;
+      const amountOfGas = dataItem?.amountOfGas || 0;
+      const payment = dataItem?.payment || 0;
 
-        calculatedData.push({
-          id: parseInt(stationId), // Используем ID станции как основной ID
-          stationId: station.id,
-          stationName: station.name || "Неизвестно",
-          landmark: station.landmark || "Немаълум",
-          startBalance,
-          limit: dataItem.limit || 0,
-          amountOfLimit: dataItem.amountOfLimit || 0,
-          totalGas: dataItem.totalGas || 0,
-          gasByMeter: dataItem.gasByMeter || 0,
-          confError: dataItem.confError || 0,
-          lowPress: dataItem.lowPress || 0,
-          gasAct: dataItem.gasAct || 0,
-          amountOfGas: dataItem.amountOfGas || 0,
-          payment: dataItem.payment || 0,
-          endBalance,
-        });
+      // Рассчитываем конечный баланс
+      const endBalance = calculateEndBalance(
+        startBalance,
+        amountOfGas,
+        amountOfLimit,
+        payment,
+      );
+
+      calculatedData.push({
+        id: parseInt(stationId),
+        stationId: station.id,
+        stationName: station.name || "Неизвестно",
+        landmark: station.landmark || "Немаълум",
+        startBalance,
+        limit,
+        amountOfLimit,
+        totalGas,
+        gasByMeter,
+        confError,
+        lowPress,
+        gasAct,
+        amountOfGas,
+        payment,
+        endBalance,
+        hasData: !!dataItem, // Флаг, есть ли данные
       });
     });
 
-    // Сортируем по ID станции (числовое сравнение)
+    // Сортируем по ID станции
     calculatedData.sort((a, b) => {
-      // Сначала пытаемся сортировать по числовому ID
       const idA = parseInt(a.id) || 0;
       const idB = parseInt(b.id) || 0;
-
-      // Если ID одинаковые или оба равны 0, сортируем по имени
       if (idA === idB) {
         return a.stationName.localeCompare(b.stationName);
       }
-
       return idA - idB;
     });
 
-    // Обновляем индексы для отображения (1, 2, 3...)
+    // Обновляем индексы для отображения
     calculatedData.forEach((item, idx) => {
-      item.displayId = idx + 1; // Добавляем отдельное поле для отображения
+      item.displayId = idx + 1;
     });
 
-    // console.log("Calculated table data (sorted by ID):", calculatedData);
+    // console.log("Final table data count:", calculatedData.length);
+    // console.log(
+    //   "Station IDs in table:",
+    //   calculatedData.map((d) => d.id),
+    // );
+    // console.log(
+    //   "Stations WITHOUT data:",
+    //   calculatedData
+    //     .filter((d) => !d.hasData)
+    //     .map((d) => ({ id: d.id, name: d.stationName })),
+    // );
+
     setTableData(calculatedData);
   };
 
-  // Обработчик клика по строке таблицы
   const handleRowClick = (row) => {
-    // console.log("Row clicked:", row);
-
-    // Находим полные данные станции
     const station = stations.find(
       (s) =>
         s.name === row.stationName ||
@@ -340,20 +293,16 @@ const GasSettlements = () => {
         rowData: row,
       });
       setStationDetailsModal(true);
-    } else {
-      console.warn("Station not found for row:", row);
     }
   };
 
   const handleFilterChange = (name, value) => {
-    // console.log(`Filter change: ${name} = ${value}`);
     setFilters((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  // Функция экспорта в Excel
   const handleExportExcel = async () => {
     if (tableData.length === 0) {
       alert("Экспорт учун маълумот йўқ!");
@@ -362,14 +311,17 @@ const GasSettlements = () => {
 
     try {
       await exportToExcel(tableData, filters, stations);
-      // alert(`Данные успешно экспортированы в Excel!`);
     } catch (error) {
-      console.error("Ошибка при экспорте:", error);
+      // console.error("Ошибка при экспорте:", error);
       alert("Excel га экспортда хатолик: " + error.message);
     }
   };
 
-  // Проверяем, является ли пользователь админом
+  const handleStationAdded = async () => {
+    // console.log("Station added, reloading stations...");
+    await reloadStations();
+  };
+
   const isAdmin = currentUser?.role === "admin";
 
   if (loading) {
@@ -387,7 +339,6 @@ const GasSettlements = () => {
           Худудгаз билан ҳисоб-китоблар (Газ ҳисоботи)
         </h2>
 
-        {/* Кнопка "Киритилган маълумотлар рўйхати" только для админа */}
         {isAdmin && (
           <motion.button
             onClick={() => navigate("/gas-settlements/list")}
@@ -412,7 +363,7 @@ const GasSettlements = () => {
               onChange={(e) => handleFilterChange("year", e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              {[2026].map((year) => (
+              {[2024, 2025, 2026, 2027].map((year) => (
                 <option key={year} value={year}>
                   {year}
                 </option>
@@ -484,7 +435,6 @@ const GasSettlements = () => {
           </div>
         </div>
 
-        {/* Кнопки действий - только для админа */}
         {isAdmin && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
             <motion.button
@@ -515,7 +465,6 @@ const GasSettlements = () => {
           </div>
         )}
 
-        {/* Если пользователь не админ, показываем только информацию о количестве */}
         {!isAdmin && (
           <div className="pt-4 border-t">
             <div className="text-right text-sm text-gray-500">
@@ -536,12 +485,13 @@ const GasSettlements = () => {
         invertBalanceColors={true}
       />
 
-      {/* Модальное окно добавления заправки - только для админа */}
+      {/* Модальное окно добавления заправки */}
       <AnimatePresence>
         {openModal && isAdmin && (
           <AddNewDataGasStation
             open={openModal}
             onClose={() => setOpenModal(false)}
+            onStationAdded={handleStationAdded}
           />
         )}
       </AnimatePresence>
