@@ -131,16 +131,8 @@ const GasSettlementsDataList = () => {
       ? new Date(station.startDate + "-01")
       : new Date(period + "-01");
 
-    console.log(
-      `Расчет сальдо для станции ${stationId} (${station.name}) за период ${period}`,
-    );
-    console.log(`Начальное сальдо из базы: ${balance}`);
-
     // Если текущий период раньше стартового периода, возвращаем стартовый баланс
     if (currentPeriodDate < startPeriodDate) {
-      console.log(
-        `Текущий период ${period} раньше стартового ${station.startDate}, возвращаем ${balance}`,
-      );
       return balance;
     }
 
@@ -159,19 +151,12 @@ const GasSettlementsDataList = () => {
       return dateA - dateB;
     });
 
-    console.log(
-      `Найдено ${sortedData.length} записей для станции ${stationId}`,
-    );
-
     // Рассчитываем баланс для всех периодов до редактируемого (не включая его)
     for (const dataItem of sortedData) {
       const itemDate = new Date(dataItem.period + "-01");
 
       // Если период позже или равен текущему редактируемому периоду, останавливаемся
       if (itemDate >= currentPeriodDate) {
-        console.log(
-          `Пропускаем период ${dataItem.period} (текущий или будущий)`,
-        );
         break;
       }
 
@@ -184,19 +169,9 @@ const GasSettlementsDataList = () => {
           : parseFloat(dataItem.amountOfLimit) || 0;
 
       const payment = parseFloat(dataItem.payment) || 0;
-
-      const oldBalance = balance;
       balance = balance + gasAmount - payment;
-
-      console.log(`Период ${dataItem.period}: 
-        amountOfGas=${dataItem.amountOfGas}, 
-        amountOfLimit=${dataItem.amountOfLimit}, 
-        использовано=${gasAmount}, 
-        payment=${payment}, 
-        сальдо ${oldBalance} -> ${balance}`);
     }
 
-    console.log(`Итоговое сальдо на начало периода ${period}: ${balance}`);
     return balance;
   };
 
@@ -229,7 +204,6 @@ const GasSettlementsDataList = () => {
   };
 
   useEffect(() => {
-    console.log("Settlements data updated:", settlementsData.length);
     updateUniquePeriods(settlementsData);
   }, [settlementsData, refreshKey]);
 
@@ -249,7 +223,6 @@ const GasSettlementsDataList = () => {
     const dataForPeriod = settlementsData.filter(
       (item) => item.period === period,
     );
-    console.log(dataForPeriod);
 
     setSelectedData({
       period,
@@ -258,19 +231,59 @@ const GasSettlementsDataList = () => {
     setViewModal(true);
   };
 
+  // ИСПРАВЛЕННАЯ ФУНКЦИЯ handleEdit - теперь добавляет новые станции
   const handleEdit = (period) => {
     const dataForPeriod = settlementsData.filter(
       (item) => item.period === period,
     );
 
+    // Получаем все stationId, для которых уже есть данные
+    const existingStationIds = dataForPeriod.map((item) =>
+      item.stationId.toString(),
+    );
+
+    // Находим станции, у которых нет данных за этот период
+    const missingStations = stations.filter(
+      (station) => !existingStationIds.includes(station.id.toString()),
+    );
+
+    console.log("Existing stations:", existingStationIds);
+    console.log(
+      "Missing stations:",
+      missingStations.map((s) => s.id),
+    );
+
+    // Создаем пустые записи для недостающих станций
+    const newEntriesForMissingStations = missingStations.map((station) => {
+      return {
+        period: period,
+        stationId: station.id,
+        limit: 0,
+        gasByMeter: 0,
+        confError: 0,
+        lowPress: 0,
+        gasAct: 0,
+        payment: 0,
+        actualConsumption: null,
+        useCalculatedConsumption: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    // Объединяем существующие данные с новыми записями
+    const allDataForPeriod = [
+      ...dataForPeriod,
+      ...newEntriesForMissingStations,
+    ];
+
     // Проверяем, есть ли в данных режим расчетного потребления
-    const hasCalculatedConsumption = dataForPeriod.some(
+    const hasCalculatedConsumption = allDataForPeriod.some(
       (item) => item.useCalculatedConsumption === true,
     );
 
     if (hasCalculatedConsumption) {
-      // Получаем данные для режима расчета
-      const firstItemWithCalc = dataForPeriod.find(
+      const firstItemWithCalc = allDataForPeriod.find(
         (item) => item.useCalculatedConsumption === true,
       );
       setUseCalculatedConsumption(true);
@@ -284,11 +297,11 @@ const GasSettlementsDataList = () => {
 
     setSelectedData({
       period,
-      data: dataForPeriod,
+      data: allDataForPeriod,
     });
 
     // Создаем копию данных для редактирования с рассчитанным сальдо на начало
-    const editingDataWithBalance = dataForPeriod.map((item) => {
+    const editingDataWithBalance = allDataForPeriod.map((item) => {
       const startBalance = calculateBalanceForPeriod(
         item.stationId,
         period,
@@ -302,6 +315,13 @@ const GasSettlementsDataList = () => {
       };
     });
 
+    // Сортируем по ID станции
+    editingDataWithBalance.sort((a, b) => {
+      const idA = parseInt(a.stationId) || 0;
+      const idB = parseInt(b.stationId) || 0;
+      return idA - idB;
+    });
+
     setEditingData(editingDataWithBalance);
     setEditModal(true);
   };
@@ -309,8 +329,6 @@ const GasSettlementsDataList = () => {
   // Обработка изменений в форме редактирования
   const handleEditChange = (index, field, value) => {
     const newEditingData = [...editingData];
-
-    // NumericFormat передает нам числовое значение через floatValue
     const numericValue = value || 0;
 
     newEditingData[index] = {
@@ -377,56 +395,59 @@ const GasSettlementsDataList = () => {
     setSaving(true);
 
     try {
-      // 1. Получаем ссылку на документ main в коллекции gasSettlements
       const mainDocRef = doc(db, "gasSettlements", "main");
-
-      // 2. Получаем текущие данные
       const currentData = [...settlementsData];
 
-      // 3. Обновляем данные в массиве currentData
+      // Обновляем или добавляем данные
       editingData.forEach((editedItem) => {
         const index = currentData.findIndex(
           (item) =>
             item.period === editedItem.period &&
-            item.stationId === editedItem.stationId,
+            item.stationId.toString() === editedItem.stationId.toString(),
         );
 
+        const price = getCurrentPriceForPeriod(editedItem.period);
+        const derived = calculateDerivedFields(editedItem, editedItem.period);
+
+        const updatedItem = {
+          ...editedItem,
+          amountOfLimit: (editedItem.limit || 0) * price,
+          amountOfGas: derived.amountOfGas,
+          totalGas: derived.totalGas,
+          calculatedMonthlyConsumption: derived.calculatedMonthlyConsumption,
+          useCalculatedConsumption: useCalculatedConsumption,
+          actualConsumptionDays: useCalculatedConsumption
+            ? parseInt(actualConsumptionDays)
+            : null,
+          updatedAt: new Date().toISOString(),
+        };
+
+        // Удаляем временные поля перед сохранением
+        delete updatedItem.calculatedStartBalance;
+
         if (index !== -1) {
-          const price = getCurrentPriceForPeriod(editedItem.period);
-          const derived = calculateDerivedFields(editedItem, editedItem.period);
-
-          const updatedItem = {
-            ...currentData[index],
-            ...editedItem,
-            amountOfLimit: (editedItem.limit || 0) * price,
-            amountOfGas: derived.amountOfGas,
-            totalGas: derived.totalGas,
-            calculatedMonthlyConsumption: derived.calculatedMonthlyConsumption,
-            useCalculatedConsumption: useCalculatedConsumption,
-            actualConsumptionDays: useCalculatedConsumption
-              ? parseInt(actualConsumptionDays)
-              : null,
-            updatedAt: new Date().toISOString(),
-          };
-
-          // Удаляем временные поля перед сохранением
-          delete updatedItem.calculatedStartBalance;
-
+          // Обновляем существующую запись
           currentData[index] = updatedItem;
+        } else {
+          // Добавляем новую запись
+          currentData.push({
+            ...updatedItem,
+            createdAt: new Date().toISOString(),
+          });
         }
       });
 
-      // 4. Сохраняем обновленные данные в Firebase
+      // Сохраняем обновленные данные в Firebase
       await updateDoc(mainDocRef, {
         data: currentData,
         updatedAt: new Date().toISOString(),
       });
 
-      // 5. Обновляем локальные данные
+      // Обновляем локальные данные
       await reloadData();
       setRefreshKey((prev) => prev + 1);
 
-      // 6. Закрываем модальное окно
+      // Закрываем модальное окно
       setEditModal(false);
       alert("Данные успешно сохранены!");
     } catch (error) {
@@ -477,7 +498,7 @@ const GasSettlementsDataList = () => {
           <div className="flex items-center gap-2 mt-2">
             <span className="text-sm text-gray-500">
               Всего периодов: {uniquePeriods.length} • Всего записей:{" "}
-              {settlementsData.length}
+              {settlementsData.length} • Всего станций: {stations.length}
             </span>
             <button
               onClick={handleRefresh}
@@ -592,6 +613,9 @@ const GasSettlementsDataList = () => {
                     (d) => d.useCalculatedConsumption === true,
                   );
 
+                  // Показываем, сколько станций не имеют данных
+                  const missingStationsCount = stations.length - count;
+
                   return (
                     <motion.tr
                       key={`${item.period}-${refreshKey}`}
@@ -613,8 +637,13 @@ const GasSettlementsDataList = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono">{count}</span>
+                          <span className="font-mono font-bold">{count}</span>
                           <span className="text-gray-500">заправок</span>
+                          {missingStationsCount > 0 && (
+                            <span className="text-xs text-orange-500 ml-2">
+                              (нет данных для {missingStationsCount} шт.)
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="p-4">
@@ -801,7 +830,6 @@ const GasSettlementsDataList = () => {
                       {selectedData.data.length} заправок, период:{" "}
                       {selectedData.period}
                     </p>
-                    {/* Отображение режима расчета */}
                     {selectedData.data.some(
                       (d) => d.useCalculatedConsumption,
                     ) && (
@@ -891,7 +919,6 @@ const GasSettlementsDataList = () => {
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                          {/* Лимит */}
                           <div className="bg-white p-3 rounded-lg border">
                             <div className="text-sm text-gray-500 mb-1">
                               Лимит
@@ -910,7 +937,6 @@ const GasSettlementsDataList = () => {
                             </div>
                           </div>
 
-                          {/* Сумма по лимиту */}
                           <div className="bg-white p-3 rounded-lg border">
                             <div className="text-sm text-gray-500 mb-1">
                               Сумма по лимиту
@@ -930,49 +956,46 @@ const GasSettlementsDataList = () => {
                             </div>
                           </div>
 
-                          {/* Фактическое потребление газа (только в расчетном режиме) */}
                           {item.useCalculatedConsumption && (
-                            <div className="bg-white p-3 rounded-lg border">
-                              <div className="text-sm text-gray-500 mb-1">
-                                Факт. потребление
+                            <>
+                              <div className="bg-white p-3 rounded-lg border">
+                                <div className="text-sm text-gray-500 mb-1">
+                                  Факт. потребление
+                                </div>
+                                <div className="font-mono font-medium">
+                                  {item.actualConsumption ? (
+                                    <NumericFormat
+                                      value={item.actualConsumption}
+                                      displayType="text"
+                                      thousandSeparator=" "
+                                      decimalScale={0}
+                                    />
+                                  ) : (
+                                    "-"
+                                  )}
+                                </div>
                               </div>
-                              <div className="font-mono font-medium">
-                                {item.actualConsumption ? (
-                                  <NumericFormat
-                                    value={item.actualConsumption}
-                                    displayType="text"
-                                    thousandSeparator=" "
-                                    decimalScale={0}
-                                  />
-                                ) : (
-                                  "-"
-                                )}
+
+                              <div className="bg-white p-3 rounded-lg border">
+                                <div className="text-sm text-gray-500 mb-1">
+                                  Расчет на месяц
+                                </div>
+                                <div className="font-mono font-medium">
+                                  {item.calculatedMonthlyConsumption ? (
+                                    <NumericFormat
+                                      value={item.calculatedMonthlyConsumption}
+                                      displayType="text"
+                                      thousandSeparator=" "
+                                      decimalScale={0}
+                                    />
+                                  ) : (
+                                    "-"
+                                  )}
+                                </div>
                               </div>
-                            </div>
+                            </>
                           )}
 
-                          {/* Расчетное потребление газа в месяц (только в расчетном режиме) */}
-                          {item.useCalculatedConsumption && (
-                            <div className="bg-white p-3 rounded-lg border">
-                              <div className="text-sm text-gray-500 mb-1">
-                                Расчет на месяц
-                              </div>
-                              <div className="font-mono font-medium">
-                                {item.calculatedMonthlyConsumption ? (
-                                  <NumericFormat
-                                    value={item.calculatedMonthlyConsumption}
-                                    displayType="text"
-                                    thousandSeparator=" "
-                                    decimalScale={0}
-                                  />
-                                ) : (
-                                  "-"
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Всего получено газа */}
                           <div className="bg-white p-3 rounded-lg border">
                             <div className="text-sm text-gray-500 mb-1">
                               Всего получено газа
@@ -990,7 +1013,6 @@ const GasSettlementsDataList = () => {
                               )}
                             </div>
 
-                            {/* Детали только в обычном режиме */}
                             {!item.useCalculatedConsumption && (
                               <div className="mt-3 space-y-1">
                                 <div className="text-xs text-gray-500">
@@ -1070,7 +1092,6 @@ const GasSettlementsDataList = () => {
                             )}
                           </div>
 
-                          {/* Сумма всего газа */}
                           <div className="bg-white p-3 rounded-lg border">
                             <div className="text-sm text-gray-500 mb-1">
                               Сумма газа
@@ -1090,7 +1111,6 @@ const GasSettlementsDataList = () => {
                             </div>
                           </div>
 
-                          {/* Оплата */}
                           <div className="bg-white p-3 rounded-lg border">
                             <div className="text-sm text-gray-500 mb-1">
                               Оплата
@@ -1178,7 +1198,7 @@ const GasSettlementsDataList = () => {
                         thousandSeparator=" "
                         decimalScale={0}
                       />{" "}
-                      сум/м³
+                      сум/м³ • Всего станций: {editingData.length}
                     </p>
                   </div>
                   <button
@@ -1203,63 +1223,61 @@ const GasSettlementsDataList = () => {
               </div>
 
               {/* Блок настройки режима расчета */}
-              <div className="bg-blue-50 p-1 border-b">
+              <div className="bg-blue-50 p-4 border-b">
                 <div className="max-w-4xl mx-auto">
-                  <div className="mb-1">
-                    <div className="grid grid-cols-3 gap-4">
-                      <label className="flex items-center gap-2 mb-3">
-                        <input
-                          type="checkbox"
-                          checked={useCalculatedConsumption}
-                          onChange={handleModeChange}
-                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                          disabled={saving}
-                        />
-                        <span className="text-sm font-medium text-gray-700">
-                          Использовать расчетное потребление
-                        </span>
+                  <div className="grid grid-cols-3 gap-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={useCalculatedConsumption}
+                        onChange={handleModeChange}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        disabled={saving}
+                      />
+                      <span className="text-sm font-medium text-gray-700">
+                        Использовать расчетное потребление
+                      </span>
+                    </label>
+                    <div
+                      className={`${!useCalculatedConsumption ? "opacity-50" : ""}`}
+                    >
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Кол-во дней потребления газа
                       </label>
-                      <div
-                        className={`${!useCalculatedConsumption ? "opacity-50" : ""} flex`}
-                      >
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Кол-во дней потр-ния газа
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max={
-                            selectedData.period
-                              ? getDaysInMonth(selectedData.period)
-                              : 31
-                          }
-                          value={actualConsumptionDays}
-                          onChange={(e) =>
-                            setActualConsumptionDays(e.target.value)
-                          }
-                          className={`w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                            !useCalculatedConsumption
-                              ? "bg-gray-100 cursor-not-allowed"
-                              : ""
-                          }`}
-                          disabled={saving || !useCalculatedConsumption}
-                        />
-                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        max={
+                          selectedData.period
+                            ? getDaysInMonth(selectedData.period)
+                            : 31
+                        }
+                        value={actualConsumptionDays}
+                        onChange={(e) =>
+                          setActualConsumptionDays(e.target.value)
+                        }
+                        className={`w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          !useCalculatedConsumption
+                            ? "bg-gray-100 cursor-not-allowed"
+                            : ""
+                        }`}
+                        disabled={saving || !useCalculatedConsumption}
+                      />
+                    </div>
 
-                      <div
-                        className={`${!useCalculatedConsumption ? "opacity-50" : ""} flex`}
-                      >
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Оставшиеся дни месяца
-                        </label>
-                        <input
-                          type="text"
-                          value={remainingDays}
-                          className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
-                          readOnly
-                          disabled
-                        />
-                      </div>
+                    <div
+                      className={`${!useCalculatedConsumption ? "opacity-50" : ""}`}
+                    >
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Оставшиеся дни месяца
+                      </label>
+                      <input
+                        type="text"
+                        value={remainingDays}
+                        className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
+                        readOnly
+                        disabled
+                      />
                     </div>
                   </div>
                 </div>
@@ -1284,16 +1302,25 @@ const GasSettlementsDataList = () => {
                     const endBalance =
                       startBalance + gasAmount - (item.payment || 0);
 
+                    // Проверяем, есть ли уже данные для этой станции
+                    const hasExistingData = settlementsData.some(
+                      (d) =>
+                        d.period === selectedData.period &&
+                        d.stationId.toString() === item.stationId.toString(),
+                    );
+
                     return (
                       <div
                         key={`${item.stationId}-${item.period}`}
-                        className="bg-gray-50 rounded-xl p-6 border border-gray-200"
+                        className={`rounded-xl p-6 border ${hasExistingData ? "bg-gray-50 border-gray-200" : "bg-yellow-50 border-yellow-300"}`}
                       >
                         <div className="flex items-center gap-3 mb-6">
-                          <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center font-bold text-lg">
+                          <div
+                            className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg ${hasExistingData ? "bg-blue-100 text-blue-600" : "bg-yellow-100 text-yellow-600"}`}
+                          >
                             {index + 1}
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <h4 className="font-bold text-xl text-blue-600">
                               {station?.name || "Неизвестно"}
                             </h4>
@@ -1301,6 +1328,11 @@ const GasSettlementsDataList = () => {
                               ID: {item.stationId} • {station?.landmark || ""}
                             </p>
                           </div>
+                          {!hasExistingData && (
+                            <div className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded-full text-xs font-medium">
+                              Новые данные
+                            </div>
+                          )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
@@ -1366,7 +1398,6 @@ const GasSettlementsDataList = () => {
 
                           {/* Поля в зависимости от режима */}
                           {useCalculatedConsumption ? (
-                            // Режим расчетного потребления
                             <>
                               <div className="bg-white p-4 rounded-lg border border-gray-300">
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -1424,7 +1455,6 @@ const GasSettlementsDataList = () => {
                               </div>
                             </>
                           ) : (
-                            // Обычный режим
                             <div className="bg-white p-4 rounded-lg border border-gray-300 col-span-2">
                               <label className="block text-sm font-semibold text-gray-700 mb-3">
                                 Компоненты газа (м³)
@@ -1602,7 +1632,7 @@ const GasSettlementsDataList = () => {
                         </div>
 
                         {/* Сводка по станции */}
-                        <div className="mt-1 pt-1 border-t border-blue-200">
+                        <div className="mt-4 pt-4 border-t border-blue-200">
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <span className="text-gray-600">
@@ -1644,7 +1674,7 @@ const GasSettlementsDataList = () => {
                 </div>
               </div>
 
-              <div className="bg-gray-50 px-6 py-1 border-t flex justify-between items-center">
+              <div className="bg-gray-50 px-6 py-4 border-t flex justify-between items-center">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
