@@ -4,6 +4,8 @@ import { db } from "../firebase/config";
 
 const StationsSelection = ({ selectedStations, onStationsChange, onClose }) => {
   const [stations, setStations] = useState([]);
+  
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -49,52 +51,59 @@ const StationsSelection = ({ selectedStations, onStationsChange, onClose }) => {
   };
 
   // Функция для получения названия станции
-  const getStationName = (station) => {
-    // Используем msc как название станции, если оно есть
-    if (station.msc) return station.msc;
+  // Функция для получения названия станции
+const getStationName = (station) => {
+  // Сначала проверяем stationName (основное поле для названия)
+  if (station.stationName) return station.stationName;
+  
+  // Затем проверяем msc как альтернативу
+  if (station.msc) return station.msc;
 
-    // Или создаем название из адреса
-    if (station.address) {
-      const address = getFullAddress(station.address);
-      return address || `Станция ${station.id.substring(0, 8)}`;
-    }
+  // Или создаем название из адреса
+  if (station.address) {
+    const address = getFullAddress(station.address);
+    return address || `Станция ${station.id.substring(0, 8)}`;
+  }
 
-    return `Станция ${station.id.substring(0, 8)}`;
-  };
+  return `Станция ${station.id.substring(0, 8)}`;
+};
 
   const filteredStations = stations.filter((station) => {
-    if (!searchTerm) return true;
+  if (!searchTerm) return true;
 
-    const searchLower = searchTerm.toLowerCase();
+  const searchLower = searchTerm.toLowerCase();
 
-    // Поиск по названию станции
-    const stationName = getStationName(station).toLowerCase();
-    if (stationName.includes(searchLower)) return true;
+  // Поиск по названию станции (обновлено)
+  const stationName = (station.stationName || station.msc || "").toLowerCase();
+  if (stationName.includes(searchLower)) return true;
 
-    // Поиск по адресу
-    const address = getFullAddress(station.address).toLowerCase();
-    if (address.includes(searchLower)) return true;
+  // Поиск по адресу
+  const address = getFullAddress(station.address).toLowerCase();
+  if (address.includes(searchLower)) return true;
 
-    // Поиск по номеру телефона
-    if (station.phone && station.phone.toLowerCase().includes(searchLower))
-      return true;
+  // Поиск по номеру телефона
+  if (station.phone && station.phone.toLowerCase().includes(searchLower))
+    return true;
 
-    // Поиск по городу
-    if (
-      station.address?.cityName &&
-      station.address.cityName.toLowerCase().includes(searchLower)
-    )
-      return true;
+  // Поиск по городу
+  if (
+    station.address?.cityName &&
+    station.address.cityName.toLowerCase().includes(searchLower)
+  )
+    return true;
 
-    // Поиск по региону
-    if (
-      station.address?.regionName &&
-      station.address.regionName.toLowerCase().includes(searchLower)
-    )
-      return true;
+  // Поиск по региону
+  if (
+    station.address?.regionName &&
+    station.address.regionName.toLowerCase().includes(searchLower)
+  )
+    return true;
 
-    return false;
-  });
+  return false;
+});
+
+ 
+  
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
@@ -136,6 +145,7 @@ const StationsSelection = ({ selectedStations, onStationsChange, onClose }) => {
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1"
                   />
                   <div className="ml-3 flex-1">
+                    
                     <div className="text-sm font-medium text-gray-900">
                       {getStationName(station)}
                     </div>
