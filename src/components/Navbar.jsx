@@ -58,8 +58,8 @@ import {
   Calculate as CalculateIcon,
   Work as WorkIcon,
   Speed as MeterIcon,
-  SettingsBackupRestore as ZeroIcon, // Иконка для ноллаш
-  Lock as SealIcon, // Иконка для пломбалаш
+  SettingsBackupRestore as ZeroIcon,
+  Lock as SealIcon,
 } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
@@ -103,7 +103,7 @@ export default function Navbar() {
   const [dailyReportsOpen, setDailyReportsOpen] = React.useState(false);
   const [energySettlementsOpen, setEnergySettlementsOpen] =
     React.useState(false);
-  const [zeroSealOpen, setZeroSealOpen] = React.useState(false); // Новое состояние для ноллаш ва пломбалаш
+  const [zeroSealOpen, setZeroSealOpen] = React.useState(false);
   const [userModalOpen, setUserModalOpen] = React.useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = React.useState(false);
   const [passwordData, setPasswordData] = React.useState({
@@ -185,7 +185,7 @@ export default function Navbar() {
       setPartnersOpen(false);
       setDailyReportsOpen(false);
       setEnergySettlementsOpen(false);
-      setZeroSealOpen(false); // Закрываем ноллаш ва пломбалаш при закрытии меню
+      setZeroSealOpen(false);
     }
   };
 
@@ -219,7 +219,7 @@ export default function Navbar() {
   const handleDailyReportsClick = () => setDailyReportsOpen(!dailyReportsOpen);
   const handleEnergySettlementsClick = () =>
     setEnergySettlementsOpen(!energySettlementsOpen);
-  const handleZeroSealClick = () => setZeroSealOpen(!zeroSealOpen); // Обработчик для ноллаш ва пломбалаш
+  const handleZeroSealClick = () => setZeroSealOpen(!zeroSealOpen);
 
   const handlePasswordChange = () => {
     setPasswordModalOpen(true);
@@ -374,7 +374,6 @@ export default function Navbar() {
     }
   };
 
-  // Обновленный массив menuItems - удаляем "Колонка кўрсаткичларини ўзгартириш" отсюда
   const menuItems = [
     { text: "Заправкалар", icon: <LocalGasStationIcon />, path: "/stations" },
     { text: "Ходимлар", icon: <BadgeIcon />, path: "/employees" },
@@ -382,10 +381,8 @@ export default function Navbar() {
     { text: "МЧЖлар", icon: <CorporateFareIcon />, path: "/ltds" },
     { text: "Банк", icon: <AccountBalanceIcon />, path: "/banks" },
     { text: "Лавозимлар", icon: <WorkIcon />, path: "/jobtitle" },
-    // Убрали отсюда "Колонка кўрсаткичларини ўзгартириш"
   ];
 
-  // Новые пункты для документов rahbar/booker (перенесены из навбара)
   const rahbarDocumentsItems = [
     {
       text: "Муддатлар бўйича хужжатлар",
@@ -399,7 +396,6 @@ export default function Navbar() {
     },
   ];
 
-  // Пункты для "Ноллаш ва пломбалаш"
   const zeroSealItems = [
     {
       text: "Колонка кўрсаткичларини ўзгартириш",
@@ -545,23 +541,18 @@ export default function Navbar() {
     },
   ];
 
-  // ⚙️ ФИЛЬТРАЦИЯ ПУНКТОВ ПО РОЛИ - ОБНОВЛЕННЫЙ КОД
+  // ⚙️ ФИЛЬТРАЦИЯ ПУНКТОВ ПО РОЛИ
   const getFilteredMenuItems = () => {
     if (!role) return [];
 
     switch (role) {
       case "admin":
         return menuItems;
-
       case "electrengineer":
-        // Теперь electrengineer не видит пункт в основном меню, он будет в "Ноллаш ва пломбалаш"
-        return menuItems.filter((item) => item.text === ""); // Пустой фильтр
-
+        return menuItems.filter((item) => item.text === "");
       case "buxgalter":
         return menuItems.filter((item) => item.text === "Ҳамкорлар");
-
       case "rahbar":
-        // Для rahbar исключаем указанные пункты
         return menuItems.filter(
           (item) =>
             item.text !== "Заправкалар" &&
@@ -570,16 +561,13 @@ export default function Navbar() {
             item.text !== "Банк" &&
             item.text !== "Лавозимлар" &&
             item.text !== "Фойдаланувчилар",
-          // Убрали проверку на "Колонка кўрсаткичларини ўзгартириш"
         );
-
       case "nazoratbux":
-        // Теперь nazoratbux не видит пункт в основном меню, он будет в "Ноллаш ва пломбалаш"
-        return menuItems.filter((item) => item.text === ""); // Пустой фильтр
-
+        return menuItems.filter((item) => item.text === "");
       case "operator":
         return menuItems.filter((item) => item.text !== "Фойдаланувчилар");
-
+      case "metrolog-hududgaz":
+        return []; // Метролог Худудгаз не видит основные пункты меню
       default:
         return [];
     }
@@ -587,23 +575,23 @@ export default function Navbar() {
 
   const filteredMenuItems = getFilteredMenuItems();
 
-  // Определяем, кому показывать "Ноллаш ва пломбалаш"
   const canSeeZeroSeal = () => {
     if (!role) return false;
-
-    // Показываем для admin, electrengineer и nazoratbux
     return ["admin", "electrengineer", "nazoratbux"].includes(role);
   };
 
-  // Определяем, кому показывать кнопки документов в навбаре
   const shouldShowDocumentButtonsInNavbar = () => {
     if (!role) return false;
-
-    // Показываем в навбаре только на десктопе/планшете для rahbar и buxgalter
     const isRahbarOrBooker = ["rahbar", "buxgalter", "nazoratbux"].includes(
       role,
     );
     return isRahbarOrBooker && !isMobile;
+  };
+
+  // Определяем, кому показывать раздел "Хужжатлар" (для metrolog-hududgaz только этот раздел)
+  const shouldShowDocumentsSection = () => {
+    if (!role) return false;
+    return role === "admin" || role === "metrolog-hududgaz";
   };
 
   const getRoleBadge = () => {
@@ -614,6 +602,7 @@ export default function Navbar() {
       rahbar: { color: "#8b5cf6", text: "Рахбар" },
       electrengineer: { color: "#f59e0b", text: "Электр инженер" },
       nazoratbux: { color: "#ec4899", text: "Назорат бухгалтер" },
+      "metrolog-hududgaz": { color: "#06b6d4", text: "Метролог Ҳудудгаз" },
     };
 
     const config = roleConfig[role] || { color: "#6b7280", text: role };
@@ -649,13 +638,14 @@ export default function Navbar() {
         }}
       >
         <Toolbar sx={{ minHeight: { xs: "64px", md: "70px" } }}>
-          {/* Показываем кнопку меню для admin, buxgalter, operator, rahbar, electrengineer и nazoratbux */}
+          {/* Показываем кнопку меню для всех ролей, включая metrolog-hududgaz */}
           {role === "admin" ||
           role === "buxgalter" ||
           role === "operator" ||
           role === "rahbar" ||
           role === "electrengineer" ||
-          role === "nazoratbux" ? (
+          role === "nazoratbux" ||
+          role === "metrolog-hududgaz" ? (
             <IconButton
               size="large"
               edge="start"
@@ -703,10 +693,8 @@ export default function Navbar() {
               Метан Система
             </Typography>
 
-            {/* Бейдж роли на десктопе */}
             {!isMobile && getRoleBadge()}
           </Box>
-          {/* Кнопки для rahbar и booker - ТОЛЬКО НА ДЕСКТОПЕ/ПЛАНШЕТЕ */}
           {shouldShowDocumentButtonsInNavbar() && (
             <Box sx={{ display: "flex", gap: 1, mr: 3 }}>
               <Button
@@ -755,8 +743,6 @@ export default function Navbar() {
               </Button>
             </Box>
           )}
-          {/* Кнопка пользователя с меню */}
-
           {userData && (
             <div className="relative inline-block">
               <button
@@ -777,11 +763,9 @@ export default function Navbar() {
                 >
                   {isMobile ? getShortName() : getUserFullName()}
                 </span>
-                {/* Бейдж роли на мобильных */}
                 {isMobile && getRoleBadge()}
               </button>
 
-              {/* Выпадающее меню пользователя */}
               {userMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-in fade-in-0 zoom-in-95">
                   <div className="p-0">
@@ -815,7 +799,6 @@ export default function Navbar() {
               )}
             </div>
           )}
-          {/* Кнопка выхода */}
           <Button
             onClick={signOutProfile}
             color="inherit"
@@ -844,7 +827,6 @@ export default function Navbar() {
         </Toolbar>
       </AppBar>
 
-      {/* Модальное окно пользователя */}
       {userModalOpen && userData && (
         <UserModal
           user={{
@@ -869,16 +851,13 @@ export default function Navbar() {
         />
       )}
 
-      {/* Модальное окно смены пароля */}
       {passwordModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden">
-            {/* Заголовок */}
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
               <h2 className="text-xl font-semibold">🔐 Паролни ўзгартириш</h2>
             </div>
 
-            {/* Содержимое */}
             <div className="p-6">
               {passwordError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
@@ -887,7 +866,6 @@ export default function Navbar() {
               )}
 
               <div className="space-y-4">
-                {/* Текущий пароль */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Жорий пароль
@@ -914,7 +892,6 @@ export default function Navbar() {
                   </div>
                 </div>
 
-                {/* Новый пароль */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Янги пароль
@@ -945,7 +922,6 @@ export default function Navbar() {
                   </p>
                 </div>
 
-                {/* Подтверждение пароля */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Янги паролни тасдиқлаш
@@ -974,7 +950,6 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* Кнопки */}
             <div className="flex gap-3 p-6 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={handlePasswordClose}
@@ -995,13 +970,13 @@ export default function Navbar() {
         </div>
       )}
 
-      {/* Боковое меню */}
       {(role === "admin" ||
         role === "buxgalter" ||
         role === "operator" ||
         role === "rahbar" ||
         role === "electrengineer" ||
-        role === "nazoratbux") && (
+        role === "nazoratbux" ||
+        role === "metrolog-hududgaz") && (
         <Drawer
           anchor="left"
           open={drawerOpen}
@@ -1025,7 +1000,6 @@ export default function Navbar() {
               background: "transparent",
             }}
           >
-            {/* Заголовок меню */}
             <Box
               sx={{
                 display: "flex",
@@ -1061,7 +1035,6 @@ export default function Navbar() {
 
             <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
 
-            {/* Содержимое меню */}
             <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
               <List sx={{ padding: "8px" }}>
                 {/* 🔹 НОВЫЙ РАЗДЕЛ: Документы для rahbar/buxgalter/nazoratbux (на мобильных) */}
@@ -1359,25 +1332,20 @@ export default function Navbar() {
                       <List component="div" disablePadding>
                         {partnersItems
                           .filter((item) => {
-                            // Для nazoratbux показываем только "Ҳамкорлар қарздорлиги"
                             if (role === "nazoratbux") {
                               return item.text === "Ҳамкорлар қарздорлиги";
                             }
-                            // Для operator и rahbar показываем только "Ҳамкорлар қарздорлиги"
                             if (role === "operator" || role === "rahbar") {
                               return item.text === "Ҳамкорлар қарздорлиги";
                             }
-                            // Для buxgalter показываем все, кроме "Тўлов турлари"
                             if (role === "buxgalter") {
                               return (
                                 !item.roles || !item.roles.includes("admin")
                               );
                             }
-                            // Для admin показываем все
                             if (role === "admin") {
                               return true;
                             }
-                            // Для остальных ролей (если есть) - фильтруем по roles
                             return !item.roles || item.roles.includes(role);
                           })
                           .map((item) => (
@@ -1458,15 +1426,12 @@ export default function Navbar() {
                       <List component="div" disablePadding>
                         {dailyReportsItems
                           .filter((item) => {
-                            // Для nazoratbux показываем ВСЕ пункты (включая "Назорат суммалар")
                             if (role === "nazoratbux") {
                               return true;
                             }
-                            // Для operator показываем только "Кундалик ҳисобот"
                             if (role === "operator") {
                               return item.text !== "Назорат суммалар";
                             }
-                            // Для остальных показываем все
                             return true;
                           })
                           .map((item) => (
@@ -1510,8 +1475,8 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Документы (для admin и nazoratbux) */}
-                {role === "admin" && (
+                {/* 🔹 Документы (для admin и metrolog-hududgaz) - ОБНОВЛЕНО */}
+                {shouldShowDocumentsSection() && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
                       <ListItemButton
@@ -1537,9 +1502,17 @@ export default function Navbar() {
                     </ListItem>
                     <Collapse in={documentsOpen} timeout="auto" unmountOnExit>
                       <List component="div" disablePadding>
+                        {/* Для admin показываем все, для metrolog-hududgaz только подразделы */}
                         <ListItem disablePadding sx={{ pl: 2 }}>
                           <ListItemButton
-                            onClick={() => handleMenuClick("/doctypepage")}
+                            onClick={() => {
+                              if (role === "metrolog-hududgaz") {
+                                // Для metrolog-hududgaz показываем только подразделы
+                                handleDocsTimedClick();
+                              } else {
+                                handleMenuClick("/doctypepage");
+                              }
+                            }}
                             sx={{
                               borderRadius: "8px",
                               py: 1.2,
@@ -1556,7 +1529,11 @@ export default function Navbar() {
                               <CategoryIcon />
                             </ListItemIcon>
                             <ListItemText
-                              primary="Хужжатлар турлари"
+                              primary={
+                                role === "metrolog-hududgaz"
+                                  ? "Муддатли хужжатлар"
+                                  : "Хужжатлар турлари"
+                              }
                               primaryTypographyProps={{
                                 fontSize: "14px",
                                 color: "rgba(255,255,255,0.9)",
@@ -1565,151 +1542,252 @@ export default function Navbar() {
                           </ListItemButton>
                         </ListItem>
 
-                        <Divider
-                          sx={{ my: 1, borderColor: "rgba(255,255,255,0.1)" }}
-                        />
-
-                        <ListItem disablePadding sx={{ pl: 2 }}>
-                          <ListItemButton
-                            onClick={handleDocsTimedClick}
-                            sx={{
-                              borderRadius: "8px",
-                              py: 1.2,
-                              transition: "all 0.3s ease",
-                              "&:hover": {
-                                backgroundColor: "rgba(255,255,255,0.08)",
-                              },
-                            }}
-                          >
-                            <ListItemIcon
-                              sx={{ color: "rgba(255,255,255,0.8)" }}
-                            >
-                              <ScheduleIcon />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary="Муддатли хужжатлар"
-                              primaryTypographyProps={{
-                                fontSize: "14px",
-                                color: "rgba(255,255,255,0.9)",
+                        {role === "admin" && (
+                          <>
+                            <Divider
+                              sx={{
+                                my: 1,
+                                borderColor: "rgba(255,255,255,0.1)",
                               }}
                             />
-                            {docsTimedOpen ? <ExpandLess /> : <ExpandMore />}
-                          </ListItemButton>
-                        </ListItem>
-                        <Collapse
-                          in={docsTimedOpen}
-                          timeout="auto"
-                          unmountOnExit
-                        >
-                          <List component="div" disablePadding>
-                            {docsTimedItems.map((item) => (
-                              <ListItem
-                                key={item.text}
-                                disablePadding
-                                sx={{ pl: 4 }}
+
+                            <ListItem disablePadding sx={{ pl: 2 }}>
+                              <ListItemButton
+                                onClick={handleDocsTimedClick}
+                                sx={{
+                                  borderRadius: "8px",
+                                  py: 1.2,
+                                  transition: "all 0.3s ease",
+                                  "&:hover": {
+                                    backgroundColor: "rgba(255,255,255,0.08)",
+                                  },
+                                }}
                               >
-                                <ListItemButton
-                                  onClick={() => handleMenuClick(item.path)}
-                                  sx={{
-                                    borderRadius: "6px",
-                                    py: 1,
-                                    transition: "all 0.3s ease",
-                                    "&:hover": {
-                                      backgroundColor: "rgba(255,255,255,0.06)",
-                                      transform: "translateX(5px)",
-                                    },
-                                  }}
+                                <ListItemIcon
+                                  sx={{ color: "rgba(255,255,255,0.8)" }}
                                 >
-                                  <ListItemIcon
-                                    sx={{ color: "rgba(255,255,255,0.7)" }}
-                                  >
-                                    {item.icon}
-                                  </ListItemIcon>
-                                  <ListItemText
-                                    primary={item.text}
-                                    primaryTypographyProps={{
-                                      fontSize: "13px",
-                                      color: "rgba(255,255,255,0.8)",
-                                    }}
-                                  />
-                                </ListItemButton>
-                              </ListItem>
-                            ))}
-                          </List>
-                        </Collapse>
-
-                        <Divider
-                          sx={{ my: 1, borderColor: "rgba(255,255,255,0.1)" }}
-                        />
-
-                        <ListItem disablePadding sx={{ pl: 2 }}>
-                          <ListItemButton
-                            onClick={handleDocsPerpClick}
-                            sx={{
-                              borderRadius: "8px",
-                              py: 1.2,
-                              transition: "all 0.3s ease",
-                              "&:hover": {
-                                backgroundColor: "rgba(255,255,255,0.08)",
-                              },
-                            }}
-                          >
-                            <ListItemIcon
-                              sx={{ color: "rgba(255,255,255,0.8)" }}
+                                  <ScheduleIcon />
+                                </ListItemIcon>
+                                <ListItemText
+                                  primary="Муддатли хужжатлар"
+                                  primaryTypographyProps={{
+                                    fontSize: "14px",
+                                    color: "rgba(255,255,255,0.9)",
+                                  }}
+                                />
+                                {docsTimedOpen ? (
+                                  <ExpandLess />
+                                ) : (
+                                  <ExpandMore />
+                                )}
+                              </ListItemButton>
+                            </ListItem>
+                            <Collapse
+                              in={docsTimedOpen}
+                              timeout="auto"
+                              unmountOnExit
                             >
-                              <AllInclusiveIcon />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary="Муддатсиз хужжатлар"
-                              primaryTypographyProps={{
-                                fontSize: "14px",
-                                color: "rgba(255,255,255,0.9)",
+                              <List component="div" disablePadding>
+                                {docsTimedItems.map((item) => (
+                                  <ListItem
+                                    key={item.text}
+                                    disablePadding
+                                    sx={{ pl: 4 }}
+                                  >
+                                    <ListItemButton
+                                      onClick={() => handleMenuClick(item.path)}
+                                      sx={{
+                                        borderRadius: "6px",
+                                        py: 1,
+                                        transition: "all 0.3s ease",
+                                        "&:hover": {
+                                          backgroundColor:
+                                            "rgba(255,255,255,0.06)",
+                                          transform: "translateX(5px)",
+                                        },
+                                      }}
+                                    >
+                                      <ListItemIcon
+                                        sx={{ color: "rgba(255,255,255,0.7)" }}
+                                      >
+                                        {item.icon}
+                                      </ListItemIcon>
+                                      <ListItemText
+                                        primary={item.text}
+                                        primaryTypographyProps={{
+                                          fontSize: "13px",
+                                          color: "rgba(255,255,255,0.8)",
+                                        }}
+                                      />
+                                    </ListItemButton>
+                                  </ListItem>
+                                ))}
+                              </List>
+                            </Collapse>
+
+                            <Divider
+                              sx={{
+                                my: 1,
+                                borderColor: "rgba(255,255,255,0.1)",
                               }}
                             />
-                            {docsPerpOpen ? <ExpandLess /> : <ExpandMore />}
-                          </ListItemButton>
-                        </ListItem>
-                        <Collapse
-                          in={docsPerpOpen}
-                          timeout="auto"
-                          unmountOnExit
-                        >
-                          <List component="div" disablePadding>
-                            {docsPerpItems.map((item) => (
-                              <ListItem
-                                key={item.text}
-                                disablePadding
-                                sx={{ pl: 4 }}
+
+                            <ListItem disablePadding sx={{ pl: 2 }}>
+                              <ListItemButton
+                                onClick={handleDocsPerpClick}
+                                sx={{
+                                  borderRadius: "8px",
+                                  py: 1.2,
+                                  transition: "all 0.3s ease",
+                                  "&:hover": {
+                                    backgroundColor: "rgba(255,255,255,0.08)",
+                                  },
+                                }}
                               >
-                                <ListItemButton
-                                  onClick={() => handleMenuClick(item.path)}
-                                  sx={{
-                                    borderRadius: "6px",
-                                    py: 1,
-                                    transition: "all 0.3s ease",
-                                    "&:hover": {
-                                      backgroundColor: "rgba(255,255,255,0.06)",
-                                      transform: "translateX(5px)",
-                                    },
-                                  }}
+                                <ListItemIcon
+                                  sx={{ color: "rgba(255,255,255,0.8)" }}
                                 >
-                                  <ListItemIcon
-                                    sx={{ color: "rgba(255,255,255,0.7)" }}
+                                  <AllInclusiveIcon />
+                                </ListItemIcon>
+                                <ListItemText
+                                  primary="Муддатсиз хужжатлар"
+                                  primaryTypographyProps={{
+                                    fontSize: "14px",
+                                    color: "rgba(255,255,255,0.9)",
+                                  }}
+                                />
+                                {docsPerpOpen ? <ExpandLess /> : <ExpandMore />}
+                              </ListItemButton>
+                            </ListItem>
+                            <Collapse
+                              in={docsPerpOpen}
+                              timeout="auto"
+                              unmountOnExit
+                            >
+                              <List component="div" disablePadding>
+                                {docsPerpItems.map((item) => (
+                                  <ListItem
+                                    key={item.text}
+                                    disablePadding
+                                    sx={{ pl: 4 }}
                                   >
-                                    {item.icon}
-                                  </ListItemIcon>
-                                  <ListItemText
-                                    primary={item.text}
-                                    primaryTypographyProps={{
-                                      fontSize: "13px",
-                                      color: "rgba(255,255,255,0.8)",
-                                    }}
-                                  />
-                                </ListItemButton>
-                              </ListItem>
-                            ))}
-                          </List>
-                        </Collapse>
+                                    <ListItemButton
+                                      onClick={() => handleMenuClick(item.path)}
+                                      sx={{
+                                        borderRadius: "6px",
+                                        py: 1,
+                                        transition: "all 0.3s ease",
+                                        "&:hover": {
+                                          backgroundColor:
+                                            "rgba(255,255,255,0.06)",
+                                          transform: "translateX(5px)",
+                                        },
+                                      }}
+                                    >
+                                      <ListItemIcon
+                                        sx={{ color: "rgba(255,255,255,0.7)" }}
+                                      >
+                                        {item.icon}
+                                      </ListItemIcon>
+                                      <ListItemText
+                                        primary={item.text}
+                                        primaryTypographyProps={{
+                                          fontSize: "13px",
+                                          color: "rgba(255,255,255,0.8)",
+                                        }}
+                                      />
+                                    </ListItemButton>
+                                  </ListItem>
+                                ))}
+                              </List>
+                            </Collapse>
+                          </>
+                        )}
+
+                        {/* Для metrolog-hududgaz добавляем подразделы Муддатли хужжатлар */}
+                        {role === "metrolog-hududgaz" && (
+                          <>
+                            <Divider
+                              sx={{
+                                my: 1,
+                                borderColor: "rgba(255,255,255,0.1)",
+                              }}
+                            />
+                            <ListItem disablePadding sx={{ pl: 2 }}>
+                              <ListItemButton
+                                onClick={handleDocsTimedClick}
+                                sx={{
+                                  borderRadius: "8px",
+                                  py: 1.2,
+                                  transition: "all 0.3s ease",
+                                  "&:hover": {
+                                    backgroundColor: "rgba(255,255,255,0.08)",
+                                  },
+                                }}
+                              >
+                                <ListItemIcon
+                                  sx={{ color: "rgba(255,255,255,0.8)" }}
+                                >
+                                  <ScheduleIcon />
+                                </ListItemIcon>
+                                <ListItemText
+                                  primary="Муддатли хужжатлар"
+                                  primaryTypographyProps={{
+                                    fontSize: "14px",
+                                    color: "rgba(255,255,255,0.9)",
+                                  }}
+                                />
+                                {docsTimedOpen ? (
+                                  <ExpandLess />
+                                ) : (
+                                  <ExpandMore />
+                                )}
+                              </ListItemButton>
+                            </ListItem>
+                            <Collapse
+                              in={docsTimedOpen}
+                              timeout="auto"
+                              unmountOnExit
+                            >
+                              <List component="div" disablePadding>
+                                {docsTimedItems.map((item) => (
+                                  <ListItem
+                                    key={item.text}
+                                    disablePadding
+                                    sx={{ pl: 4 }}
+                                  >
+                                    <ListItemButton
+                                      onClick={() => handleMenuClick(item.path)}
+                                      sx={{
+                                        borderRadius: "6px",
+                                        py: 1,
+                                        transition: "all 0.3s ease",
+                                        "&:hover": {
+                                          backgroundColor:
+                                            "rgba(255,255,255,0.06)",
+                                          transform: "translateX(5px)",
+                                        },
+                                      }}
+                                    >
+                                      <ListItemIcon
+                                        sx={{ color: "rgba(255,255,255,0.7)" }}
+                                      >
+                                        {item.icon}
+                                      </ListItemIcon>
+                                      <ListItemText
+                                        primary={item.text}
+                                        primaryTypographyProps={{
+                                          fontSize: "13px",
+                                          color: "rgba(255,255,255,0.8)",
+                                        }}
+                                      />
+                                    </ListItemButton>
+                                  </ListItem>
+                                ))}
+                              </List>
+                            </Collapse>
+                          </>
+                        )}
                       </List>
                     </Collapse>
                   </>
@@ -1815,7 +1893,6 @@ export default function Navbar() {
                           </List>
                         </Collapse>
 
-                        {/* Типы оборудования */}
                         <ListItem disablePadding sx={{ pl: 2 }}>
                           <ListItemButton
                             onClick={handleEquipmentTypesClick}

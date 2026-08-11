@@ -52,6 +52,8 @@ import {
   Seal,
   UserAllDocuments,
   PriceOfGasPage,
+  HomeHududgazMetrolog,
+  DocumentPage, // Импортируем DocumentPage
 } from "./pages";
 import {
   createBrowserRouter,
@@ -64,7 +66,6 @@ import { useAppStore } from "./lib/zustand";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./firebase/config";
 import SessionWarning from "./components/SessionWarning";
-import DocumentPage from "./pages/DocumentPage";
 import { Toaster } from "react-hot-toast";
 import GasSettlementsDataList from "./components/GasSettlements/GasSettlementsDataList";
 
@@ -77,18 +78,15 @@ function App() {
     (state) => state.checkExistingSession,
   );
 
-  // Проверяем сессию при загрузке приложения
   useEffect(() => {
     checkExistingSession();
   }, [checkExistingSession]);
 
-  // Отслеживаем авторизацию Firebase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
 
-        // 🔹 Загружаем данные пользователя из Firestore при обновлении страницы
         const storedUserData = JSON.parse(localStorage.getItem("userData"));
         if (!storedUserData || storedUserData.email !== firebaseUser.email) {
           await loadUserData(firebaseUser);
@@ -97,24 +95,21 @@ function App() {
         setUser(null);
         localStorage.removeItem("sessionStartTime");
         localStorage.removeItem("lastActivityTime");
-        localStorage.removeItem("userData"); // Очищаем userData
+        localStorage.removeItem("userData");
       }
     });
 
     return () => unsubscribe();
   }, [setUser, loadUserData]);
 
-  // 🔹 Функция проверки доступа по роли
   const hasAccess = (role, allowedRoles) => allowedRoles.includes(role);
 
-  // 🔹 Основной layout для ролей
   const ProtectedLayout = ({ allowedRoles, element }) => {
     if (!user) return <Navigate to="/login" replace />;
     const userData = useAppStore((state) => state.userData);
     const role = userData?.role || "guest";
 
     if (!hasAccess(role, allowedRoles)) {
-      // Перенаправляем в зависимости от роли
       if (role === "rahbar") return <Navigate to="/homechief" replace />;
       if (role === "nazoratbux")
         return <Navigate to="/homecontrolbooker" replace />;
@@ -123,12 +118,13 @@ function App() {
       if (role === "tasischi") return <Navigate to="/hometasischi" replace />;
       if (role === "electrengineer")
         return <Navigate to="/homeelectronics" replace />;
+      if (role === "metrolog-hududgaz")
+        return <Navigate to="/homehududgazmetrolog" replace />;
       return <Navigate to="/" replace />;
     }
     return element;
   };
 
-  // ✅ Маршруты
   const routes = createBrowserRouter([
     {
       path: "/",
@@ -139,15 +135,12 @@ function App() {
         </ProtectedRoutes>
       ),
       children: [
-        // ==== 🔹 Главная страница для ADMIN ====
         {
           index: true,
           element: (
             <ProtectedLayout allowedRoles={["admin"]} element={<Home />} />
           ),
         },
-
-        // ==== 🔹 Доступ только для ADMIN ====
         {
           path: "/stations",
           element: (
@@ -281,7 +274,7 @@ function App() {
           path: "/docdeadline",
           element: (
             <ProtectedLayout
-              allowedRoles={["admin"]}
+              allowedRoles={["admin", "metrolog-hududgaz"]}
               element={<DocDeadline />}
             />
           ),
@@ -344,7 +337,7 @@ function App() {
           path: "/docbystation",
           element: (
             <ProtectedLayout
-              allowedRoles={["admin"]}
+              allowedRoles={["admin", "metrolog-hududgaz"]}
               element={<DocByStation />}
             />
           ),
@@ -367,11 +360,27 @@ function App() {
             />
           ),
         },
+        // 🔹 ВАЖНО: Добавляем доступ для metrolog-hududgaz к странице документов
+        {
+          path: "/documents/:id",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["admin", "metrolog-hududgaz"]}
+              element={<DocumentPage />}
+            />
+          ),
+        },
         {
           path: "/stationdocs/:id",
           element: (
             <ProtectedLayout
-              allowedRoles={["admin", "rahbar", "buxgalter", "nazoratbux"]}
+              allowedRoles={[
+                "admin",
+                "rahbar",
+                "buxgalter",
+                "nazoratbux",
+                "metrolog-hududgaz",
+              ]}
               element={<StationDocs />}
             />
           ),
@@ -385,7 +394,6 @@ function App() {
             />
           ),
         },
-
         {
           path: "/user-all-docs/:userId",
           element: (
@@ -405,15 +413,6 @@ function App() {
           ),
         },
         {
-          path: "/documents/:id",
-          element: (
-            <ProtectedLayout
-              allowedRoles={["admin"]}
-              element={<DocumentPage />}
-            />
-          ),
-        },
-        {
           path: "/documentsinf/:id",
           element: (
             <ProtectedLayout
@@ -422,8 +421,6 @@ function App() {
             />
           ),
         },
-
-        // ==== 🔹 Домашние страницы для BUCHGALTER и OPERATOR ====
         {
           path: "/homechief",
           element: (
@@ -531,7 +528,6 @@ function App() {
           path: "/employeesdocdeadlineinf",
           element: <EmployeesDocDeadlineInf />,
         },
-
         {
           path: "/elektrsettlements",
           element: <ElektrSettlements />,
@@ -548,10 +544,17 @@ function App() {
           path: "/price-of-gas",
           element: <PriceOfGasPage />,
         },
+        {
+          path: "/homehududgazmetrolog",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["metrolog-hududgaz"]}
+              element={<HomeHududgazMetrolog />}
+            />
+          ),
+        },
       ],
     },
-
-    // ==== 🔹 LOGIN ====
     {
       path: "/login",
       errorElement: <ErrorPage />,
@@ -562,6 +565,8 @@ function App() {
           <Navigate to="/homebooker" replace />
         ) : user.role === "operator" ? (
           <Navigate to="/homeoperator" replace />
+        ) : user.role === "metrolog-hududgaz" ? (
+          <Navigate to="/homehududgazmetrolog" replace />
         ) : (
           <Navigate to="/" replace />
         )

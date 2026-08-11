@@ -25,13 +25,13 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
   const [availableHoses, setAvailableHoses] = useState([]);
   const [lastReportData, setLastReportData] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
+  const [isSearching, setIsSearching] = useState(false);
 
   // Функция для определения квартала по дате
   const getQuarterFromDate = (dateString) => {
     if (!dateString) return null;
 
     try {
-      // Преобразуем DD-MM-YYYY в Date
       const parts = dateString.split("-");
       if (parts.length !== 3) return null;
 
@@ -40,138 +40,138 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
 
       if (isNaN(date.getTime())) return null;
 
-      const monthNum = date.getMonth() + 1; // 1-12
-      const yearNum = date.getFullYear();
+      const monthNum = date.getMonth() + 1;
 
-      if (monthNum >= 1 && monthNum <= 3) return `I`;
-      if (monthNum >= 4 && monthNum <= 6) return `II`;
-      if (monthNum >= 7 && monthNum <= 9) return `III`;
-      return `IV`;
+      if (monthNum >= 1 && monthNum <= 3) return "I";
+      if (monthNum >= 4 && monthNum <= 6) return "II";
+      if (monthNum >= 7 && monthNum <= 9) return "III";
+      return "IV";
     } catch (error) {
       console.error("Ошибка определения квартала:", error);
       return null;
     }
   };
 
-  // Функция для получения имени коллекции по дате
-  const getCollectionName = (dateString) => {
-    if (!dateString) return null;
-
-    const quarter = getQuarterFromDate(dateString);
-    if (!quarter) return null;
+  // Получение всех возможных вариантов названий коллекций
+  const getPossibleCollectionNames = (dateString) => {
+    if (!dateString) return [];
 
     const parts = dateString.split("-");
-    if (parts.length !== 3) return null;
+    if (parts.length !== 3) return [];
 
     const [day, month, year] = parts;
-    return `unifiedDailyReports_${quarter}_${year}`;
-  };
+    const quarterRoman = getQuarterFromDate(dateString);
+    if (!quarterRoman) return [];
 
-  // Упрощенная загрузка данных
-  const loadLastReportData = async () => {
-    if (!formData.stationId || !formData.resetDate) return;
+    const quarterVariants = [];
 
-    try {
-      const collectionName = getCollectionName(formData.resetDate);
+    quarterVariants.push(quarterRoman);
 
-      if (!collectionName) {
-        // console.log(
-        //   "Не удалось определить коллекцию для даты:",
-        //   formData.resetDate
-        // );
-        return;
-      }
-
-      // console.log("Ищем отчеты в коллекции:", collectionName);
-
-      // Проверяем существование коллекции
-      try {
-        const allReportsQuery = query(
-          collection(db, collectionName),
-          where("stationId", "==", formData.stationId),
-          orderBy("reportDate", "desc"),
-          limit(10)
-        );
-
-        const snapshot = await getDocs(allReportsQuery);
-
-        if (!snapshot.empty) {
-          // Берем самый свежий отчет
-          const latestReport = snapshot.docs[0].data();
-          setLastReportData(latestReport);
-
-          // Создаем список доступных шлангов
-          const hoses = latestReport.hoseData?.map((hose) => hose.hose) || [];
-          setAvailableHoses(hoses);
-
-          // console.log(
-          //   "Найден отчет в коллекции:",
-          //   collectionName,
-          //   "шланги:",
-          //   hoses
-          // );
-          toast.success("Хисобот маълумотлари юкланди");
-        } else {
-          // Если нет отчетов в текущем квартале, ищем в предыдущих
-          await searchInOtherQuarters(formData.stationId, formData.resetDate);
-        }
-      } catch (error) {
-        // Если коллекция не существует или другая ошибка
-        console.log("Коллекция не найдена или ошибка:", error.message);
-        await searchInOtherQuarters(formData.stationId, formData.resetDate);
-      }
-    } catch (error) {
-      console.error("Ошибка загрузки отчетов:", error);
-      setLastReportData(null);
-      setAvailableHoses([]);
-
-      if (error.code === "failed-precondition") {
-        console.warn("Индекс еще создается. Пробуем альтернативный подход...");
-        toast.warning("Индекслар ҳали яратилмоқда. Кутинг...");
-      }
+    const romanToArabic = {
+      I: "1",
+      II: "2",
+      III: "3",
+      IV: "4",
+    };
+    if (romanToArabic[quarterRoman]) {
+      quarterVariants.push(romanToArabic[quarterRoman]);
     }
+
+    const collections = [];
+    quarterVariants.forEach((q) => {
+      collections.push(`unifiedDailyReports_${q}_${year}`);
+      collections.push(`unifiedDailyReports${q}${year}`);
+      collections.push(`unifiedDailyReports-${q}-${year}`);
+    });
+
+    return [...new Set(collections)];
   };
 
-  // Поиск отчетов в других кварталах
-  const searchInOtherQuarters = async (stationId, resetDate) => {
+  // Проверка валидности даты
+  const isValidDate = (dateString) => {
+    if (!dateString) return false;
+
+    const parts = dateString.split("-");
+    if (parts.length !== 3) return false;
+
+    const [day, month, year] = parts;
+
+    if (!/^\d+$/.test(day) || !/^\d+$/.test(month) || !/^\d+$/.test(year)) {
+      return false;
+    }
+
+    const dayNum = parseInt(day);
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+
+    if (yearNum < 2000 || yearNum > 2100) return false;
+    if (monthNum < 1 || monthNum > 12) return false;
+
+    const daysInMonth = new Date(yearNum, monthNum - 1, 0).getDate();
+    if (dayNum < 1 || dayNum > daysInMonth) return false;
+
+    return true;
+  };
+
+  // Улучшенная функция поиска отчетов - БЕЗ ИНДЕКСА
+  const loadLastReportData = async () => {
+    if (
+      !formData.stationId ||
+      !formData.resetDate ||
+      !isValidDate(formData.resetDate)
+    ) {
+      return;
+    }
+
+    setIsSearching(true);
+
     try {
-      const parts = resetDate.split("-");
-      if (parts.length !== 3) return;
+      const possibleCollections = getPossibleCollectionNames(
+        formData.resetDate,
+      );
 
-      const [day, month, yearStr] = parts;
-      const year = parseInt(yearStr);
-
-      // Список кварталов для поиска (от текущего к предыдущим)
-      const quartersToSearch = [
-        { quarter: getQuarterFromDate(resetDate), year: year },
-        { quarter: "IV", year: year - 1 },
-        { quarter: "III", year: year - 1 },
-        { quarter: "II", year: year - 1 },
-        { quarter: "I", year: year - 1 },
-      ];
+      console.log("Поиск в коллекциях:", possibleCollections);
 
       let foundReport = null;
+      let foundCollection = null;
 
-      for (const { quarter, year: searchYear } of quartersToSearch) {
-        if (!quarter) continue;
-
-        const collectionName = `unifiedDailyReports_${quarter}_${searchYear}`;
-        // console.log("Проверяем коллекцию:", collectionName);
-
+      // Пробуем найти отчет в каждой коллекции
+      for (const collectionName of possibleCollections) {
         try {
-          const reportQuery = query(
+          // Сначала проверяем, существует ли коллекция - БЕЗ orderBy
+          const testQuery = query(
             collection(db, collectionName),
-            where("stationId", "==", stationId),
-            orderBy("reportDate", "desc"),
-            limit(1)
+            where("stationId", "==", formData.stationId),
+            limit(10), // Загружаем несколько документов
           );
 
-          const snapshot = await getDocs(reportQuery);
+          const testSnapshot = await getDocs(testQuery);
 
-          if (!snapshot.empty) {
-            foundReport = snapshot.docs[0].data();
-            // console.log("Найден отчет в коллекции:", collectionName);
-            break;
+          if (!testSnapshot.empty) {
+            // Находим самый свежий отчет вручную
+            let latestReport = null;
+            let latestDate = null;
+
+            testSnapshot.forEach((doc) => {
+              const data = doc.data();
+              const reportDate = data.reportDate;
+              if (reportDate) {
+                if (!latestDate || reportDate > latestDate) {
+                  latestDate = reportDate;
+                  latestReport = data;
+                }
+              } else if (!latestReport) {
+                // Если нет reportDate, берем первый попавшийся
+                latestReport = data;
+              }
+            });
+
+            if (latestReport) {
+              foundReport = latestReport;
+              foundCollection = collectionName;
+              console.log("Найден отчет в коллекции:", collectionName);
+              break;
+            }
           }
         } catch (error) {
           console.log("Коллекция не доступна:", collectionName, error.message);
@@ -184,25 +184,88 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
         const hoses = foundReport.hoseData?.map((hose) => hose.hose) || [];
         setAvailableHoses(hoses);
 
-        toast(
-          `Маълумотлар аввалги даврдан олинди (${foundReport.quarter || "?"}_${
-            foundReport.year || "?"
-          })`,
-          {
-            icon: "⚠️",
-            duration: 3000,
+        toast.success(`Хисобот маълумотлари юкланди (${foundCollection})`);
+      } else {
+        // Если не нашли в основных коллекциях, пробуем поискать во всех коллекциях
+        await searchAllCollections();
+      }
+    } catch (error) {
+      console.error("Ошибка загрузки отчетов:", error);
+      setLastReportData(null);
+      setAvailableHoses([]);
+      toast.error("Хисоботларни юклашда хатолик");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Поиск во всех коллекциях - БЕЗ ИНДЕКСА
+  const searchAllCollections = async () => {
+    try {
+      // Получаем все коллекции
+      const collections = await getDocs(collection(db, "unifiedDailyReports"));
+
+      const reportCollections = collections.docs
+        .map((doc) => doc.id)
+        .filter((name) => name.startsWith("unifiedDailyReports"));
+
+      console.log("Все коллекции отчетов:", reportCollections);
+
+      let foundReport = null;
+
+      for (const collectionName of reportCollections) {
+        try {
+          // Без orderBy, чтобы не требовать индекс
+          const reportQuery = query(
+            collection(db, collectionName),
+            where("stationId", "==", formData.stationId),
+            limit(10),
+          );
+
+          const snapshot = await getDocs(reportQuery);
+
+          if (!snapshot.empty) {
+            // Находим самый свежий отчет вручную
+            let latestReport = null;
+            let latestDate = null;
+
+            snapshot.forEach((doc) => {
+              const data = doc.data();
+              const reportDate = data.reportDate;
+              if (reportDate) {
+                if (!latestDate || reportDate > latestDate) {
+                  latestDate = reportDate;
+                  latestReport = data;
+                }
+              } else if (!latestReport) {
+                latestReport = data;
+              }
+            });
+
+            if (latestReport) {
+              foundReport = latestReport;
+              console.log("Найден отчет в коллекции:", collectionName);
+              break;
+            }
           }
-        );
+        } catch (error) {
+          console.log("Ошибка в коллекции:", collectionName, error.message);
+          continue;
+        }
+      }
+
+      if (foundReport) {
+        setLastReportData(foundReport);
+        const hoses = foundReport.hoseData?.map((hose) => hose.hose) || [];
+        setAvailableHoses(hoses);
+        toast.success("Хисобот маълумотлари топилди");
       } else {
         setLastReportData(null);
         setAvailableHoses([]);
-        toast("Станция учун хеч қандай хисобот топилмади", {
-          icon: "ℹ️",
-          duration: 3000,
-        });
+        toast.info("Станция учун хеч қандай хисобот топилмади");
       }
     } catch (error) {
-      console.error("Ошибка поиска в других кварталах:", error);
+      console.error("Ошибка поиска во всех коллекциях:", error);
       setLastReportData(null);
       setAvailableHoses([]);
     }
@@ -217,7 +280,6 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
     ) {
       loadLastReportData();
     } else {
-      // Если нет станции или даты, очищаем данные
       if (formData.hose) {
         setFormData((prev) => ({
           ...prev,
@@ -235,7 +297,7 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
   useEffect(() => {
     if (formData.hose && lastReportData) {
       const hoseData = lastReportData.hoseData?.find(
-        (h) => h.hose === formData.hose
+        (h) => h.hose === formData.hose,
       );
       if (hoseData) {
         setFormData((prevData) => ({
@@ -244,7 +306,6 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
           lastReadingBeforeReset: hoseData.current.toString(),
         }));
       } else {
-        // Если шланг не найден в отчете
         setFormData((prevData) => ({
           ...prevData,
           lastReadingFromReport: "",
@@ -259,17 +320,15 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
     if (!stationId || !hose || !resetDate) return false;
 
     try {
-      // Используем упрощенный запрос
       const resetQuery = query(
         collection(db, "meterResetEvents"),
         where("stationId", "==", stationId),
         where("resetDate", "==", resetDate),
-        limit(20)
+        limit(20),
       );
 
       const snapshot = await getDocs(resetQuery);
 
-      // Фильтруем на стороне клиента по шлангу
       let existing = false;
       snapshot.forEach((doc) => {
         const data = doc.data();
@@ -291,7 +350,6 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
       [field]: value,
     }));
 
-    // При изменении даты или станции, очищаем данные отчета
     if (field === "resetDate" || field === "stationId") {
       setLastReportData(null);
       setAvailableHoses([]);
@@ -311,10 +369,30 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
     }));
   };
 
+  // Обработка ввода даты
+  const handleDateInput = (e) => {
+    let value = e.target.value;
+
+    value = value.replace(/\D/g, "");
+
+    if (value.length > 8) value = value.substring(0, 8);
+
+    if (value.length >= 2) {
+      value = value.substring(0, 2) + "-" + value.substring(2);
+    }
+    if (value.length >= 5) {
+      value = value.substring(0, 5) + "-" + value.substring(5);
+    }
+
+    handleInputChange("resetDate", value);
+  };
+
   const validateForm = () => {
     const errors = {};
 
     if (!formData.resetDate) errors.resetDate = "Мажбурий майдон";
+    if (!isValidDate(formData.resetDate))
+      errors.resetDate = "Сана нотўғри форматда";
     if (!formData.stationId) errors.stationId = "Мажбурий майдон";
     if (!formData.hose) errors.hose = "Мажбурий майдон";
     if (!formData.lastReadingBeforeReset)
@@ -354,7 +432,8 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
       !formData.stationId ||
       !formData.hose ||
       !formData.lastReadingBeforeReset ||
-      !formData.newReadingAfterReset
+      !formData.newReadingAfterReset ||
+      !isValidDate(formData.resetDate)
     ) {
       return true;
     }
@@ -379,13 +458,12 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
       return;
     }
 
-    // Проверяем существующее обнуление
     let hasExistingReset = false;
     try {
       hasExistingReset = await checkExistingReset(
         formData.stationId,
         formData.hose,
-        formData.resetDate
+        formData.resetDate,
       );
     } catch (error) {
       console.warn("Проверка дубликатов не удалась, продолжаем:", error);
@@ -444,67 +522,15 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
     onClose();
   };
 
-  const handleDateInput = (e) => {
-    let value = e.target.value;
-
-    // Удаляем все нецифровые символы, кроме дефиса
-    value = value.replace(/[^\d-]/g, "");
-
-    // Ограничиваем длину
-    if (value.length > 10) value = value.substring(0, 10);
-
-    // Автоматически добавляем дефисы
-    if (value.length === 2 && !value.includes("-")) {
-      value = value + "-";
-    } else if (value.length === 5 && value[4] !== "-") {
-      value = value.substring(0, 4) + "-" + value[4];
-    }
-
-    handleInputChange("resetDate", value);
-  };
-
-  // Проверка валидности даты
-  const isValidDate = (dateString) => {
-    try {
-      const parts = dateString.split("-");
-      if (parts.length !== 3) return false;
-
-      const [day, month, year] = parts;
-
-      // Проверяем, что все части - числа
-      if (
-        isNaN(parseInt(day)) ||
-        isNaN(parseInt(month)) ||
-        isNaN(parseInt(year))
-      ) {
-        return false;
-      }
-
-      // Проверяем разумные значения
-      const dayNum = parseInt(day);
-      const monthNum = parseInt(month);
-      const yearNum = parseInt(year);
-
-      if (yearNum < 2000 || yearNum > 2100) return false;
-      if (monthNum < 1 || monthNum > 12) return false;
-      if (dayNum < 1 || dayNum > 31) return false;
-
-      return true;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  // Получение отображаемой информации о квартале
   const getQuarterDisplayInfo = () => {
     if (!formData.resetDate || !isValidDate(formData.resetDate)) return null;
 
     const quarter = getQuarterFromDate(formData.resetDate);
-    const collectionName = getCollectionName(formData.resetDate);
+    const possibleCollections = getPossibleCollectionNames(formData.resetDate);
 
     return {
       quarter,
-      collectionName,
+      possibleCollections,
       displayText: quarter
         ? `${quarter}-чорак, ${formData.resetDate.split("-")[2]}`
         : "Номаълум",
@@ -544,7 +570,7 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
             <form onSubmit={handleSubmit} className="flex-1 overflow-auto p-6">
               <div className="space-y-4">
                 {/* Информация о квартале */}
-                {/* {quarterInfo && (
+                {quarterInfo && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <div className="flex items-center justify-between">
                       <div>
@@ -560,10 +586,19 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
                       </div>
                     </div>
                     <p className="text-xs text-blue-600 mt-2">
-                      Коллекция: {quarterInfo.collectionName}
+                      Қидирилаётган коллекциялар:{" "}
+                      {quarterInfo.possibleCollections.join(", ")}
                     </p>
+                    {isSearching && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        <span className="text-xs text-blue-600">
+                          Қидирилмоқда...
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )} */}
+                )}
 
                 {/* Дата */}
                 <div>
@@ -597,7 +632,7 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
                     </p>
                   )}
                   <p className="text-xs text-gray-500 mt-1">
-                    Формат: ДД-ММ-ГГГГ
+                    Формат: ДД-ММ-ГГГГ (масалан: 13-07-2026)
                   </p>
                 </div>
 
@@ -640,7 +675,9 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
                   <select
                     value={formData.hose}
                     onChange={(e) => handleInputChange("hose", e.target.value)}
-                    disabled={!formData.stationId || !formData.resetDate}
+                    disabled={
+                      !formData.stationId || !formData.resetDate || isSearching
+                    }
                     className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 ${
                       validationErrors.hose
                         ? "border-red-500 bg-red-50"
@@ -662,7 +699,8 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
                   )}
                   {formData.stationId &&
                     formData.resetDate &&
-                    availableHoses.length === 0 && (
+                    availableHoses.length === 0 &&
+                    !isSearching && (
                       <div className="mt-2">
                         <p className="text-amber-600 text-xs">
                           Хисобот топилмади. Маълумотларни қўлда киритинг.
@@ -680,6 +718,11 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
                         </div>
                       </div>
                     )}
+                  {isSearching && (
+                    <p className="text-blue-600 text-xs mt-1">
+                      Шланглар қидирилмоқда...
+                    </p>
+                  )}
                 </div>
 
                 {/* Последнее показание счетчика с отчета */}
@@ -718,7 +761,7 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
                     onChange={(e) =>
                       handleInputChange(
                         "lastReadingBeforeReset",
-                        e.target.value
+                        e.target.value,
                       )
                     }
                     step="0.01"
@@ -788,9 +831,9 @@ const AddMeterResetModal = ({ isOpen, onClose, onSaved, stations }) => {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={loading || isSaveButtonDisabled()}
+                disabled={loading || isSaveButtonDisabled() || isSearching}
                 className={`px-5 py-2 rounded-xl font-semibold flex-1 ${
-                  loading || isSaveButtonDisabled()
+                  loading || isSaveButtonDisabled() || isSearching
                     ? "bg-gray-400 cursor-not-allowed text-gray-600"
                     : "bg-blue-600 text-white hover:bg-blue-700"
                 }`}

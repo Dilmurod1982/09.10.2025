@@ -6,12 +6,13 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { getStatusColor } from "../utils/dateUtils";
 import AddDocumentModalByStation from "../components/AddDocumentModalByStation";
-import { useAppStore } from "../lib/zustand"; // Добавляем импорт Zustand
+import { useAppStore } from "../lib/zustand";
 
 const StationDocs = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const userData = useAppStore((state) => state.userData); // Получаем данные пользователя
+  const userData = useAppStore((state) => state.userData);
+  const role = userData?.role;
 
   const [docs, setDocs] = useState([]);
   const [filteredDocs, setFilteredDocs] = useState([]);
@@ -21,22 +22,45 @@ const StationDocs = () => {
   const [loading, setLoading] = useState(true);
   const [missingDocs, setMissingDocs] = useState([]);
 
-  // Изменение: устанавливаем true по умолчанию
   const [showLatestOnly, setShowLatestOnly] = useState(true);
   const [selectedType, setSelectedType] = useState("Все");
   const [expiryFilter, setExpiryFilter] = useState("Все");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Разрешенные типы документов для метролога
+  const getFilteredTypeIds = (allTypeIds, typesMapData) => {
+    if (role === "metrolog-hududgaz") {
+      const allowedTypes = [
+        "Газ ҳисоблаш тугунини сертификати (ИК)",
+        "Газ ҳисоблагич сертификати (Автопилот)",
+        "Торайтирувчи мослама сертификати (Шайба)",
+      ];
+
+      // Фильтруем ID типов документов по названиям
+      const filteredIds = [];
+      allTypeIds.forEach((id) => {
+        const typeName = typesMapData[id];
+        if (typeName && allowedTypes.includes(typeName)) {
+          filteredIds.push(id);
+        }
+      });
+
+      return filteredIds;
+    }
+    return allTypeIds;
+  };
 
   // Проверяем, может ли пользователь добавлять документы
   const canAddDocuments =
     userData &&
     (userData.role === "admin" ||
       userData.role === "nazorat" ||
-      userData.role === "rahbar");
+      userData.role === "rahbar") &&
+    role !== "metrolog-hududgaz"; // Метролог не может добавлять
 
   useEffect(() => {
     fetchDocs();
-  }, [id]);
+  }, [id, role]);
 
   useEffect(() => {
     applyFilters();
@@ -72,7 +96,10 @@ const StationDocs = () => {
       });
 
       setTypesMap(types);
-      setValidExpirationIds(validIds);
+
+      // 🔹 Применяем фильтрацию для метролога
+      const filteredValidIds = getFilteredTypeIds(validIds, types);
+      setValidExpirationIds(filteredValidIds);
 
       // === Станция ===
       const stationSnap = await getDocs(
@@ -90,7 +117,8 @@ const StationDocs = () => {
         .map((doc) => {
           const data = doc.data();
 
-          if (!validIds.includes(data.docType)) return null;
+          // Проверяем, что тип документа входит в разрешенные
+          if (!filteredValidIds.includes(data.docType)) return null;
 
           const expiry = new Date(data.expiryDate);
           const issue = new Date(data.issueDate);
@@ -126,15 +154,18 @@ const StationDocs = () => {
 
       setDocs(sortedDocs);
 
-      // === Вычисляем отсутствующие документы ===
+      // === Вычисляем отсутствующие документы (только для разрешенных типов) ===
       const existingTypeIds = new Set(sortedDocs.map((d) => d.typeId));
       const missing = typesArray
         .filter(
-          (t) => t.validity === "expiration" && !existingTypeIds.has(t.id),
+          (t) =>
+            t.validity === "expiration" &&
+            filteredValidIds.includes(t.id) &&
+            !existingTypeIds.has(t.id),
         )
         .map((t) => ({ id: t.id, name: t.name }));
 
-      setMissingDocs(missing); // ✅ сохраняем отсутствующие типы
+      setMissingDocs(missing);
     } catch (err) {
       console.error("Ошибка загрузки документов:", err);
     } finally {
@@ -161,11 +192,8 @@ const StationDocs = () => {
     }
 
     if (showLatestOnly) {
-      // Создаем объект для хранения самых последних документов по каждому типу
       const latestDocs = {};
-
       filtered.forEach((d) => {
-        // Сравниваем по expiryRaw (дате истечения) - берем документ с самой поздней датой истечения
         if (
           !latestDocs[d.typeId] ||
           d.expiryRaw > latestDocs[d.typeId].expiryRaw
@@ -173,8 +201,6 @@ const StationDocs = () => {
           latestDocs[d.typeId] = d;
         }
       });
-
-      // Преобразуем объект обратно в массив
       filtered = Object.values(latestDocs);
     }
 
@@ -217,13 +243,26 @@ const StationDocs = () => {
 
   return (
     <div className="p-6">
+      {/* Информационное сообщение для метролога */}
+      {role === "metrolog-hududgaz" && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
+          <span className="font-medium">ℹ️ </span>
+          Фақат газ ускуналари бўйича ҳужжатлар кўрсатилмоқда. Қуйидаги ҳужжат:
+          <ul className="list-disc list-inside mt-1 ml-2">
+            <li>Газ ҳисоблаш тугунини сертификати (ИК)</li>
+            <li>Газ ҳисоблагич сертификати (Автопилот)</li>
+            <li>Торайтирувчи мослама сертификати (Шайба)</li>
+          </ul>
+        </div>
+      )}
+
       {/* Заголовок */}
       <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
         <h1 className="text-2xl font-semibold text-gray-800">
           {stationName} заправка муддатли хужжатлари
         </h1>
         <div className="flex flex-wrap gap-3">
-          {/* Кнопка "Добавить документ" показывается только для определенных ролей */}
+          {/* Кнопка "Добавить документ" показывается только для определенных ролей, но не для метролога */}
           {canAddDocuments && (
             <button
               onClick={() => setIsModalOpen(true)}
@@ -264,9 +303,22 @@ const StationDocs = () => {
           className="border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
         >
           <option value="Все">Барчаси</option>
-          {Object.values(typesMap).map((type) => (
-            <option key={type}>{type}</option>
-          ))}
+          {Object.values(typesMap)
+            .filter((type) => {
+              // Если метроолог, показываем только разрешенные типы
+              if (role === "metrolog-hududgaz") {
+                const allowedTypes = [
+                  "Газ ҳисоблаш тугунини сертификати (ИК)",
+                  "Газ ҳисоблагич сертификати (Автопилот)",
+                  "Торайтирувчи мослама сертификати (Шайба)",
+                ];
+                return allowedTypes.includes(type);
+              }
+              return true;
+            })
+            .map((type) => (
+              <option key={type}>{type}</option>
+            ))}
         </select>
 
         <select
@@ -295,7 +347,6 @@ const StationDocs = () => {
               <div className="flex justify-between items-center mb-3">
                 <h2 className="font-medium text-lg text-gray-800">{d.name}</h2>
                 <div className="flex items-center gap-2">
-                  {/* Цветной индикатор статуса */}
                   <div
                     className={`w-3 h-3 rounded-full ${
                       d.diffDays < 0
@@ -332,6 +383,7 @@ const StationDocs = () => {
           ))}
         </div>
       )}
+
       {/* Отсутствующие документы */}
       {missingDocs.length > 0 && (
         <div className="mt-10">
@@ -351,7 +403,7 @@ const StationDocs = () => {
         </div>
       )}
 
-      {/* Модальное окно добавления документа */}
+      {/* Модальное окно добавления документа - скрываем для метролога */}
       {canAddDocuments && (
         <AddDocumentModalByStation
           isOpen={isModalOpen}

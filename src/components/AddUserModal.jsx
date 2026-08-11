@@ -179,7 +179,7 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
-        formData.password
+        formData.password,
       );
 
       const userData = {
@@ -243,7 +243,8 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl font-light w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors">
+              className="text-gray-400 hover:text-gray-600 text-2xl font-light w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors"
+            >
               ×
             </button>
           </div>
@@ -308,12 +309,13 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                             passwordStrength.strength < 50
                               ? "bg-red-500"
                               : passwordStrength.strength < 75
-                              ? "bg-yellow-500"
-                              : "bg-green-500"
+                                ? "bg-yellow-500"
+                                : "bg-green-500"
                           }`}
                           style={{
                             width: `${passwordStrength.strength}%`,
-                          }}></div>
+                          }}
+                        ></div>
                       </div>
                       <div className="text-xs text-gray-500">
                         {passwordStrength.message} • Минимум 8 символов,
@@ -484,7 +486,7 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                     Серия паспорта *
                     {isFieldValid(
                       "passportSeries",
-                      formData.passportSeries
+                      formData.passportSeries,
                     ) && <span className="text-green-500 ml-1">✓</span>}
                   </label>
                   <input
@@ -514,7 +516,7 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                     Номер паспорта *
                     {isFieldValid(
                       "passportNumber",
-                      formData.passportNumber
+                      formData.passportNumber,
                     ) && <span className="text-green-500 ml-1">✓</span>}
                   </label>
                   <input
@@ -573,7 +575,8 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                     value={formData.role}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
                     <option value="admin">Админ</option>
                     <option value="tasischi">Таъсисчи</option>
                     <option value="nazoratbux">Назорат Бухгалтер</option>
@@ -586,6 +589,7 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                     <option value="yurist">Юрист</option>
                     <option value="partner">Хамкор</option>
                     <option value="electrengineer">Электронщик</option>
+                    <option value="metrolog-hududgaz">Худудгаз</option>
                   </select>
                 </div>
 
@@ -597,7 +601,8 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                   <button
                     type="button"
                     onClick={() => setShowStations(true)}
-                    className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600 hover:text-gray-700 transition-colors">
+                    className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600 hover:text-gray-700 transition-colors"
+                  >
                     Выбрать станции ({selectedStations.length})
                   </button>
                 </div>
@@ -609,13 +614,15 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                 type="button"
                 onClick={onClose}
                 disabled={loading}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
                 Отмена
               </button>
               <button
                 type="submit"
                 disabled={!isFormValid() || loading}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 {loading ? "Создание..." : "Создать пользователя"}
               </button>
             </div>

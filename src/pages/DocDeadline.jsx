@@ -10,6 +10,23 @@ const DocDeadline = () => {
   const [loading, setLoading] = useState(true);
 
   const { documents, setDocuments } = useAppStore();
+  const userData = useAppStore((state) => state.userData);
+  const role = userData?.role;
+
+  // Определяем, какие типы документов показывать для metrolog-hududgaz
+  const getFilteredDocumentTypes = (types) => {
+    if (role === "metrolog-hududgaz") {
+      // Только эти 3 типа для метролога
+      const allowedTypes = [
+        "Газ ҳисоблаш тугунини сертификати (ИК)",
+        "Газ ҳисоблагич сертификати (Автопилот)",
+        "Торайтирувчи мослама сертификати (Шайба)",
+      ];
+      return types.filter((type) => allowedTypes.includes(type.name));
+    }
+    // Для всех остальных ролей показываем все типы
+    return types;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -18,7 +35,7 @@ const DocDeadline = () => {
         const typesData = typesSnap.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }))
           .filter((type) => type.validity === "expiration")
-          .sort((a, b) => (a.number || 0) - (b.number || 0)); // ✅ сортировка по полю number
+          .sort((a, b) => (a.number || 0) - (b.number || 0));
 
         const docsSnap = await getDocs(collection(db, "documents"));
         const docsData = docsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -50,7 +67,9 @@ const DocDeadline = () => {
           else if (diffDays <= 30) counts[type].less30++;
         });
 
-        setDocumentTypes(typesData);
+        // Применяем фильтрацию перед сохранением в state
+        const filteredTypes = getFilteredDocumentTypes(typesData);
+        setDocumentTypes(filteredTypes);
         setStats(counts);
       } catch (err) {
         console.error("Ошибка загрузки данных:", err);
@@ -60,13 +79,38 @@ const DocDeadline = () => {
     };
 
     fetchData();
-  }, [setDocuments]);
+  }, [setDocuments, role]); // Добавляем role в зависимости
 
   if (loading) return <p className="text-center text-gray-500">Загрузка...</p>;
+
+  // Если после фильтрации не осталось типов документов
+  if (documentTypes.length === 0) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-6">
+          Сроки действия документов
+        </h1>
+        <div className="text-center text-gray-500 py-8">
+          {role === "metrolog-hududgaz"
+            ? "Доступные типы документов не найдены"
+            : "Нет доступных типов документов"}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold mb-6">Сроки действия документов</h1>
+
+      {/* Показываем информацию о фильтрации для метролога */}
+      {role === "metrolog-hududgaz" && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
+          <span className="font-medium">ℹ️ </span>
+          Показаны только документы по газовому оборудованию
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {documentTypes.map((type) => {
           const s = stats[type.id] || {};
@@ -74,7 +118,8 @@ const DocDeadline = () => {
             <Link
               to={`/documents/${type.id}`}
               key={type.id}
-              className="border rounded-lg p-4 hover:shadow-md transition bg-white">
+              className="border rounded-lg p-4 hover:shadow-md transition bg-white"
+            >
               <div className="flex items-center justify-between mb-2">
                 <h2 className="font-medium text-lg">{type.name}</h2>
                 <div
