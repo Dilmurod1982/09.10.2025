@@ -185,7 +185,8 @@ const Banks = () => {
         className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}>
+        transition={{ duration: 0.6 }}
+      >
         <div>
           <h1 className="text-3xl lg:text-4xl font-bold text-gray-800 mb-2">
             Банклар
@@ -197,7 +198,8 @@ const Banks = () => {
           className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 w-full lg:w-auto justify-center"
           onClick={handleCreateBank}
           whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}>
+          whileTap={{ scale: 0.98 }}
+        >
           <Plus size={20} />
           Банк қўшиш
         </motion.button>
@@ -208,7 +210,8 @@ const Banks = () => {
         className="bg-white rounded-2xl shadow-sm p-4 mb-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.1 }}>
+        transition={{ duration: 0.6, delay: 0.1 }}
+      >
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1 relative">
             <Search
@@ -238,7 +241,8 @@ const Banks = () => {
         transition={{ duration: 0.6, delay: 0.2 }}
         variants={containerVariants}
         initial="hidden"
-        animate="visible">
+        animate="visible"
+      >
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -265,7 +269,8 @@ const Banks = () => {
                   onClick={() => handleBankClick(bank)}
                   className="hover:bg-indigo-50 transition-colors duration-200 cursor-pointer group"
                   variants={itemVariants}
-                  whileHover={{ scale: 1.01 }}>
+                  whileHover={{ scale: 1.01 }}
+                >
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
@@ -306,7 +311,8 @@ const Banks = () => {
             className="text-center py-12"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.6 }}>
+            transition={{ duration: 0.6 }}
+          >
             <Building className="mx-auto text-gray-400 mb-4" size={48} />
             <h3 className="text-lg font-semibold text-gray-600 mb-2">
               {searchTerm ? "Банклар топилмади" : "Банклар қўшилмаган"}
@@ -319,7 +325,8 @@ const Banks = () => {
             {!searchTerm && (
               <button
                 onClick={handleCreateBank}
-                className="bg-indigo-500 text-white px-6 py-2 rounded-lg hover:bg-indigo-600 transition-colors">
+                className="bg-indigo-500 text-white px-6 py-2 rounded-lg hover:bg-indigo-600 transition-colors"
+              >
                 Банк қўшиш
               </button>
             )}
@@ -335,14 +342,16 @@ const Banks = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={handleCloseModal}>
+            onClick={handleCloseModal}
+          >
             <motion.div
               className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              onClick={(e) => e.stopPropagation()}>
+              onClick={(e) => e.stopPropagation()}
+            >
               {/* Заголовок модального окна */}
               <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6">
                 <div className="flex justify-between items-center">
@@ -357,7 +366,8 @@ const Banks = () => {
                     onClick={handleCloseModal}
                     className="w-8 h-8 rounded-full bg-white bg-opacity-20 flex items-center justify-center hover:bg-opacity-30 transition-all"
                     whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}>
+                    whileTap={{ scale: 0.9 }}
+                  >
                     <X size={18} />
                   </motion.button>
                 </div>
@@ -518,7 +528,8 @@ const Banks = () => {
                       onClick={handleEdit}
                       className="w-full sm:w-auto bg-indigo-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-indigo-600 transition-colors flex items-center gap-2 justify-center"
                       whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}>
+                      whileTap={{ scale: 0.98 }}
+                    >
                       <Edit size={16} />
                       Таҳрирлаш
                     </motion.button>
@@ -530,14 +541,16 @@ const Banks = () => {
                         onClick={handleCancel}
                         className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
                         whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}>
+                        whileTap={{ scale: 0.98 }}
+                      >
                         Бекор
                       </motion.button>
                       <motion.button
                         onClick={handleSave}
                         className="bg-green-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-600 transition-colors flex items-center gap-2 justify-center"
                         whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}>
+                        whileTap={{ scale: 0.98 }}
+                      >
                         <Save size={16} />
                         Сақлаш
                       </motion.button>
@@ -549,7 +562,8 @@ const Banks = () => {
                       onClick={handleCloseModal}
                       className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
                       whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}>
+                      whileTap={{ scale: 0.98 }}
+                    >
                       Ёпиш
                     </motion.button>
                   )}

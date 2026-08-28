@@ -52,3 +52,4 @@ export { default as UserAllDocuments } from "./UserAllDocuments";
 export { default as PriceOfGasPage } from "./PriceOfGasPage";
 export { default as HomeHududgazMetrolog } from "./HomeHududgazMetrolog";
 export { default as DocumentPage } from "./DocumentPage";
+export { default as GazAnalytics } from "./GazAnalytics";

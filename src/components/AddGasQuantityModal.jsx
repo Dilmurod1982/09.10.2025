@@ -53,8 +53,8 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
   // Получение данных предыдущего месяца
   const getPreviousMonthData = async (year, month) => {
     try {
-      const prevMonth = parseInt(month) - 1;
       let prevYear = parseInt(year);
+      let prevMonth = parseInt(month) - 1; // ✅ Исправлено: const → let
 
       if (prevMonth === 0) {
         prevYear = prevYear - 1;
@@ -333,13 +333,15 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={handleClose}>
+      onClick={handleClose}
+    >
       <motion.div
         className="bg-white rounded-2xl shadow-xl w-full max-w-7xl max-h-[90vh] overflow-hidden flex flex-col"
         initial={{ scale: 0.9 }}
         animate={{ scale: 1 }}
         exit={{ scale: 0.9 }}
-        onClick={(e) => e.stopPropagation()}>
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Заголовок */}
         <div className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white">
           <div className="flex justify-between items-center">
@@ -364,7 +366,8 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}>
+                onChange={(e) => setSelectedYear(e.target.value)}
+              >
                 <option value="">Выберите год...</option>
                 {yearOptions().map((option) => (
                   <option key={option.value} value={option.value}>
@@ -381,7 +384,8 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}>
+                onChange={(e) => setSelectedMonth(e.target.value)}
+              >
                 <option value="">Выберите месяц...</option>
                 {monthOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -530,7 +534,8 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
                               station.endBalance >= 0
                                 ? "text-green-600"
                                 : "text-red-600"
-                            }>
+                            }
+                          >
                             {station.endBalance.toLocaleString("ru-RU", {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
@@ -549,7 +554,8 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
                 className="mx-auto h-12 w-12 text-gray-400"
                 fill="none"
                 stroke="currentColor"
-                viewBox="0 0 24 24">
+                viewBox="0 0 24 24"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -572,13 +578,15 @@ const AddGasQuantityModal = ({ isOpen, onClose, stations, onSaved }) => {
           <button
             onClick={handleClose}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
-            disabled={loading}>
+            disabled={loading}
+          >
             Отмена
           </button>
           <button
             onClick={handleSave}
             disabled={!canSave || loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             {loading ? "Сохранение..." : "Сохранить"}
           </button>
         </div>

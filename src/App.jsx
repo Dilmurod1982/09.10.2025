@@ -53,6 +53,7 @@ import {
   UserAllDocuments,
   PriceOfGasPage,
   HomeHududgazMetrolog,
+  GazAnalytics,
   DocumentPage, // Импортируем DocumentPage
 } from "./pages";
 import {
@@ -75,7 +76,7 @@ function App() {
   const userData = useAppStore((state) => state.userData);
   const loadUserData = useAppStore((state) => state.loadUserData);
   const checkExistingSession = useAppStore(
-    (state) => state.checkExistingSession,
+    (state) => state.checkExistingSession
   );
 
   useEffect(() => {
@@ -256,6 +257,15 @@ function App() {
           path: "/regions",
           element: (
             <ProtectedLayout allowedRoles={["admin"]} element={<Regions />} />
+          ),
+        },
+        {
+          path: "/gazanalytics",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["admin"]}
+              element={<GazAnalytics />}
+            />
           ),
         },
         {

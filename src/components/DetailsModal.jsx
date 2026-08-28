@@ -22,8 +22,8 @@ const DetailsModal = ({ isOpen, onClose, settlement, onSaved }) => {
   const getPreviousMonthData = async (period) => {
     try {
       const [year, month] = period.split("-");
-      const prevMonth = parseInt(month) - 1;
       let prevYear = parseInt(year);
+      let prevMonth = parseInt(month) - 1; // ✅ Исправлено: const → let
 
       if (prevMonth === 0) {
         prevYear = prevYear - 1;
@@ -180,13 +180,15 @@ const DetailsModal = ({ isOpen, onClose, settlement, onSaved }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={onClose}>
+      onClick={onClose}
+    >
       <motion.div
         className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
         initial={{ scale: 0.9 }}
         animate={{ scale: 1 }}
         exit={{ scale: 0.9 }}
-        onClick={(e) => e.stopPropagation()}>
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Заголовок */}
         <div className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white">
           <div className="flex justify-between items-center">
@@ -208,13 +210,15 @@ const DetailsModal = ({ isOpen, onClose, settlement, onSaved }) => {
                     <button
                       onClick={handleSyncWithPreviousMonth}
                       className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-                      title="Синхронизировать сальдо с предыдущим месяцем">
+                      title="Синхронизировать сальдо с предыдущим месяцем"
+                    >
                       Синхронизировать
                     </button>
                   )}
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  >
                     Редактировать
                   </button>
                 </>
@@ -225,13 +229,15 @@ const DetailsModal = ({ isOpen, onClose, settlement, onSaved }) => {
                       setIsEditing(false);
                       setFormData(settlement); // Сброс изменений
                     }}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium">
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                  >
                     Отмена
                   </button>
                   <button
                     onClick={handleSave}
                     disabled={loading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50">
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+                  >
                     {loading ? "Сохранение..." : "Сохранить"}
                   </button>
                 </>
@@ -260,7 +266,8 @@ const DetailsModal = ({ isOpen, onClose, settlement, onSaved }) => {
                 {!isEditing && (
                   <button
                     onClick={handleSyncWithPreviousMonth}
-                    className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors">
+                    className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+                  >
                     Обновить сальдо
                   </button>
                 )}
@@ -466,7 +473,8 @@ const DetailsModal = ({ isOpen, onClose, settlement, onSaved }) => {
                       formData.endBalance >= 0
                         ? "bg-green-50 text-green-600"
                         : "bg-red-50 text-red-600"
-                    }`}>
+                    }`}
+                  >
                     {formatNumber(formData.endBalance)} сўм
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
@@ -499,7 +507,8 @@ const DetailsModal = ({ isOpen, onClose, settlement, onSaved }) => {
         <div className="p-6 border-t bg-gray-50 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium">
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+          >
             Закрыть
           </button>
         </div>

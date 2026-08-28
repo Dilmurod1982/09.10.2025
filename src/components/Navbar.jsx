@@ -60,6 +60,7 @@ import {
   Speed as MeterIcon,
   SettingsBackupRestore as ZeroIcon,
   Lock as SealIcon,
+  Analytics as AnalyticsIcon, // ✅ ДОБАВЛЕНО
 } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
