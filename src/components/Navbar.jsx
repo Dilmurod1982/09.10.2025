@@ -296,7 +296,7 @@ export default function Navbar() {
 
     if (!validatePassword(passwordData.newPassword)) {
       setPasswordError(
-        "Парол камида 8 та белгидан иборат бўлиши керак, жумладан, катта ва кичик харфлар, рақамлар ва махсус белгилар",
+        "Парол камида 8 та белгидан иборат бўлиши керак, жумладан, катта ва кичик харфлар, рақамлар ва махсус белгилар"
       );
       return;
     }
@@ -345,7 +345,7 @@ export default function Navbar() {
         }
       } catch (firestoreError) {
         throw new Error(
-          "Паролни маълумотлар базасига сақлашда хатолик юз берди",
+          "Паролни маълумотлар базасига сақлашда хатолик юз берди"
         );
       }
 
@@ -462,6 +462,11 @@ export default function Navbar() {
       icon: <BoltIcon />,
       path: "/elektrsettlements",
     },
+    {
+      text: "Газ бўйича тахлиллар",
+      icon: <AnalyticsIcon />,
+      path: "/gazanalytics",
+    },
   ];
 
   const equipmentDetailsItems = [
@@ -560,7 +565,7 @@ export default function Navbar() {
             item.text !== "МЧЖлар" &&
             item.text !== "Банк" &&
             item.text !== "Лавозимлар" &&
-            item.text !== "Фойдаланувчилар",
+            item.text !== "Фойдаланувчилар"
         );
       case "nazoratbux":
         return menuItems.filter((item) => item.text === "");
@@ -583,7 +588,7 @@ export default function Navbar() {
   const shouldShowDocumentButtonsInNavbar = () => {
     if (!role) return false;
     const isRahbarOrBooker = ["rahbar", "buxgalter", "nazoratbux"].includes(
-      role,
+      role
     );
     return isRahbarOrBooker && !isMobile;
   };
