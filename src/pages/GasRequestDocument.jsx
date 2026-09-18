@@ -15,8 +15,8 @@ const MONTHS_LAT = [
   "iyun",
   "iyul",
   "avgust",
-  "sentabr",
-  "oktabr",
+  "sentyabr",
+  "oktyabr",
   "noyabr",
   "dekabr",
 ];
