@@ -22,6 +22,7 @@ const MONTHS_LAT = [
 ];
 
 // Утилита: первая буква заглавная, остальные строчные
+// "FARG'ONA" → "Farg'ona"
 function capitalize(str) {
   if (!str) return "";
   const s = String(str).toLowerCase().trim();
@@ -112,6 +113,7 @@ export default function GasRequestDocument() {
         const l = { id: letterSnap.id, ...letterSnap.data() };
         setLetter(l);
 
+        // Газовое хозяйство и директор
         const [orgSnap, dirSnap] = await Promise.all([
           getDoc(doc(db, "gasOrganizations", l.gasOrganizationId)),
           getDoc(doc(db, "gasOrgDirectors", l.gasDirectorId)),
@@ -120,6 +122,7 @@ export default function GasRequestDocument() {
         if (dirSnap.exists())
           setDirector({ id: dirSnap.id, ...dirSnap.data() });
 
+        // Ищем первую станцию ООО, чтобы взять её cityId
         const stationsSnap = await getDocs(collection(db, "stations"));
         const orgStations = stationsSnap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
@@ -128,6 +131,7 @@ export default function GasRequestDocument() {
         const cityId = orgStations[0]?.address?.cityId;
 
         if (cityId) {
+          // Загружаем город/район
           const [citySnap, citiesSnap] = await Promise.all([
             getDoc(doc(db, "cities", cityId)),
             getDocs(collection(db, "cities")),
@@ -137,6 +141,7 @@ export default function GasRequestDocument() {
           if (citySnap.exists()) {
             cityData = { id: citySnap.id, ...citySnap.data() };
           } else {
+            // Fallback: ищем по id в списке
             cityData = citiesSnap.docs
               .map((d) => ({ id: d.id, ...d.data() }))
               .find((c) => String(c.id) === String(cityId));
@@ -160,22 +165,31 @@ export default function GasRequestDocument() {
   const deadline = getDeadline(letter.year, letter.month);
   const deadlineStr = formatDateUz(deadline);
 
-  // Адресат: "S.A.Abdumajidov"
+  // ============================================================
+  // АДРЕСАТ (директор газового хозяйства)
+  // ============================================================
+  // Формат: "S.A.Abdumajidov"
   const directorShort = `${
     director?.firstName ? capitalize(director.firstName).charAt(0) + "." : ""
   }${
     director?.middleName ? capitalize(director.middleName).charAt(0) + "." : ""
   }${director?.lastName ? capitalize(director.lastName) : ""}`;
 
-  // Фирменная шапка
-  const regionName = cityInfo?.regionName || "";
+  // ============================================================
+  // ФИРМЕННАЯ ШАПКА
+  // ============================================================
+  // Viloyat: "FARG'ONA" → "Farg'ona viloyati"
+  const rawRegionName = cityInfo?.regionName || "";
+  const regionName = rawRegionName ? capitalize(rawRegionName) : "";
   const regionPart = regionName
     ? regionName.toLowerCase().includes("viloyat")
       ? regionName
       : `${regionName} viloyati`
     : "";
 
-  const cityName = cityInfo?.name || "";
+  // Tuman/Shahar: "FARG'ONA" → "Farg'ona shahar"
+  const rawCityName = cityInfo?.name || "";
+  const cityName = rawCityName ? capitalize(rawCityName) : "";
   const cityType = cityInfo?.type || "";
 
   let cityPart = "";
@@ -189,9 +203,11 @@ export default function GasRequestDocument() {
     const suffix = isShahar ? "shahar" : "tumani";
     cityPart = `${cityName} ${suffix}`;
   } else if (letter.organizationCity) {
-    cityPart = `${letter.organizationCity} tumani`;
+    cityPart = `${capitalize(letter.organizationCity)} tumani`;
   }
 
+  // Финальная шапка:
+  // "O'zbekiston Respublikasi Farg'ona viloyati Qo'qon shahar PROFI MIX"
   const headerText = [
     "O'zbekiston Respublikasi",
     regionPart,
@@ -277,7 +293,7 @@ export default function GasRequestDocument() {
           }}
         >
           <div style={{ width: "40%", textAlign: "left" }}>
-            "{gasOrg?.name}" gaz ta'minoti filiali direktori {directorShort}ga
+            "{gasOrg?.name} direktori {directorShort}ga
           </div>
         </div>
 
