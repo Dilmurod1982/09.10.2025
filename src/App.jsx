@@ -54,7 +54,12 @@ import {
   PriceOfGasPage,
   HomeHududgazMetrolog,
   GazAnalytics,
-  DocumentPage, // Импортируем DocumentPage
+  DocumentPage,
+  GasSettlementsBinding,
+  GasOrganizations,
+  GasRequestDocument,
+  GasRequests,
+  GasRequestBatch,
 } from "./pages";
 import {
   createBrowserRouter,
@@ -269,6 +274,42 @@ function App() {
           ),
         },
         {
+          path: "/gas-organizations",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["admin"]}
+              element={<GasOrganizations />}
+            />
+          ),
+        },
+        {
+          path: "/gas-requests",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["admin"]}
+              element={<GasRequests />}
+            />
+          ),
+        },
+        {
+          path: "/gas-requests/batch/:id",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["admin"]}
+              element={<GasRequestBatch />}
+            />
+          ),
+        },
+        {
+          path: "/gas-request/:id",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["admin"]}
+              element={<GasRequestDocument />}
+            />
+          ),
+        },
+        {
           path: "/cities",
           element: (
             <ProtectedLayout allowedRoles={["admin"]} element={<Cities />} />
@@ -358,6 +399,15 @@ function App() {
             <ProtectedLayout
               allowedRoles={["admin"]}
               element={<DocByStationInf />}
+            />
+          ),
+        },
+        {
+          path: "/gas-settlements-binding",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["admin"]}
+              element={<GasSettlementsBinding />}
             />
           ),
         },

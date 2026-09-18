@@ -468,6 +468,18 @@ export default function Navbar() {
       icon: <AnalyticsIcon />,
       path: "/gazanalytics",
     },
+    {
+      text: "Объектларни боғлаш",
+      icon: <HandshakeIcon />,
+      path: "/gas-settlements-binding",
+    },
+    // ✅ ДОБАВИТЬ:
+    { text: "Талабномалар", icon: <DescriptionIcon />, path: "/gas-requests" },
+    {
+      text: "Газ ташкилотлари",
+      icon: <CorporateFareIcon />,
+      path: "/gas-organizations",
+    },
   ];
 
   const equipmentDetailsItems = [

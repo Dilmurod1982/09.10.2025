@@ -53,3 +53,8 @@ export { default as PriceOfGasPage } from "./PriceOfGasPage";
 export { default as HomeHududgazMetrolog } from "./HomeHududgazMetrolog";
 export { default as DocumentPage } from "./DocumentPage";
 export { default as GazAnalytics } from "./GazAnalytics";
+export { default as GasSettlementsBinding } from "./GasSettlementsBinding";
+export { default as GasRequestDocument } from "./GasRequestDocument";
+export { default as GasRequests } from "./GasRequests";
+export { default as GasRequestBatch } from "./GasRequestBatch";
+export { default as GasOrganizations } from "./GasOrganizations";
