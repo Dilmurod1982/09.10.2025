@@ -1,14 +1,43 @@
+// Конвертер чисел в узбекские слова (латиница)
+// Пример: 500000 → "besh yuz ming"
+
 const ONES = [
-    "", "bir", "ikki", "uch", "to'rt", "besh",
-    "olti", "yetti", "sakkiz", "to'qqiz",
+    "",
+    "bir",
+    "ikki",
+    "uch",
+    "to'rt",
+    "besh",
+    "olti",
+    "yetti",
+    "sakkiz",
+    "to'qqiz",
   ];
+  
   const TEENS = [
-    "o'n", "o'n bir", "o'n ikki", "o'n uch", "o'n to'rt", "o'n besh",
-    "o'n olti", "o'n yetti", "o'n sakkiz", "o'n to'qqiz",
+    "o'n",
+    "o'n bir",
+    "o'n ikki",
+    "o'n uch",
+    "o'n to'rt",
+    "o'n besh",
+    "o'n olti",
+    "o'n yetti",
+    "o'n sakkiz",
+    "o'n to'qqiz",
   ];
+  
   const TENS = [
-    "", "", "yigirma", "o'ttiz", "qirq",
-    "ellik", "oltmish", "yetmish", "sakson", "to'qson",
+    "",
+    "",
+    "yigirma",
+    "o'ttiz",
+    "qirq",
+    "ellik",
+    "oltmish",
+    "yetmish",
+    "sakson",
+    "to'qson",
   ];
   
   function threeDigitToWords(n) {
@@ -35,7 +64,7 @@ const ONES = [
     if (num === 0) return "nol";
     if (!num || isNaN(num)) return "";
   
-    num = Math.floor(num);
+    num = Math.floor(Number(num));
     const parts = [];
   
     const billions = Math.floor(num / 1_000_000_000);

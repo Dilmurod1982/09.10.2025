@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { numberToUzbekWords } from "../utils/numberToUzbekWords";
+import AGNKSLogo from "../components/AGNKSLogo";
 
 // Месяцы на латинице
 const MONTHS_LAT = [
@@ -20,7 +21,51 @@ const MONTHS_LAT = [
   "dekabr",
 ];
 
+// Утилита: первая буква заглавная, остальные строчные
+function capitalize(str) {
+  if (!str) return "";
+  const s = String(str).toLowerCase().trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Формат ФИО директора МЧЖ: "ФАМИЛИЯ ИМЯ ОТЧЕСТВО" → "И.О.Фамилия"
+// Пример: "BARATOV UMID ISMAILOVICH" → "U.I.Baratov"
+function formatMchjDirector(fullName) {
+  if (!fullName) return "";
+  const str = String(fullName).trim();
+
+  if (str.includes(".")) {
+    return str
+      .split(".")
+      .map((part) => {
+        const t = part.trim();
+        if (!t) return "";
+        if (t.length === 1) return t.toUpperCase();
+        return capitalize(t);
+      })
+      .filter(Boolean)
+      .join(".");
+  }
+
+  const parts = str.split(/\s+/);
+
+  if (parts.length >= 3) {
+    const [lastName, firstName, middleName] = parts;
+    return `${capitalize(firstName).charAt(0)}.${capitalize(middleName).charAt(
+      0
+    )}.${capitalize(lastName)}`;
+  }
+
+  if (parts.length === 2) {
+    const [lastName, firstName] = parts;
+    return `${capitalize(firstName).charAt(0)}.${capitalize(lastName)}`;
+  }
+
+  return capitalize(str);
+}
+
 function getDeadline(year, month) {
+  // Возвращаем объект Date (локальный), а не строку
   const firstDay = new Date(year, month - 1, 1);
   const d = new Date(firstDay);
   d.setDate(d.getDate() - 10);
@@ -28,9 +73,22 @@ function getDeadline(year, month) {
 }
 
 // Дата на латинице: "2026 yil 20 avgust"
-function formatDateUz(dateStr) {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
+// Принимает Date или строку. Строки "YYYY-MM-DD" парсит как локальные (без UTC-сдвига).
+function formatDateUz(dateInput) {
+  if (!dateInput) return "";
+  let d;
+
+  if (dateInput instanceof Date) {
+    d = dateInput;
+  } else {
+    const str = String(dateInput);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      d = new Date(str + "T00:00:00");
+    } else {
+      d = new Date(str);
+    }
+  }
+
   return `${d.getFullYear()} yil ${d.getDate()} ${MONTHS_LAT[d.getMonth()]}`;
 }
 
@@ -54,7 +112,6 @@ export default function GasRequestDocument() {
         const l = { id: letterSnap.id, ...letterSnap.data() };
         setLetter(l);
 
-        // Загружаем газовое хозяйство и директора
         const [orgSnap, dirSnap] = await Promise.all([
           getDoc(doc(db, "gasOrganizations", l.gasOrganizationId)),
           getDoc(doc(db, "gasOrgDirectors", l.gasDirectorId)),
@@ -63,28 +120,23 @@ export default function GasRequestDocument() {
         if (dirSnap.exists())
           setDirector({ id: dirSnap.id, ...dirSnap.data() });
 
-        // Загружаем первую станцию этого ООО, чтобы взять её cityId
         const stationsSnap = await getDocs(collection(db, "stations"));
         const orgStations = stationsSnap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
           .filter((s) => s.organizationId === l.organizationId);
 
-        // Берём cityId первой станции
         const cityId = orgStations[0]?.address?.cityId;
 
         if (cityId) {
-          // Загружаем данные города/района
           const [citySnap, citiesSnap] = await Promise.all([
             getDoc(doc(db, "cities", cityId)),
             getDocs(collection(db, "cities")),
           ]);
 
           let cityData = null;
-
           if (citySnap.exists()) {
             cityData = { id: citySnap.id, ...citySnap.data() };
           } else {
-            // Fallback: ищем по id в списке
             cityData = citiesSnap.docs
               .map((d) => ({ id: d.id, ...d.data() }))
               .find((c) => String(c.id) === String(cityId));
@@ -106,17 +158,16 @@ export default function GasRequestDocument() {
 
   const monthName = MONTHS_LAT[letter.month - 1];
   const deadline = getDeadline(letter.year, letter.month);
-  const deadlineStr = formatDateUz(deadline.toISOString().split("T")[0]);
+  const deadlineStr = formatDateUz(deadline);
 
-  // Адресат: "Sh.A.Abdumajidovga"
-  const directorShort = `${director?.firstName?.[0] || ""}.${
-    director?.middleName?.[0] || ""
-  }.${director?.lastName || ""}`;
+  // Адресат: "S.A.Abdumajidov"
+  const directorShort = `${
+    director?.firstName ? capitalize(director.firstName).charAt(0) + "." : ""
+  }${
+    director?.middleName ? capitalize(director.middleName).charAt(0) + "." : ""
+  }${director?.lastName ? capitalize(director.lastName) : ""}`;
 
-  // ============================================================
-  // ФИРМЕННАЯ ШАПКА
-  // ============================================================
-  // Viloyat: cities.regionName + " viloyati"
+  // Фирменная шапка
   const regionName = cityInfo?.regionName || "";
   const regionPart = regionName
     ? regionName.toLowerCase().includes("viloyat")
@@ -124,7 +175,6 @@ export default function GasRequestDocument() {
       : `${regionName} viloyati`
     : "";
 
-  // Tuman/Shahar: cities.name + " tumani"/" shahar"
   const cityName = cityInfo?.name || "";
   const cityType = cityInfo?.type || "";
 
@@ -139,12 +189,9 @@ export default function GasRequestDocument() {
     const suffix = isShahar ? "shahar" : "tumani";
     cityPart = `${cityName} ${suffix}`;
   } else if (letter.organizationCity) {
-    // Fallback
     cityPart = `${letter.organizationCity} tumani`;
   }
 
-  // Финальная шапка:
-  // "O'zbekiston Respublikasi Farg'ona viloyati Qo'qon shahar PROFI MIX"
   const headerText = [
     "O'zbekiston Respublikasi",
     regionPart,
@@ -185,11 +232,28 @@ export default function GasRequestDocument() {
       >
         {/* ============ ФИРМЕННАЯ ШАПКА ============ */}
         <div className="flex justify-between items-start mb-2">
-          <div style={{ width: "48%", fontWeight: "bold", lineHeight: 1.5 }}>
+          {/* Левая колонка: текстовый заголовок */}
+          <div
+            style={{
+              width: "60%",
+              fontWeight: "bold",
+              lineHeight: 1.5,
+              paddingTop: "8px",
+            }}
+          >
             {headerText}
           </div>
-          <div style={{ width: "48%", textAlign: "right", fontWeight: "bold" }}>
-            {headerText}
+
+          {/* Правая колонка: эмблема АГНКС */}
+          <div
+            style={{
+              width: "40%",
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "flex-start",
+            }}
+          >
+            <AGNKSLogo size={90} />
           </div>
         </div>
 
@@ -209,6 +273,7 @@ export default function GasRequestDocument() {
             fontWeight: "bold",
             display: "flex",
             justifyContent: "flex-end",
+            marginTop: "20px",
           }}
         >
           <div style={{ width: "40%", textAlign: "left" }}>
@@ -283,7 +348,8 @@ export default function GasRequestDocument() {
             MCHJ direktori
           </div>
           <div style={{ fontWeight: "bold", paddingRight: "60px" }}>
-            {letter.organizationDirectorName || "________________"}
+            {formatMchjDirector(letter.organizationDirectorName) ||
+              "________________"}
           </div>
         </div>
       </div>

@@ -44,9 +44,6 @@ export default function GasRequests() {
     loadAll();
   }, []);
 
-  // ============================================================
-  // ЗАГРУЗКА ДАННЫХ
-  // ============================================================
   const loadAll = async () => {
     setLoading(true);
     try {
@@ -73,9 +70,6 @@ export default function GasRequests() {
     }
   };
 
-  // ============================================================
-  // ГРУППИРОВКА ПО BATCH (партиям)
-  // ============================================================
   const groupedByBatch = React.useMemo(() => {
     const map = {};
     requests.forEach((r) => {
@@ -104,9 +98,6 @@ export default function GasRequests() {
     );
   }, [requests]);
 
-  // ============================================================
-  // НОРМАЛИЗАЦИЯ PERIOD (на случай "2026-1" вместо "2026-01")
-  // ============================================================
   const normalizePeriod = (p) => {
     if (!p) return "";
     const m = String(p).match(/^(\d{4})-(\d{1,2})/);
@@ -114,9 +105,6 @@ export default function GasRequests() {
     return String(p);
   };
 
-  // ============================================================
-  // СОЗДАНИЕ ПАРТИИ ПИСЕМ
-  // ============================================================
   const handleCreate = async () => {
     if (!form.gasOrganizationId) {
       toast.error("Газ ташкилотини танланг");
@@ -132,7 +120,6 @@ export default function GasRequests() {
       const period = `${form.year}-${String(form.month).padStart(2, "0")}`;
       const targetPeriod = normalizePeriod(period);
 
-      // 1. Активный директор
       const activeDirector = directors.find(
         (d) =>
           d.gasOrganizationId === form.gasOrganizationId &&
@@ -144,7 +131,6 @@ export default function GasRequests() {
         return;
       }
 
-      // 2. Загружаем всё
       const [orgsSnap, stationsSnap, mainSnap] = await Promise.all([
         getDocs(collection(db, "organizations")),
         getDocs(collection(db, "stations")),
@@ -178,7 +164,6 @@ export default function GasRequests() {
         activeDirector.firstName
       } ${activeDirector.middleName || ""}`.trim();
 
-      // 3. Batch-документ
       const batchRef = await addDoc(collection(db, "gasRequestBatches"), {
         year: Number(form.year),
         month: Number(form.month),
@@ -192,21 +177,16 @@ export default function GasRequests() {
         createdAt: new Date(),
       });
 
-      // 4. Формируем письма для каждого ООО
       const lettersPayload = [];
 
       for (const org of allOrgs) {
         const orgStations = allStations
           .filter((s) => s.organizationId === org.id)
           .map((station) => {
-            // ⭐ ГЛАВНАЯ ЛОГИКА СВЯЗИ ⭐
-            // Шаг 1: Находим запись в mainData по stationId (= station.id)
             const mainItem = mainData.find(
               (m) => String(m.stationId) === String(station.id)
             );
 
-            // Шаг 2: Через mainItem.id ищем limit в data
-            //         (в data.stationId хранится mainItem.id, например "1")
             let limit = 0;
             if (mainItem) {
               const dataItem = dataArr.find(
@@ -229,22 +209,10 @@ export default function GasRequests() {
 
         if (orgStations.length === 0) continue;
 
-        // Сортировка по номеру станции
         orgStations.sort(
           (a, b) =>
             (parseInt(a.stationNumber) || 0) - (parseInt(b.stationNumber) || 0)
         );
-
-        // Лог для проверки
-        console.log(`📄 ООО "${org.name}":`, {
-          stationsCount: orgStations.length,
-          totalLimit: orgStations.reduce((s, x) => s + x.limit, 0),
-          stations: orgStations.map((s) => ({
-            num: s.stationNumber,
-            landmark: s.landmark,
-            limit: s.limit,
-          })),
-        });
 
         lettersPayload.push({
           batchId: batchRef.id,
@@ -259,7 +227,6 @@ export default function GasRequests() {
           gasDirectorId: activeDirector.id,
           gasDirectorName,
 
-          // Данные конкретного ООО
           organizationId: org.id,
           organizationName: org.name,
           organizationNameCyr: `Общество с ограниченной ответственностью "${org.name}"`,
@@ -280,7 +247,6 @@ export default function GasRequests() {
         return;
       }
 
-      // 5. Сохраняем все письма
       for (const letter of lettersPayload) {
         await addDoc(collection(db, "gasRequests"), letter);
       }
@@ -310,9 +276,6 @@ export default function GasRequests() {
     }
   };
 
-  // ============================================================
-  // РЕНДЕР
-  // ============================================================
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -323,7 +286,6 @@ export default function GasRequests() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      {/* ============ ЗАГОЛОВОК + КНОПКИ ============ */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 mb-1">
@@ -360,7 +322,6 @@ export default function GasRequests() {
         </div>
       </div>
 
-      {/* ============ СПИСОК ПАРТИЙ ============ */}
       {groupedByBatch.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-md p-12 text-center">
           <FileText className="mx-auto text-gray-400 mb-4" size={48} />
@@ -450,7 +411,6 @@ export default function GasRequests() {
         </div>
       )}
 
-      {/* ============ МОДАЛЬНОЕ ОКНО СОЗДАНИЯ ============ */}
       <AnimatePresence>
         {createModalOpen && (
           <motion.div
@@ -467,7 +427,6 @@ export default function GasRequests() {
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Заголовок */}
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-5 flex justify-between items-center">
                 <h2 className="text-xl font-bold">Янги талабнома яратиш</h2>
                 <button
@@ -479,9 +438,7 @@ export default function GasRequests() {
                 </button>
               </div>
 
-              {/* Форма */}
               <div className="p-6 space-y-4">
-                {/* Год + Месяц */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -524,7 +481,6 @@ export default function GasRequests() {
                   </div>
                 </div>
 
-                {/* Газ ташкилоти */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Газ ташкилоти *
@@ -554,7 +510,6 @@ export default function GasRequests() {
                   )}
                 </div>
 
-                {/* Дата + Номер */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -588,7 +543,6 @@ export default function GasRequests() {
                   </div>
                 </div>
 
-                {/* Информационная плашка */}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800">
                   <p className="font-medium mb-1">ℹ️ Маълумот</p>
                   <p className="text-xs">
@@ -599,7 +553,6 @@ export default function GasRequests() {
                 </div>
               </div>
 
-              {/* Кнопки */}
               <div className="px-6 py-4 bg-gray-50 border-t flex gap-3 justify-end">
                 <button
                   onClick={() => setCreateModalOpen(false)}

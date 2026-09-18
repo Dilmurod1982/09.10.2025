@@ -6,12 +6,10 @@ import {
   addDoc,
   updateDoc,
   doc,
-  query,
-  where,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { toast } from "react-toastify";
-import { Plus, X, Edit, Save, Building, User, Calendar } from "lucide-react";
+import { Plus, X, Edit } from "lucide-react";
 
 export default function GasOrganizations() {
   const [gasOrgs, setGasOrgs] = useState([]);
@@ -60,7 +58,6 @@ export default function GasOrganizations() {
     }
   };
 
-  // ---------- СОХРАНЕНИЕ ГАЗОВОГО ХОЗЯЙСТВА ----------
   const saveOrg = async () => {
     if (!orgForm.name.trim() || !orgForm.startDate) {
       toast.error("Ном ва бошланиш санасини киритинг");
@@ -96,7 +93,6 @@ export default function GasOrganizations() {
     }
   };
 
-  // ---------- СОХРАНЕНИЕ РУКОВОДИТЕЛЯ ----------
   const saveDirector = async () => {
     if (
       !directorForm.gasOrganizationId ||
@@ -181,7 +177,6 @@ export default function GasOrganizations() {
         </button>
       </div>
 
-      {/* Таблица газовых хозяйств */}
       <div className="bg-white rounded-2xl shadow-md overflow-hidden mb-8">
         <table className="w-full">
           <thead className="bg-gray-100">
@@ -242,7 +237,6 @@ export default function GasOrganizations() {
         </table>
       </div>
 
-      {/* Список руководителей */}
       <h2 className="text-xl font-bold mb-3">Рахбарлар</h2>
       <div className="bg-white rounded-2xl shadow-md overflow-hidden">
         <table className="w-full">
@@ -313,14 +307,14 @@ export default function GasOrganizations() {
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-sm font-medium">Номи (лотin) *</label>
+                  <label className="text-sm font-medium">Номи (lotin) *</label>
                   <input
                     type="text"
                     value={orgForm.name}
                     onChange={(e) =>
                       setOrgForm({ ...orgForm, name: e.target.value })
                     }
-                    placeholder='"Ҳудудгаз Фарғона" газ таъминоти филиали'
+                    placeholder={`"Hududgaz Farg'ona" gaz ta'minoti filiali`}
                     className="w-full px-3 py-2 border rounded-lg"
                   />
                 </div>
@@ -332,7 +326,6 @@ export default function GasOrganizations() {
                     onChange={(e) =>
                       setOrgForm({ ...orgForm, nameCyrillic: e.target.value })
                     }
-                    placeholder='Фарганский филиал по газоснабжению "Худудгаз"'
                     className="w-full px-3 py-2 border rounded-lg"
                   />
                 </div>
@@ -437,49 +430,47 @@ export default function GasOrganizations() {
                     ))}
                   </select>
                 </div>
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <label className="text-sm font-medium">Фамилияси *</label>
-                    <input
-                      type="text"
-                      value={directorForm.lastName}
-                      onChange={(e) =>
-                        setDirectorForm({
-                          ...directorForm,
-                          lastName: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Исми *</label>
-                    <input
-                      type="text"
-                      value={directorForm.firstName}
-                      onChange={(e) =>
-                        setDirectorForm({
-                          ...directorForm,
-                          firstName: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Отчестваси</label>
-                    <input
-                      type="text"
-                      value={directorForm.middleName}
-                      onChange={(e) =>
-                        setDirectorForm({
-                          ...directorForm,
-                          middleName: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
+                <div>
+                  <label className="text-sm font-medium">Фамилияси *</label>
+                  <input
+                    type="text"
+                    value={directorForm.lastName}
+                    onChange={(e) =>
+                      setDirectorForm({
+                        ...directorForm,
+                        lastName: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Исми *</label>
+                  <input
+                    type="text"
+                    value={directorForm.firstName}
+                    onChange={(e) =>
+                      setDirectorForm({
+                        ...directorForm,
+                        firstName: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Отчестваси</label>
+                  <input
+                    type="text"
+                    value={directorForm.middleName}
+                    onChange={(e) =>
+                      setDirectorForm({
+                        ...directorForm,
+                        middleName: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>

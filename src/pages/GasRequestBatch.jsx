@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../firebase/config";
-import { Eye, Printer } from "lucide-react";
+import { Eye } from "lucide-react";
 
 export default function GasRequestBatch() {
   const { id } = useParams();
@@ -22,7 +22,7 @@ export default function GasRequestBatch() {
     })();
   }, [id]);
 
-  if (loading) return <div className="p-6">Юкланмоқда...</div>;
+  if (loading) return <div className="p-6">Yuklanmoqda...</div>;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -34,7 +34,7 @@ export default function GasRequestBatch() {
           onClick={() => navigate("/gas-requests")}
           className="px-4 py-2 border rounded-xl"
         >
-          ← Орқага
+          ← Orqaga
         </button>
       </div>
 
