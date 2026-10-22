@@ -4,21 +4,42 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { toast } from "react-hot-toast";
 
+// Узбекские названия месяцев
+const UZ_MONTHS = [
+  "Январ",
+  "Феврал",
+  "Март",
+  "Апрел",
+  "Май",
+  "Июн",
+  "Июл",
+  "Август",
+  "Сентябр",
+  "Октябр",
+  "Ноябр",
+  "Декабр",
+];
+
 const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
   const [turnoverData, setTurnoverData] = useState([]);
   const [paymentsData, setPaymentsData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [contractData, setContractData] = useState(null);
 
-  // Состояния для выбора периода
+  // Состояния для выбора периода (дневная/квартальная/годовая оборотка)
   const [periodType, setPeriodType] = useState("month");
   const [selectedYear, setSelectedYear] = useState(
-    new Date().getFullYear().toString(),
+    new Date().getFullYear().toString()
   );
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedQuarter, setSelectedQuarter] = useState("");
 
-  // Годы для выбора (с 2025 по текущий)
+  // 🤝 Год для месячной оборотки (отдельно от фильтра дневной)
+  const [monthlyYear, setMonthlyYear] = useState(
+    new Date().getFullYear().toString()
+  );
+
+  // Годы для выбора
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const years = [];
@@ -28,28 +49,26 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     return years.reverse();
   }, []);
 
-  // Месяцы
   const monthOptions = [
-    { value: "01", label: "Январь" },
-    { value: "02", label: "Февраль" },
+    { value: "01", label: "Январ" },
+    { value: "02", label: "Феврал" },
     { value: "03", label: "Март" },
-    { value: "04", label: "Апрель" },
+    { value: "04", label: "Апрел" },
     { value: "05", label: "Май" },
-    { value: "06", label: "Июнь" },
-    { value: "07", label: "Июль" },
+    { value: "06", label: "Июн" },
+    { value: "07", label: "Июл" },
     { value: "08", label: "Август" },
-    { value: "09", label: "Сентябрь" },
-    { value: "10", label: "Октябрь" },
-    { value: "11", label: "Ноябрь" },
-    { value: "12", label: "Декабрь" },
+    { value: "09", label: "Сентябр" },
+    { value: "10", label: "Октябр" },
+    { value: "11", label: "Ноябр" },
+    { value: "12", label: "Декабр" },
   ];
 
-  // Кварталы
   const quarterOptions = [
-    { value: "I", label: "I чорак (январь-март)" },
-    { value: "II", label: "II чорак (апрель-июнь)" },
-    { value: "III", label: "III чорак (июль-сентябрь)" },
-    { value: "IV", label: "IV чорак (октябрь-декабрь)" },
+    { value: "I", label: "I чорак (январ-март)" },
+    { value: "II", label: "II чорак (апрел-июн)" },
+    { value: "III", label: "III чорак (июл-сентябр)" },
+    { value: "IV", label: "IV чорак (октябр-декабр)" },
   ];
 
   // Сброс месяца/квартала при смене типа периода
@@ -71,7 +90,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     }
   }, [isOpen, periodType]);
 
-  // Загрузка полных данных контракта при открытии модального окна
+  // Загрузка полных данных контракта
   useEffect(() => {
     if (!isOpen || !partner || !partner.contractId) return;
 
@@ -79,7 +98,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
       try {
         const q = query(
           collection(db, "contracts"),
-          where("contractId", "==", partner.contractId),
+          where("contractId", "==", partner.contractId)
         );
         const snapshot = await getDocs(q);
 
@@ -87,10 +106,9 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
           const doc = snapshot.docs[0];
           setContractData({ id: doc.id, ...doc.data() });
         } else {
-          // Если не нашли по contractId, пробуем по id
           const q2 = query(
             collection(db, "contracts"),
-            where("__name__", "==", partner.contractId),
+            where("__name__", "==", partner.contractId)
           );
           const snapshot2 = await getDocs(q2);
           if (!snapshot2.empty) {
@@ -99,7 +117,6 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
           }
         }
       } catch (error) {
-        console.error("Error fetching contract:", error);
         toast.error("Шартнома маълумотларини юклашда хатолик");
       }
     };
@@ -114,15 +131,22 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
   };
 
   const formatNumber = (num) => {
-    return num.toLocaleString("ru-RU", {
+    return toNumber(num).toLocaleString("ru-RU", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
   };
 
+  const formatNumberM3 = (num) => {
+    return toNumber(num).toLocaleString("ru-RU", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return "—";
-    const [year, month, day] = dateStr.split("-");
+    const [year, month, day] = String(dateStr).split("-");
     return `${day}.${month}.${year}`;
   };
 
@@ -144,7 +168,6 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     return new Date(year, month, 0).getDate();
   };
 
-  // Получение максимальной даты из транзакций
   const getMaxTransactionDate = (transactions) => {
     if (!transactions || transactions.length === 0) return null;
 
@@ -160,7 +183,6 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     return maxDate;
   };
 
-  // Получение массива дат для периода (ограниченный последней датой транзакций)
   const getDateRange = (maxAllowedDate) => {
     const year = parseInt(selectedYear);
     let startDate, endDate;
@@ -188,13 +210,11 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
 
     if (!startDate || !endDate) return [];
 
-    // Если есть максимальная дата транзакций, ограничиваем endDate
     let finalEndDate = endDate;
     if (maxAllowedDate && maxAllowedDate < endDate) {
       finalEndDate = maxAllowedDate;
     }
 
-    // Генерируем все даты в диапазоне
     const dates = [];
     const current = new Date(startDate);
     const end = new Date(finalEndDate);
@@ -210,7 +230,6 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     return dates;
   };
 
-  // Получение фильтрованных платежей за период
   const getFilteredPayments = (transactions, startDate, endDate) => {
     if (!transactions || transactions.length === 0) return [];
 
@@ -232,26 +251,22 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
       }
     }
 
-    // Сортируем по дате платежа
     payments.sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
     return payments;
   };
 
-  // Расчет ежедневного оборота
   const calculateDailyTurnover = (
     dateRange,
     transactions,
     startBalance,
-    startBalanceDate,
+    startBalanceDate
   ) => {
     if (!dateRange.length || !transactions) return [];
 
-    // Сортируем транзакции по дате
     const sortedTransactions = [...transactions].sort((a, b) =>
-      (a.reportDate || "").localeCompare(b.reportDate || ""),
+      (a.reportDate || "").localeCompare(b.reportDate || "")
     );
 
-    // Создаем карту транзакций по дням
     const dailyMap = new Map();
 
     for (const t of sortedTransactions) {
@@ -267,7 +282,6 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
       dayData.paymentSum += toNumber(t.paymentSum);
     }
 
-    // Рассчитываем сальдо на каждый день
     let currentBalance = toNumber(startBalance);
     const turnover = [];
 
@@ -279,7 +293,6 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
         paymentSum: 0,
       };
 
-      // Начальное сальдо дня
       let dayStartBalance;
 
       if (i === 0 && startBalanceDate && date === startBalanceDate) {
@@ -317,7 +330,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     return turnover;
   };
 
-  // Загрузка оборотных данных и платежей
+  // Загрузка данных для дневной/квартальной/годовой оборотки
   useEffect(() => {
     if (!isOpen || !contractData) return;
     if (periodType === "month" && !selectedMonth) return;
@@ -329,7 +342,6 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
       try {
         const transactions = contractData.transactions || [];
 
-        // Получаем даты периода
         const maxTransactionDate = getMaxTransactionDate(transactions);
         const dateRange = getDateRange(maxTransactionDate);
 
@@ -340,19 +352,16 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
           return;
         }
 
-        // Получаем start и end даты для фильтрации платежей
         const startDate = dateRange[0];
         const endDate = dateRange[dateRange.length - 1];
 
-        // Фильтруем платежи за период
         const filteredPayments = getFilteredPayments(
           transactions,
           startDate,
-          endDate,
+          endDate
         );
         setPaymentsData(filteredPayments);
 
-        // Рассчитываем оборот
         const startBalance = contractData.startBalance || 0;
         const startBalanceDate = contractData.startBalanceDate;
 
@@ -360,11 +369,10 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
           dateRange,
           transactions,
           startBalance,
-          startBalanceDate,
+          startBalanceDate
         );
         setTurnoverData(turnover);
       } catch (error) {
-        console.error("Error calculating data:", error);
         toast.error("Маълумотларни ҳисоблашда хатолик");
         setTurnoverData([]);
         setPaymentsData([]);
@@ -383,7 +391,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     selectedQuarter,
   ]);
 
-  // Подсчет итогов
+  // Итоги по дневной оборотке
   const totals = useMemo(() => {
     return turnoverData.reduce(
       (acc, day) => {
@@ -392,14 +400,107 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
         acc.totalPaid += day.paid;
         return acc;
       },
-      { totalSoldM3: 0, totalSoldAmount: 0, totalPaid: 0 },
+      { totalSoldM3: 0, totalSoldAmount: 0, totalPaid: 0 }
     );
   }, [turnoverData]);
 
-  // Подсчет итогов платежей
   const paymentsTotal = useMemo(() => {
     return paymentsData.reduce((sum, payment) => sum + payment.amount, 0);
   }, [paymentsData]);
+
+  // ============================================================
+  // 🤝 ОЙЛИК ОБОРОТ — расчёт по месяцам за выбранный год
+  // ============================================================
+  const monthlyTurnover = useMemo(() => {
+    if (!contractData) return [];
+
+    const transactions = Array.isArray(contractData.transactions)
+      ? [...contractData.transactions].sort((a, b) =>
+          String(a.reportDate || "").localeCompare(String(b.reportDate || ""))
+        )
+      : [];
+
+    const startBalance = toNumber(contractData.startBalance);
+    const year = parseInt(monthlyYear);
+
+    if (!year) return [];
+
+    const result = [];
+
+    let runningBalance = startBalance;
+    let txIndex = 0;
+
+    // сначала учтём все транзакции ДО 1 января выбранного года
+    const yearStartDate = `${year}-01-01`;
+    while (txIndex < transactions.length) {
+      const t = transactions[txIndex];
+      const d = t.reportDate;
+      if (!d || d >= yearStartDate) break;
+      runningBalance += toNumber(t.totalAmount) - toNumber(t.paymentSum);
+      txIndex++;
+    }
+
+    for (let m = 1; m <= 12; m++) {
+      const monthStart = `${year}-${pad2(m)}-01`;
+      const lastDay = getLastDayOfMonth(year, m);
+      const monthEnd = `${year}-${pad2(m)}-${pad2(lastDay)}`;
+
+      const monthStartBalance = runningBalance;
+      let monthSoldM3 = 0;
+      let monthSoldAmount = 0;
+      let monthPaid = 0;
+
+      while (txIndex < transactions.length) {
+        const t = transactions[txIndex];
+        const d = t.reportDate;
+        if (!d || d > monthEnd) break;
+        if (d >= monthStart) {
+          monthSoldM3 += toNumber(t.soldM3);
+          monthSoldAmount += toNumber(t.totalAmount);
+          monthPaid += toNumber(t.paymentSum);
+        }
+        txIndex++;
+      }
+
+      const monthEndBalance = monthStartBalance + monthSoldAmount - monthPaid;
+
+      result.push({
+        month: UZ_MONTHS[m - 1],
+        monthNumber: m,
+        startBalance: monthStartBalance,
+        soldM3: monthSoldM3,
+        soldAmount: monthSoldAmount,
+        paid: monthPaid,
+        endBalance: monthEndBalance,
+        hasActivity: monthSoldM3 > 0 || monthSoldAmount > 0 || monthPaid > 0,
+      });
+
+      runningBalance = monthEndBalance;
+    }
+
+    return result;
+  }, [contractData, monthlyYear]);
+
+  // Итоги по месячной оборотке
+  const monthlyTotals = useMemo(() => {
+    return monthlyTurnover.reduce(
+      (acc, m) => {
+        acc.totalSoldM3 += m.soldM3;
+        acc.totalSoldAmount += m.soldAmount;
+        acc.totalPaid += m.paid;
+        return acc;
+      },
+      { totalSoldM3: 0, totalSoldAmount: 0, totalPaid: 0 }
+    );
+  }, [monthlyTurnover]);
+
+  // Стиль для сальдо
+  const balanceClass = (val) => {
+    const n = toNumber(val);
+    if (n > 0) return "text-red-600";
+    if (n < 0) return "text-green-600";
+    return "text-gray-700";
+  };
 
   // Печать
   const handlePrint = () => {
@@ -408,13 +509,13 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     const getPeriodLabel = () => {
       if (periodType === "month") {
         const month = monthOptions.find(
-          (m) => m.value === selectedMonth,
+          (m) => m.value === selectedMonth
         )?.label;
         return `${month} ${selectedYear}`;
       }
       if (periodType === "quarter") {
         const quarter = quarterOptions.find(
-          (q) => q.value === selectedQuarter,
+          (q) => q.value === selectedQuarter
         )?.label;
         return `${quarter} ${selectedYear}`;
       }
@@ -425,205 +526,140 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
     <!DOCTYPE html>
     <html>
       <head>
-        <title>Хамкор маълумотлари - ${partner.partnerName}</title>
+        <title>Ҳамкор маълумотлари - ${partner.partnerName}</title>
         <style>
-          @page { 
-            size: A4 portrait; 
-            margin: 0.5cm;
-          }
-          body {
-            font-family: Arial, sans-serif;
-            font-size: 10px;
-            line-height: 1.2;
-            margin: 0;
-            padding: 0;
-          }
-          .container { 
-            max-width: 100%;
-            padding: 5px;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #2563eb;
-            page-break-after: avoid;
-          }
-          .header h1 { 
-            font-size: 14px; 
-            margin: 0 0 5px; 
-            color: #2563eb;
-            font-weight: bold;
-          }
-          .header p { 
-            margin: 2px 0; 
-            color: #374151;
-            font-size: 9px;
-          }
-          .info-section {
-            margin-bottom: 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            padding: 8px;
-            page-break-inside: avoid;
-            page-break-after: avoid;
-          }
-          .info-title {
-            font-size: 11px;
-            font-weight: bold;
-            margin-bottom: 6px;
-            color: #2563eb;
-          }
-          .info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 6px;
-          }
-          .info-item { 
-            display: flex;
-            font-size: 9px;
-          }
-          .info-label { 
-            font-weight: bold; 
-            width: 120px;
-            flex-shrink: 0;
-          }
-          .info-value { 
-            color: #374151;
-            word-break: break-word;
-          }
-          .table-container {
-            margin-bottom: 15px;
-            page-break-inside: avoid;
-          }
-          .table-title {
-            font-size: 11px;
-            font-weight: bold;
-            margin-bottom: 6px;
-            color: #2563eb;
-            background-color: #f3f4f6;
-            padding: 6px;
-            border-radius: 4px;
-            page-break-after: avoid;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 8px;
-            page-break-inside: auto;
-          }
-          thead {
-            display: table-header-group;
-          }
-          tbody {
-            display: table-row-group;
-          }
-          tr {
-            page-break-inside: avoid;
-            page-break-after: auto;
-          }
-          th, td {
-            border: 1px solid #9ca3af;
-            padding: 4px 3px;
-            text-align: right;
-          }
-          th:first-child, td:first-child { 
-            text-align: center;
-            width: 30px;
-          }
-          th:nth-child(2), td:nth-child(2) { 
-            text-align: center;
-            width: 70px;
-          }
-          th {
-            background-color: #f3f4f6;
-            font-weight: bold;
-            text-align: center;
-          }
-          tfoot td {
-            background-color: #f3f4f6;
-            font-weight: bold;
-          }
-          .payments-table th:first-child,
-          .payments-table td:first-child {
-            text-align: center;
-            width: 30px;
-          }
-          .payments-table th:nth-child(2),
-          .payments-table td:nth-child(2) {
-            text-align: right;
-            width: 100px;
-          }
-          .payments-table th:nth-child(3),
-          .payments-table td:nth-child(3) {
-            text-align: center;
-            width: 70px;
-          }
-          .payments-table th:nth-child(4),
-          .payments-table td:nth-child(4) {
-            text-align: center;
-            width: 100px;
-          }
-          .payments-table th:nth-child(5),
-          .payments-table td:nth-child(5) {
-            text-align: left;
-          }
-          .footer {
-            margin-top: 15px;
-            text-align: center;
-            font-size: 8px;
-            color: #6b7280;
-            page-break-before: avoid;
-          }
-          @media print {
-            body {
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            .info-section {
-              break-inside: avoid;
-              page-break-inside: avoid;
-            }
-            .table-container {
-              break-inside: avoid;
-              page-break-inside: avoid;
-            }
-            thead {
-              display: table-header-group;
-            }
-            tr {
-              break-inside: avoid;
-              page-break-inside: avoid;
-            }
-          }
+          @page { size: A4 landscape; margin: 0.5cm; }
+          body { font-family: Arial, sans-serif; font-size: 10px; line-height: 1.2; margin: 0; padding: 0; }
+          .container { max-width: 100%; padding: 5px; }
+          .header { text-align: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #2563eb; page-break-after: avoid; }
+          .header h1 { font-size: 14px; margin: 0 0 5px; color: #2563eb; font-weight: bold; }
+          .header p { margin: 2px 0; color: #374151; font-size: 9px; }
+          .info-section { margin-bottom: 10px; border: 1px solid #d1d5db; border-radius: 4px; padding: 8px; page-break-inside: avoid; page-break-after: avoid; }
+          .info-title { font-size: 11px; font-weight: bold; margin-bottom: 6px; color: #2563eb; }
+          .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+          .info-item { display: flex; font-size: 9px; }
+          .info-label { font-weight: bold; width: 120px; flex-shrink: 0; }
+          .info-value { color: #374151; word-break: break-word; }
+          .table-container { margin-bottom: 15px; page-break-inside: avoid; }
+          .table-title { font-size: 11px; font-weight: bold; margin-bottom: 6px; color: #2563eb; background-color: #f3f4f6; padding: 6px; border-radius: 4px; page-break-after: avoid; }
+          table { width: 100%; border-collapse: collapse; font-size: 8px; page-break-inside: auto; }
+          thead { display: table-header-group; }
+          tbody { display: table-row-group; }
+          tr { page-break-inside: avoid; page-break-after: auto; }
+          th, td { border: 1px solid #9ca3af; padding: 4px 3px; text-align: right; }
+          th:first-child, td:first-child { text-align: center; width: 30px; }
+          th:nth-child(2), td:nth-child(2) { text-align: center; width: 70px; }
+          th { background-color: #f3f4f6; font-weight: bold; text-align: center; }
+          tfoot td { background-color: #f3f4f6; font-weight: bold; }
+          .text-red-600 { color: #dc2626; }
+          .text-green-600 { color: #16a34a; }
+          .footer { margin-top: 15px; text-align: center; font-size: 8px; color: #6b7280; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>Хамкор маълумотлари ва кунлик оборот ҳисоботи</h1>
+            <h1>Ҳамкор маълумотлари ва оборот ҳисоботи</h1>
             <p>${stationName || "Заправка"} | ${getPeriodLabel()}</p>
             <p>Ҳисобот санаси: ${new Date().toLocaleDateString("ru-RU")}</p>
           </div>
           
           <div class="info-section">
-            <div class="info-title">📋 Хамкор маълумотлари</div>
+            <div class="info-title">📋 Ҳамкор маълумотлари</div>
             <div class="info-grid">
-              <div class="info-item"><span class="info-label">Хамкор номи:</span><span class="info-value">${partner.partnerName || "—"}</span></div>
-              <div class="info-item"><span class="info-label">ИНН:</span><span class="info-value">${partner.inn || "—"}</span></div>
-              <div class="info-item"><span class="info-label">Рахбар ФИО:</span><span class="info-value">${partner.director || "—"}</span></div>
-              <div class="info-item"><span class="info-label">ШХР:</span><span class="info-value">${partner.shhr || "—"}</span></div>
-              <div class="info-item"><span class="info-label">Р/счет:</span><span class="info-value">${partner.bankAccount || "—"}</span></div>
-              <div class="info-item"><span class="info-label">Шартнома №:</span><span class="info-value">${partner.contractNumber || "—"}</span></div>
-              <div class="info-item"><span class="info-label">Шартнома санаси:</span><span class="info-value">${formatDate(partner.contractDate)}</span></div>
-              <div class="info-item"><span class="info-label">Шартнома тугаш санаси:</span><span class="info-value">${formatDate(partner.contractEndDate)}</span></div>
-              <div class="info-item"><span class="info-label">Станция:</span><span class="info-value">${stationName || partner.stationName || "—"}</span></div>
-              <div class="info-item"><span class="info-label">Бошланғич сальдо:</span><span class="info-value">${formatNumber(partner.startBalance || 0)} сўм</span></div>
-              <div class="info-item"><span class="info-label">Сальдо санаси:</span><span class="info-value">${formatDate(partner.startBalanceDate)}</span></div>
-              <div class="info-item"><span class="info-label">Қўшимча файллар:</span><span class="info-value">${partner.files?.length || 0} та файл</span></div>
+              <div class="info-item"><span class="info-label">Ҳамкор номи:</span><span class="info-value">${
+                partner.partnerName || "—"
+              }</span></div>
+              <div class="info-item"><span class="info-label">ИНН:</span><span class="info-value">${
+                partner.inn || "—"
+              }</span></div>
+              <div class="info-item"><span class="info-label">Раҳбар ФИО:</span><span class="info-value">${
+                partner.director || "—"
+              }</span></div>
+              <div class="info-item"><span class="info-label">ШХР:</span><span class="info-value">${
+                partner.shhr || "—"
+              }</span></div>
+              <div class="info-item"><span class="info-label">Р/счет:</span><span class="info-value">${
+                partner.bankAccount || "—"
+              }</span></div>
+              <div class="info-item"><span class="info-label">Шартнома №:</span><span class="info-value">${
+                partner.contractNumber || "—"
+              }</span></div>
+              <div class="info-item"><span class="info-label">Шартнома санаси:</span><span class="info-value">${formatDate(
+                partner.contractDate
+              )}</span></div>
+              <div class="info-item"><span class="info-label">Шартнома тугаш санаси:</span><span class="info-value">${formatDate(
+                partner.contractEndDate
+              )}</span></div>
+              <div class="info-item"><span class="info-label">Станция:</span><span class="info-value">${
+                stationName || partner.stationName || "—"
+              }</span></div>
+              <div class="info-item"><span class="info-label">Бошланғич сальдо:</span><span class="info-value">${formatNumber(
+                partner.startBalance || 0
+              )} сўм</span></div>
+              <div class="info-item"><span class="info-label">Сальдо санаси:</span><span class="info-value">${formatDate(
+                partner.startBalanceDate
+              )}</span></div>
             </div>
           </div>
-          
+
+          <div class="table-container">
+            <div class="table-title">📅 Ойлик оборот (${monthlyYear} йил)</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>№</th>
+                  <th>Ой</th>
+                  <th>Ой бошига сальдо (сўм)</th>
+                  <th>Заправлено м³</th>
+                  <th>Заправлено сум</th>
+                  <th>Тўланди (сўм)</th>
+                  <th>Ой охирига сальдо (сўм)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${monthlyTurnover
+                  .map(
+                    (m, idx) => `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td>${m.month}</td>
+                    <td class="${
+                      m.startBalance > 0
+                        ? "text-red-600"
+                        : m.startBalance < 0
+                        ? "text-green-600"
+                        : ""
+                    }">${formatNumber(m.startBalance)}</td>
+                    <td>${formatNumberM3(m.soldM3)}</td>
+                    <td>${formatNumber(m.soldAmount)}</td>
+                    <td style="color:#16a34a;">${formatNumber(m.paid)}</td>
+                    <td class="${
+                      m.endBalance > 0
+                        ? "text-red-600"
+                        : m.endBalance < 0
+                        ? "text-green-600"
+                        : ""
+                    }">${formatNumber(m.endBalance)}</td>
+                  </tr>
+                `
+                  )
+                  .join("")}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" style="text-align: right;">Жами:</td>
+                  <td>${formatNumberM3(monthlyTotals.totalSoldM3)}</td>
+                  <td>${formatNumber(monthlyTotals.totalSoldAmount)}</td>
+                  <td style="color:#16a34a;">${formatNumber(
+                    monthlyTotals.totalPaid
+                  )}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
           <div class="table-container">
             <div class="table-title">📊 Кунлик оборот (${getPeriodLabel()})</div>
             <table>
@@ -645,13 +681,25 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                   <tr>
                     <td>${idx + 1}</td>
                     <td>${formatDate(day.date)}</td>
-                    <td>${formatNumber(day.dayStartBalance)}</td>
+                    <td class="${
+                      day.dayStartBalance > 0
+                        ? "text-red-600"
+                        : day.dayStartBalance < 0
+                        ? "text-green-600"
+                        : ""
+                    }">${formatNumber(day.dayStartBalance)}</td>
                     <td>${formatNumber(day.soldM3)}</td>
                     <td>${formatNumber(day.soldAmount)}</td>
                     <td>${formatNumber(day.paid)}</td>
-                    <td>${formatNumber(day.dayEndBalance)}</td>
+                    <td class="${
+                      day.dayEndBalance > 0
+                        ? "text-red-600"
+                        : day.dayEndBalance < 0
+                        ? "text-green-600"
+                        : ""
+                    }">${formatNumber(day.dayEndBalance)}</td>
                   </tr>
-                `,
+                `
                   )
                   .join("")}
               </tbody>
@@ -666,10 +714,10 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
               </tfoot>
             </table>
           </div>
-          
+
           <div class="table-container">
             <div class="table-title">💳 Тўловлар ҳисоботи (${getPeriodLabel()})</div>
-            <table class="payments-table">
+            <table>
               <thead>
                 <tr>
                   <th>№</th>
@@ -690,14 +738,16 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                     <td>${formatDateTime(payment.createdAt)}</td>
                     <td>${payment.createdBy || "—"}</td>
                   </tr>
-                `,
+                `
                   )
                   .join("")}
               </tbody>
               <tfoot>
                 <tr>
                   <td colspan="1" style="text-align: right;">Жами:</td>
-                  <td style="font-weight: bold;">${formatNumber(paymentsTotal)} сўм</td>
+                  <td style="font-weight: bold;">${formatNumber(
+                    paymentsTotal
+                  )} сўм</td>
                   <td colspan="3"></td>
                 </tr>
               </tfoot>
@@ -709,10 +759,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
           </div>
         </div>
         <script>
-          window.onload = function() { 
-            window.print(); 
-            setTimeout(() => window.close(), 500); 
-          }
+          window.onload = function() { window.print(); setTimeout(() => window.close(), 500); }
         </script>
       </body>
     </html>
@@ -733,7 +780,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
           onClick={onClose}
         >
           <motion.div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-7xl max-h-[90vh] overflow-hidden flex flex-col"
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
@@ -787,7 +834,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                       d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                     />
                   </svg>
-                  Хамкор маълумотлари
+                  Ҳамкор маълумотлари
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                   <div>
@@ -795,7 +842,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                     {partner.inn || "—"}
                   </div>
                   <div>
-                    <span className="font-medium text-gray-600">Рахбар:</span>{" "}
+                    <span className="font-medium text-gray-600">Раҳбар:</span>{" "}
                     {partner.director || "—"}
                   </div>
                   <div>
@@ -822,13 +869,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                     <span className="font-medium text-gray-600">
                       Бошланғич сальдо:
                     </span>{" "}
-                    <span
-                      className={
-                        toNumber(partner.startBalance) >= 0
-                          ? "text-red-600"
-                          : "text-green-600"
-                      }
-                    >
+                    <span className={balanceClass(partner.startBalance)}>
                       {formatNumber(partner.startBalance || 0)} сўм
                     </span>
                   </div>
@@ -845,7 +886,115 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                 </div>
               </div>
 
-              {/* Фильтры периода */}
+              {/* ============================================================
+                  🤝 ОЙЛИК ОБОРОТ
+                  ============================================================ */}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 px-4 py-3 border-b flex flex-wrap justify-between items-center gap-3">
+                  <h3 className="font-semibold text-gray-800">
+                    📅 Ойлик оборот
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600 font-medium">
+                      Йил:
+                    </label>
+                    <select
+                      className="px-3 py-1.5 border rounded-lg text-sm"
+                      value={monthlyYear}
+                      onChange={(e) => setMonthlyYear(e.target.value)}
+                    >
+                      {yearOptions.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-center w-12">№</th>
+                        <th className="px-3 py-2 text-left">Ой</th>
+                        <th className="px-3 py-2 text-right">
+                          Ой бошига сальдо (сўм)
+                        </th>
+                        <th className="px-3 py-2 text-right">Заправлено м³</th>
+                        <th className="px-3 py-2 text-right">Заправлено сум</th>
+                        <th className="px-3 py-2 text-right">Тўланди (сўм)</th>
+                        <th className="px-3 py-2 text-right">
+                          Ой охирига сальдо (сўм)
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyTurnover.map((m, idx) => (
+                        <tr
+                          key={m.monthNumber}
+                          className={`border-t ${
+                            m.hasActivity ? "hover:bg-gray-50" : "text-gray-400"
+                          }`}
+                        >
+                          <td className="px-3 py-2 text-center">{idx + 1}</td>
+                          <td className="px-3 py-2 font-medium">{m.month}</td>
+                          <td
+                            className={`px-3 py-2 text-right font-mono ${balanceClass(
+                              m.startBalance
+                            )}`}
+                          >
+                            {formatNumber(m.startBalance)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-purple-600">
+                            {formatNumberM3(m.soldM3)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-blue-600">
+                            {formatNumber(m.soldAmount)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-green-600">
+                            {formatNumber(m.paid)}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right font-mono font-semibold ${balanceClass(
+                              m.endBalance
+                            )}`}
+                          >
+                            {formatNumber(m.endBalance)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-gray-50 font-semibold">
+                      <tr>
+                        <td colSpan="3" className="px-3 py-2 text-right">
+                          Жами:
+                        </td>
+                        <td className="px-3 py-2 text-right text-purple-600">
+                          {formatNumberM3(monthlyTotals.totalSoldM3)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-blue-600">
+                          {formatNumber(monthlyTotals.totalSoldAmount)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-green-600">
+                          {formatNumber(monthlyTotals.totalPaid)}
+                        </td>
+                        <td className="px-3 py-2"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <div className="px-4 py-2 text-xs text-gray-500 border-t bg-gray-50">
+                  💡 Сальдо:{" "}
+                  <span className="text-red-600 font-semibold">қизил</span> —
+                  қарздорлик,{" "}
+                  <span className="text-green-600 font-semibold">яшил</span> —
+                  олдиндан тўлов
+                </div>
+              </div>
+
+              {/* Фильтры периода (для дневной/квартальной/годовой оборотки) */}
               <div className="bg-white rounded-xl p-4 mb-5 border border-gray-200">
                 <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                   <svg
@@ -861,7 +1010,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                       d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                     />
                   </svg>
-                  Даврни танланг
+                  Кунлик оборот даврини танланг
                 </h3>
                 <div className="flex flex-wrap gap-4">
                   <div>
@@ -935,7 +1084,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                 </div>
               </div>
 
-              {/* Таблица оборота */}
+              {/* Таблица оборота (дневная) */}
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
                 <div className="bg-gray-50 px-4 py-2 border-b">
                   <h3 className="font-semibold text-gray-800">
@@ -979,7 +1128,9 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                               {formatDate(day.date)}
                             </td>
                             <td
-                              className={`px-3 py-2 text-right ${day.dayStartBalance >= 0 ? "text-red-600" : "text-green-600"}`}
+                              className={`px-3 py-2 text-right font-mono ${balanceClass(
+                                day.dayStartBalance
+                              )}`}
                             >
                               {formatNumber(day.dayStartBalance)}
                             </td>
@@ -993,7 +1144,9 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                               {formatNumber(day.paid)}
                             </td>
                             <td
-                              className={`px-3 py-2 text-right ${day.dayEndBalance >= 0 ? "text-red-600" : "text-green-600"}`}
+                              className={`px-3 py-2 text-right font-mono font-semibold ${balanceClass(
+                                day.dayEndBalance
+                              )}`}
                             >
                               {formatNumber(day.dayEndBalance)}
                             </td>
@@ -1130,7 +1283,7 @@ const PartnerDetailsModal = ({ isOpen, onClose, partner, stationName }) => {
                       d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
                     />
                   </svg>
-                  Печать
+                  Чоп этиш
                 </button>
               </div>
             </div>

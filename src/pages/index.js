@@ -58,3 +58,5 @@ export { default as GasRequestDocument } from "./GasRequestDocument";
 export { default as GasRequests } from "./GasRequests";
 export { default as GasRequestBatch } from "./GasRequestBatch";
 export { default as GasOrganizations } from "./GasOrganizations";
+export { default as HomePartner } from "./HomePartner";
+export { default as PartnerStatement } from "./PartnerStatement";

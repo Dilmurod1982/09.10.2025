@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { db, auth } from "../firebase/config";
@@ -18,18 +18,50 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
     passportNumber: "",
     address: "",
     role: "operator",
-    accessEndDate: "", // Новое поле: дата завершения доступа
+    accessEndDate: "",
   });
   const [showStations, setShowStations] = useState(false);
   const [selectedStations, setSelectedStations] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // uniqueErrors — только для информирования пользователя, НЕ блокирует кнопку
   const [uniqueErrors, setUniqueErrors] = useState({
     email: "",
     passportNumber: "",
     pinfl: "",
   });
 
+  // 🤝 Партнёры
+  const [partners, setPartners] = useState([]);
+  const [partnersLoading, setPartnersLoading] = useState(false);
+  const [partnersFetchError, setPartnersFetchError] = useState("");
+  const [selectedPartnerId, setSelectedPartnerId] = useState("");
+  const [searchPartner, setSearchPartner] = useState("");
+
+  // Загрузка партнёров
+  useEffect(() => {
+    const fetchPartners = async () => {
+      try {
+        setPartnersLoading(true);
+        setPartnersFetchError("");
+        const snap = await getDocs(collection(db, "partners"));
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        list.sort((a, b) =>
+          String(a.name || "").localeCompare(String(b.name || ""))
+        );
+        setPartners(list);
+      } catch (e) {
+        setPartnersFetchError(e.message || "Ошибка загрузки партнёров");
+      } finally {
+        setPartnersLoading(false);
+      }
+    };
+    fetchPartners();
+  }, []);
+
+  // ============================================================
   // Валидация пароля
+  // ============================================================
   const validatePassword = useCallback((password) => {
     const minLength = 8;
     const hasUpperCase = /[A-Z]/.test(password);
@@ -66,7 +98,7 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
     return { strength, message };
   }, []);
 
-  // Проверка уникальности полей
+  // Проверка уникальности (используется только в handleSubmit)
   const checkUniqueFields = useCallback(async (field, value) => {
     if (!value) return "";
 
@@ -80,8 +112,7 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
       }
       return "";
     } catch (error) {
-      console.error("Error checking unique field:", error);
-      return "Ошибка проверки уникальности";
+      return "";
     }
   }, []);
 
@@ -94,36 +125,38 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
     return fieldNames[field] || field;
   }, []);
 
-  // Проверка всех обязательных полей
-  const isFormValid = useCallback(() => {
-    const requiredFields = {
-      email: formData.email.trim() !== "" && !uniqueErrors.email,
+  // ============================================================
+  // Проверка формы (БЕЗ uniqueErrors — они не блокируют кнопку)
+  // ============================================================
+  const validation = useMemo(() => {
+    const checks = {
+      email: formData.email.trim() !== "",
       password:
         formData.password.trim() !== "" && validatePassword(formData.password),
       displayName: formData.displayName.trim() !== "",
       firstName: formData.firstName.trim() !== "",
       lastName: formData.lastName.trim() !== "",
       birthday: formData.birthday.trim() !== "",
-      pinfl:
-        formData.pinfl.trim() !== "" &&
-        formData.pinfl.length === 14 &&
-        !uniqueErrors.pinfl,
+      pinfl: formData.pinfl.trim() !== "" && formData.pinfl.length === 14,
       passportSeries:
         formData.passportSeries.trim() !== "" &&
         formData.passportSeries.length === 2,
       passportNumber:
         formData.passportNumber.trim() !== "" &&
-        formData.passportNumber.length === 7 &&
-        !uniqueErrors.passportNumber,
+        formData.passportNumber.length === 7,
       role: formData.role.trim() !== "",
+      partnerId: formData.role !== "partner" ? true : selectedPartnerId !== "",
     };
 
-    return (
-      Object.values(requiredFields).every(Boolean) &&
-      !Object.values(uniqueErrors).some((error) => error !== "")
-    );
-  }, [formData, uniqueErrors, validatePassword]);
+    const allValid = Object.values(checks).every(Boolean);
+    return { checks, allValid };
+  }, [formData, validatePassword, selectedPartnerId]);
 
+  const isFormValid = useCallback(() => validation.allValid, [validation]);
+
+  // ============================================================
+  // Обработка изменения полей
+  // ============================================================
   const handleInputChange = async (e) => {
     const { name, value } = e.target;
 
@@ -149,7 +182,13 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
       [name]: processedValue,
     }));
 
-    // Проверка уникальности для email, паспорта и ПИНФЛ
+    // 🤝 Если роль меняется и это НЕ partner — сбрасываем партнёра
+    if (name === "role" && processedValue !== "partner") {
+      setSelectedPartnerId("");
+      setSearchPartner("");
+    }
+
+    // Проверка уникальности (только для отображения, не блокирует)
     if (name === "email" && processedValue) {
       const error = await checkUniqueFields("email", processedValue);
       setUniqueErrors((prev) => ({ ...prev, email: error }));
@@ -166,6 +205,9 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
     }
   };
 
+  // ============================================================
+  // Отправка формы
+  // ============================================================
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -175,11 +217,41 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
     }
 
     setLoading(true);
+
     try {
+      // 🤝 Финальная проверка уникальности (перед созданием)
+      const emailErr = await checkUniqueFields("email", formData.email);
+      if (emailErr) {
+        setUniqueErrors((prev) => ({ ...prev, email: emailErr }));
+        alert(emailErr);
+        setLoading(false);
+        return;
+      }
+
+      const pinflErr = await checkUniqueFields("pinfl", formData.pinfl);
+      if (pinflErr) {
+        setUniqueErrors((prev) => ({ ...prev, pinfl: pinflErr }));
+        alert(pinflErr);
+        setLoading(false);
+        return;
+      }
+
+      const passportErr = await checkUniqueFields(
+        "passportNumber",
+        formData.passportNumber
+      );
+      if (passportErr) {
+        setUniqueErrors((prev) => ({ ...prev, passportNumber: passportErr }));
+        alert(passportErr);
+        setLoading(false);
+        return;
+      }
+
+      // Создаём пользователя
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
-        formData.password,
+        formData.password
       );
 
       const userData = {
@@ -187,14 +259,16 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
         uid: userCredential.user.uid,
         createdAt: new Date(),
         stations: selectedStations,
-        isActive: true, // Пользователь активен по умолчанию
+        isActive: true,
+        ...(formData.role === "partner"
+          ? { partnerId: selectedPartnerId }
+          : {}),
       };
 
       await addDoc(collection(db, "users"), userData);
 
       onUserCreated();
     } catch (error) {
-      console.error("Error creating user:", error);
       alert("Ошибка при создании пользователя: " + error.message);
     } finally {
       setLoading(false);
@@ -203,11 +277,11 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
 
   const passwordStrength = getPasswordStrength(formData.password);
 
-  // Вспомогательные функции для проверки полей (только для отображения)
+  // Вспомогательные функции для отображения
   const isFieldValid = (fieldName, value) => {
     switch (fieldName) {
       case "email":
-        return value.trim() !== "" && !uniqueErrors.email;
+        return value.trim() !== "";
       case "password":
         return value.trim() !== "" && validatePassword(value);
       case "displayName":
@@ -217,20 +291,31 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
       case "role":
         return value.trim() !== "";
       case "pinfl":
-        return (
-          value.trim() !== "" && value.length === 14 && !uniqueErrors.pinfl
-        );
+        return value.trim() !== "" && value.length === 14;
       case "passportSeries":
         return value.trim() !== "" && value.length === 2;
       case "passportNumber":
-        return (
-          value.trim() !== "" &&
-          value.length === 7 &&
-          !uniqueErrors.passportNumber
-        );
+        return value.trim() !== "" && value.length === 7;
       default:
         return false;
     }
+  };
+
+  // 🤝 Фильтр партнёров по поиску
+  const filteredPartners = useMemo(() => {
+    const s = searchPartner.trim().toLowerCase();
+    if (!s) return partners;
+    return partners.filter(
+      (p) =>
+        String(p.name || "")
+          .toLowerCase()
+          .includes(s) || String(p.inn || "").includes(s)
+    );
+  }, [partners, searchPartner]);
+
+  // Обработчик выбора партнёра
+  const handleSelectPartner = (partnerId) => {
+    setSelectedPartnerId(partnerId);
   };
 
   return (
@@ -309,12 +394,10 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                             passwordStrength.strength < 50
                               ? "bg-red-500"
                               : passwordStrength.strength < 75
-                                ? "bg-yellow-500"
-                                : "bg-green-500"
+                              ? "bg-yellow-500"
+                              : "bg-green-500"
                           }`}
-                          style={{
-                            width: `${passwordStrength.strength}%`,
-                          }}
+                          style={{ width: `${passwordStrength.strength}%` }}
                         ></div>
                       </div>
                       <div className="text-xs text-gray-500">
@@ -475,7 +558,7 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                   )}
                   {formData.pinfl && formData.pinfl.length !== 14 && (
                     <div className="text-yellow-500 text-xs">
-                      Должно быть 14 цифр
+                      Должно быть 14 цифр (сейчас: {formData.pinfl.length})
                     </div>
                   )}
                 </div>
@@ -486,7 +569,7 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                     Серия паспорта *
                     {isFieldValid(
                       "passportSeries",
-                      formData.passportSeries,
+                      formData.passportSeries
                     ) && <span className="text-green-500 ml-1">✓</span>}
                   </label>
                   <input
@@ -505,7 +588,8 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                   {formData.passportSeries &&
                     formData.passportSeries.length !== 2 && (
                       <div className="text-yellow-500 text-xs">
-                        Должно быть 2 буквы
+                        Должно быть 2 буквы (сейчас:{" "}
+                        {formData.passportSeries.length})
                       </div>
                     )}
                 </div>
@@ -516,7 +600,7 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                     Номер паспорта *
                     {isFieldValid(
                       "passportNumber",
-                      formData.passportNumber,
+                      formData.passportNumber
                     ) && <span className="text-green-500 ml-1">✓</span>}
                   </label>
                   <input
@@ -545,7 +629,8 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                   {formData.passportNumber &&
                     formData.passportNumber.length !== 7 && (
                       <div className="text-yellow-500 text-xs">
-                        Должно быть 7 цифр
+                        Должно быть 7 цифр (сейчас:{" "}
+                        {formData.passportNumber.length})
                       </div>
                     )}
                 </div>
@@ -592,6 +677,107 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                     <option value="metrolog-hududgaz">Худудгаз</option>
                   </select>
                 </div>
+
+                {/* 🤝 Блок выбора партнёра (только для role=partner) */}
+                {formData.role === "partner" && (
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Ҳамкор * (танланг рўйхатдан)
+                      {selectedPartnerId && (
+                        <span className="text-green-500 ml-1">✓</span>
+                      )}
+                    </label>
+
+                    {partnersLoading ? (
+                      <div className="text-sm text-gray-500">
+                        Ҳамкорлар юкланмоқда...
+                      </div>
+                    ) : partnersFetchError ? (
+                      <div className="text-sm text-red-500">
+                        Хатолик: {partnersFetchError}
+                      </div>
+                    ) : partners.length === 0 ? (
+                      <div className="text-sm text-red-500">
+                        Базада ҳамкорлар йўқ. Аввал «Ҳамкорлар» бўлимида қўшинг.
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="Қидириш: номи ёки ИНН..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={searchPartner}
+                          onChange={(e) => setSearchPartner(e.target.value)}
+                        />
+
+                        <div className="max-h-56 overflow-y-auto border border-gray-300 rounded-lg bg-white">
+                          {filteredPartners.length === 0 ? (
+                            <div className="p-3 text-sm text-gray-500">
+                              Ҳамкор топилмади
+                            </div>
+                          ) : (
+                            filteredPartners.map((p) => {
+                              const isSelected = selectedPartnerId === p.id;
+                              return (
+                                <div
+                                  key={p.id}
+                                  onClick={() => handleSelectPartner(p.id)}
+                                  className={`flex items-center gap-3 px-3 py-2 cursor-pointer border-b last:border-b-0 transition-colors ${
+                                    isSelected
+                                      ? "bg-blue-50 ring-1 ring-inset ring-blue-400"
+                                      : "hover:bg-gray-50"
+                                  }`}
+                                >
+                                  {/* Кастомный radio */}
+                                  <div
+                                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                                      isSelected
+                                        ? "border-blue-600 bg-blue-600"
+                                        : "border-gray-300 bg-white"
+                                    }`}
+                                  >
+                                    {isSelected && (
+                                      <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                    )}
+                                  </div>
+
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-gray-800 truncate">
+                                      {p.name}
+                                    </div>
+                                    <div className="text-xs text-gray-500 truncate">
+                                      ИНН: {p.inn || "—"} • Раҳбар:{" "}
+                                      {p.director || "—"}
+                                    </div>
+                                  </div>
+
+                                  {isSelected && (
+                                    <span className="text-green-500 text-lg flex-shrink-0">
+                                      ✓
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {selectedPartnerId && (
+                          <div className="text-xs text-green-600">
+                            ✓ Танланди:{" "}
+                            {partners.find((p) => p.id === selectedPartnerId)
+                              ?.name || "—"}
+                          </div>
+                        )}
+                        {!selectedPartnerId && (
+                          <div className="text-xs text-yellow-600">
+                            ⚠️ Ҳамкорни танланг (акс ҳолда кнопка фаол бўлмайди)
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* Прикрепленные станции */}
                 <div className="md:col-span-2 space-y-2">

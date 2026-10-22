@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { doc, updateDoc } from "firebase/firestore";
-import { updatePassword } from "firebase/auth";
-import { db, auth } from "../firebase/config";
-import { getFunctions, httpsCallable } from "firebase/functions"; // ← Добавьте эту строку
+import React, { useState, useEffect, useMemo } from "react";
+import { doc, updateDoc, collection, getDocs } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { db } from "../firebase/config";
 import StationsSelection from "./StationsSelection";
 
 const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
@@ -30,19 +29,50 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
     message: "",
   });
 
-  // Если readOnly=true, то запрещаем редактирование
+  // 🤝 Партнёры
+  const [partners, setPartners] = useState([]);
+  const [partnersLoading, setPartnersLoading] = useState(false);
+  const [selectedPartnerId, setSelectedPartnerId] = useState(
+    user.partnerId || ""
+  );
+  const [searchPartner, setSearchPartner] = useState("");
+
+  // readOnly
   useEffect(() => {
-    if (readOnly) {
-      setIsEditing(false);
-    }
+    if (readOnly) setIsEditing(false);
   }, [readOnly]);
 
-  // Загружаем станции пользователя при открытии модального окна
+  // Загружаем станции пользователя
   useEffect(() => {
-    if (user.stations) {
-      setSelectedStations(user.stations);
-    }
+    if (user.stations) setSelectedStations(user.stations);
   }, [user.stations]);
+
+  // Синхронизируем partnerId при изменении user
+  useEffect(() => {
+    setSelectedPartnerId(user.partnerId || "");
+  }, [user.partnerId]);
+
+  // Загрузка партнёров, если роль — partner
+  useEffect(() => {
+    if (formData.role !== "partner") return;
+
+    const fetchPartners = async () => {
+      try {
+        setPartnersLoading(true);
+        const snap = await getDocs(collection(db, "partners"));
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        list.sort((a, b) =>
+          String(a.name || "").localeCompare(String(b.name || ""))
+        );
+        setPartners(list);
+      } catch (e) {
+        console.error("Ошибка загрузки партнёров:", e);
+      } finally {
+        setPartnersLoading(false);
+      }
+    };
+    fetchPartners();
+  }, [formData.role]);
 
   const maskPinfl = (pinfl) => {
     if (!pinfl || pinfl.length < 3) return pinfl;
@@ -57,26 +87,20 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
   };
 
   const handleInputChange = (e) => {
-    // Если readOnly режим и поле не пароль, игнорируем изменения
-    if (readOnly && e.target.name !== "password") {
-      return;
-    }
+    if (readOnly && e.target.name !== "password") return;
 
     const { name, value } = e.target;
 
     let processedValue = value;
 
-    // Ограничения по длине
     if (name === "passportNumber" && value.length > 7) return;
     if (name === "pinfl" && value.length > 14) return;
     if (name === "passportSeries" && value.length > 2) return;
 
-    // Только цифры для паспорта и ПИНФЛ
     if (name === "passportNumber" || name === "pinfl") {
       processedValue = value.replace(/\D/g, "");
     }
 
-    // Заглавные буквы для серии паспорта
     if (name === "passportSeries") {
       processedValue = value.toUpperCase().replace(/[^A-ZА-Я]/g, "");
     }
@@ -86,14 +110,19 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
       [name]: processedValue,
     }));
 
-    // Проверка силы пароля
+    // 🤝 Если роль ушла с partner — сбрасываем partnerId
+    if (name === "role" && processedValue !== "partner") {
+      setSelectedPartnerId("");
+      setSearchPartner("");
+    }
+
     if (name === "password") {
       setPasswordStrength(getPasswordStrength(processedValue));
     }
   };
 
   const validatePassword = (password) => {
-    if (!password) return true; // Пароль не обязателен при редактировании
+    if (!password) return true;
 
     const minLength = 8;
     const hasUpperCase = /[A-Z]/.test(password);
@@ -137,6 +166,12 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
       return;
     }
 
+    // 🤝 Валидация партнёра
+    if (formData.role === "partner" && !selectedPartnerId) {
+      alert("Выберите партнёра из списка");
+      return;
+    }
+
     setLoading(true);
     try {
       const userDoc = doc(db, "users", user.id);
@@ -153,40 +188,28 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
         role: formData.role,
         accessEndDate: formData.accessEndDate,
         stations: selectedStations,
+        // 🤝 партнёр
+        partnerId: formData.role === "partner" ? selectedPartnerId : null,
       };
 
-      // Сохраняем пароль отдельно
       const passwordToUpdate = formData.password;
 
-      // Обновляем данные пользователя в Firestore
       await updateDoc(userDoc, updateData);
 
-      // Если указан новый пароль, обновляем его через Cloud Function
       if (passwordToUpdate) {
         try {
-          // Инициализируем Functions
           const functions = getFunctions();
-
-          // Указываем регион если нужно (по умолчанию us-central1)
-          // const functions = getFunctions(app, 'europe-west1');
-
           const updatePasswordFunction = httpsCallable(
             functions,
             "updateUserPassword"
           );
-
-          const result = await updatePasswordFunction({
+          await updatePasswordFunction({
             targetUserId: user.id,
             newPassword: passwordToUpdate,
           });
-
-          console.log("Пароль обновлен:", result.data);
         } catch (passwordError) {
           console.error("Ошибка обновления пароля:", passwordError);
-
-          // Более детальная обработка ошибок
           let errorMessage = "Неизвестная ошибка";
-
           if (passwordError.code === "permission-denied") {
             errorMessage =
               "У вас нет прав для изменения паролей. Требуется роль администратора.";
@@ -195,7 +218,6 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
           } else if (passwordError.message) {
             errorMessage = passwordError.message;
           }
-
           alert(
             "Данные пользователя обновлены, но произошла ошибка при смене пароля: " +
               errorMessage
@@ -203,13 +225,11 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
         }
       }
 
-      // Очищаем поле пароля после успешного сохранения
       setFormData((prev) => ({ ...prev, password: "" }));
       setPasswordStrength({ strength: 0, message: "" });
 
       onUserUpdated();
       setIsEditing(false);
-
       alert("Данные пользователя успешно обновлены");
     } catch (error) {
       console.error("Error updating user:", error);
@@ -236,11 +256,12 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
       accessEndDate: user.accessEndDate || "",
     });
     setSelectedStations(user.stations || []);
+    setSelectedPartnerId(user.partnerId || "");
+    setSearchPartner("");
     setIsEditing(false);
     setPasswordStrength({ strength: 0, message: "" });
   };
 
-  // Проверка статуса доступа пользователя
   const getAccessStatus = () => {
     if (!formData.accessEndDate)
       return { status: "active", text: "Активен", color: "text-green-600" };
@@ -262,14 +283,24 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
 
   const accessStatus = getAccessStatus();
 
-  // Определяем, можно ли редактировать поле
   const isFieldEditable = (fieldName) => {
-    if (readOnly) {
-      // В readOnly режиме только пароль можно редактировать
-      return fieldName === "password";
-    }
+    if (readOnly) return fieldName === "password";
     return isEditing;
   };
+
+  // 🤝 фильтр партнёров
+  const filteredPartners = useMemo(() => {
+    const s = searchPartner.trim().toLowerCase();
+    if (!s) return partners;
+    return partners.filter(
+      (p) =>
+        String(p.name || "")
+          .toLowerCase()
+          .includes(s) || String(p.inn || "").includes(s)
+    );
+  }, [partners, searchPartner]);
+
+  const currentPartner = partners.find((p) => p.id === selectedPartnerId);
 
   return (
     <>
@@ -283,7 +314,8 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl font-light w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors">
+              className="text-gray-400 hover:text-gray-600 text-2xl font-light w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors"
+            >
               ×
             </button>
           </div>
@@ -300,7 +332,8 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
                     accessStatus.status === "expired"
                       ? "bg-red-50 border-red-200"
                       : "bg-green-50 border-green-200"
-                  }`}>
+                  }`}
+                >
                   <span className={`font-medium ${accessStatus.color}`}>
                     {accessStatus.text}
                   </span>
@@ -321,58 +354,6 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
               </div>
-
-              {/* Пароль */}
-              {/* <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Пароль
-                </label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  placeholder="Новый пароль"
-                  disabled={!isFieldEditable("password")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
-                />
-                {isFieldEditable("password") && formData.password && (
-                  <div className="space-y-1">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${
-                          passwordStrength.strength < 50
-                            ? "bg-red-500"
-                            : passwordStrength.strength < 75
-                            ? "bg-yellow-500"
-                            : "bg-green-500"
-                        }`}
-                        style={{
-                          width: `${passwordStrength.strength}%`,
-                        }}></div>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {passwordStrength.message} • Минимум 8 символов, заглавные
-                      и строчные буквы, цифры, специальные символы
-                    </div>
-                  </div>
-                )}
-              </div> */}
-
-              {/* Display Name */}
-              {/* <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Display Name
-                </label>
-                <input
-                  type="text"
-                  name="displayName"
-                  value={formData.displayName}
-                  onChange={handleInputChange}
-                  disabled={!isFieldEditable("displayName")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
-                />
-              </div> */}
 
               {/* Имя */}
               <div className="space-y-2">
@@ -433,21 +414,6 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                 />
               </div>
-
-              {/* Дата завершения доступа */}
-              {/* <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Дата завершения доступа
-                </label>
-                <input
-                  type="date"
-                  name="accessEndDate"
-                  value={formData.accessEndDate}
-                  onChange={handleInputChange}
-                  disabled={!isFieldEditable("accessEndDate")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
-                />
-              </div> */}
 
               {/* ПИНФЛ */}
               <div className="space-y-2">
@@ -535,9 +501,12 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
                   value={formData.role}
                   onChange={handleInputChange}
                   disabled={!isFieldEditable("role")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500">
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                >
                   <option value="admin">Admin</option>
+                  <option value="tasischi">Таъсисчи</option>
                   <option value="nazorat">Nazorat</option>
+                  <option value="nazoratbux">Назорат Бухгалтер</option>
                   <option value="rahbar">Rahbar</option>
                   <option value="operator">Operator</option>
                   <option value="boshmexanik">Bosh Mexanik</option>
@@ -545,8 +514,104 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
                   <option value="buxgalter">Buxgalter</option>
                   <option value="yurist">Yurist</option>
                   <option value="partner">Partner</option>
+                  <option value="electrengineer">Электронщик</option>
+                  <option value="metrolog-hududgaz">Худудгаз</option>
                 </select>
               </div>
+
+              {/* 🤝 Блок выбора партнёра */}
+              {formData.role === "partner" && (
+                <div className="md:col-span-2 space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Ҳамкор{" "}
+                    {!isFieldEditable("partnerId") &&
+                      selectedPartnerId &&
+                      currentPartner && (
+                        <span className="text-green-500 ml-1">✓</span>
+                      )}
+                  </label>
+
+                  {!isFieldEditable("partnerId") ? (
+                    <div className="px-3 py-2 bg-gray-100 rounded-lg text-gray-700">
+                      {currentPartner
+                        ? `${currentPartner.name}${
+                            currentPartner.inn
+                              ? ` (ИНН: ${currentPartner.inn})`
+                              : ""
+                          }`
+                        : user.partnerId
+                        ? `ID: ${user.partnerId}`
+                        : "Ҳамкор бириктирилмаган"}
+                    </div>
+                  ) : partnersLoading ? (
+                    <div className="text-sm text-gray-500">
+                      Ҳамкорлар юкланмоқда...
+                    </div>
+                  ) : partners.length === 0 ? (
+                    <div className="text-sm text-red-500">
+                      Базада ҳамкорлар йўқ. Аввал «Ҳамкорлар» бўлимида қўшинг.
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Қидириш: номи ёки ИНН..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        value={searchPartner}
+                        onChange={(e) => setSearchPartner(e.target.value)}
+                      />
+
+                      <div className="max-h-56 overflow-y-auto border border-gray-300 rounded-lg bg-white">
+                        {filteredPartners.length === 0 ? (
+                          <div className="p-3 text-sm text-gray-500">
+                            Ҳамкор топилмади
+                          </div>
+                        ) : (
+                          filteredPartners.map((p) => (
+                            <label
+                              key={p.id}
+                              className={`flex items-center gap-3 px-3 py-2 cursor-pointer border-b last:border-b-0 transition-colors ${
+                                selectedPartnerId === p.id
+                                  ? "bg-blue-50"
+                                  : "hover:bg-gray-50"
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="partnerSelectEdit"
+                                value={p.id}
+                                checked={selectedPartnerId === p.id}
+                                onChange={() => setSelectedPartnerId(p.id)}
+                                className="w-4 h-4"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-gray-800 truncate">
+                                  {p.name}
+                                </div>
+                                <div className="text-xs text-gray-500 truncate">
+                                  ИНН: {p.inn || "—"} • Раҳбар:{" "}
+                                  {p.director || "—"}
+                                </div>
+                              </div>
+                              {selectedPartnerId === p.id && (
+                                <span className="text-green-500 text-lg">
+                                  ✓
+                                </span>
+                              )}
+                            </label>
+                          ))
+                        )}
+                      </div>
+
+                      {selectedPartnerId && (
+                        <div className="text-xs text-green-600">
+                          ✓ Танланди: {currentPartner?.name || "—"}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Прикрепленные станции */}
               <div className="md:col-span-2 space-y-2">
@@ -563,7 +628,8 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
                   <button
                     type="button"
                     onClick={() => setShowStations(true)}
-                    className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600 hover:text-gray-700 transition-colors">
+                    className="w-full px-3 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600 hover:text-gray-700 transition-colors"
+                  >
                     Управление станциями ({selectedStations.length})
                   </button>
                 ) : (
@@ -587,14 +653,15 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
               <>
                 <button
                   onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
                   Закрыть
                 </button>
-                {/* Кнопка Редактировать показывается только если не readOnly режим */}
                 {!readOnly && (
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
                     Редактировать
                   </button>
                 )}
@@ -604,13 +671,15 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
                 <button
                   onClick={handleCancel}
                   disabled={loading}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                >
                   Отмена
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={loading}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                >
                   {loading ? "Сохранение..." : "Сохранить"}
                 </button>
               </>
@@ -619,7 +688,6 @@ const UserModal = ({ user, onClose, onUserUpdated, readOnly = false }) => {
         </div>
       </div>
 
-      {/* Модальное окно выбора станций */}
       {showStations && (
         <StationsSelection
           selectedStations={selectedStations}

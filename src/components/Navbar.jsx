@@ -60,7 +60,8 @@ import {
   Speed as MeterIcon,
   SettingsBackupRestore as ZeroIcon,
   Lock as SealIcon,
-  Analytics as AnalyticsIcon, // ✅ ДОБАВЛЕНО
+  Analytics as AnalyticsIcon,
+  ReceiptLong as StatementIcon,
 } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
@@ -473,7 +474,6 @@ export default function Navbar() {
       icon: <HandshakeIcon />,
       path: "/gas-settlements-binding",
     },
-    // ✅ ДОБАВИТЬ:
     { text: "Талабномалар", icon: <DescriptionIcon />, path: "/gas-requests" },
     {
       text: "Газ ташкилотлари",
@@ -585,7 +585,9 @@ export default function Navbar() {
       case "operator":
         return menuItems.filter((item) => item.text !== "Фойдаланувчилар");
       case "metrolog-hududgaz":
-        return []; // Метролог Худудгаз не видит основные пункты меню
+        return [];
+      case "partner":
+        return []; // У партнёра своё меню ниже
       default:
         return [];
     }
@@ -606,10 +608,23 @@ export default function Navbar() {
     return isRahbarOrBooker && !isMobile;
   };
 
-  // Определяем, кому показывать раздел "Хужжатлар" (для metrolog-hududgaz только этот раздел)
   const shouldShowDocumentsSection = () => {
     if (!role) return false;
     return role === "admin" || role === "metrolog-hududgaz";
+  };
+
+  // Список ролей, у которых есть доступ к Drawer
+  const hasDrawerAccess = () => {
+    return [
+      "admin",
+      "buxgalter",
+      "operator",
+      "rahbar",
+      "electrengineer",
+      "nazoratbux",
+      "metrolog-hududgaz",
+      "partner",
+    ].includes(role);
   };
 
   const getRoleBadge = () => {
@@ -621,6 +636,7 @@ export default function Navbar() {
       electrengineer: { color: "#f59e0b", text: "Электр инженер" },
       nazoratbux: { color: "#ec4899", text: "Назорат бухгалтер" },
       "metrolog-hududgaz": { color: "#06b6d4", text: "Метролог Ҳудудгаз" },
+      partner: { color: "#0ea5e9", text: "Ҳамкор" },
     };
 
     const config = roleConfig[role] || { color: "#6b7280", text: role };
@@ -656,14 +672,7 @@ export default function Navbar() {
         }}
       >
         <Toolbar sx={{ minHeight: { xs: "64px", md: "70px" } }}>
-          {/* Показываем кнопку меню для всех ролей, включая metrolog-hududgaz */}
-          {role === "admin" ||
-          role === "buxgalter" ||
-          role === "operator" ||
-          role === "rahbar" ||
-          role === "electrengineer" ||
-          role === "nazoratbux" ||
-          role === "metrolog-hududgaz" ? (
+          {hasDrawerAccess() ? (
             <IconButton
               size="large"
               edge="start"
@@ -988,13 +997,7 @@ export default function Navbar() {
         </div>
       )}
 
-      {(role === "admin" ||
-        role === "buxgalter" ||
-        role === "operator" ||
-        role === "rahbar" ||
-        role === "electrengineer" ||
-        role === "nazoratbux" ||
-        role === "metrolog-hududgaz") && (
+      {hasDrawerAccess() && (
         <Drawer
           anchor="left"
           open={drawerOpen}
@@ -1055,7 +1058,70 @@ export default function Navbar() {
 
             <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
               <List sx={{ padding: "8px" }}>
-                {/* 🔹 НОВЫЙ РАЗДЕЛ: Документы для rahbar/buxgalter/nazoratbux (на мобильных) */}
+                {/* 🤝 МЕНЮ ПАРТНЁРА — только оборотка */}
+                {role === "partner" && (
+                  <>
+                    <ListItem disablePadding sx={{ mb: 1 }}>
+                      <ListItemButton
+                        onClick={() => handleMenuClick("/partner-statement")}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          background: "rgba(14, 165, 233, 0.2)",
+                          "&:hover": {
+                            backgroundColor: "rgba(14, 165, 233, 0.3)",
+                            transform: "translateX(5px)",
+                          },
+                        }}
+                      >
+                        <ListItemIcon sx={{ color: "white" }}>
+                          <StatementIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="📊 Оборотка"
+                          primaryTypographyProps={{
+                            fontWeight: "600",
+                            color: "white",
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+
+                    <ListItem disablePadding sx={{ mb: 1 }}>
+                      <ListItemButton
+                        onClick={() => handleMenuClick("/homepartner")}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                            transform: "translateX(5px)",
+                          },
+                        }}
+                      >
+                        <ListItemIcon sx={{ color: "white" }}>
+                          <DashboardIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="🏠 Асосий саҳифа"
+                          primaryTypographyProps={{
+                            fontSize: "15px",
+                            fontWeight: "500",
+                            color: "white",
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+
+                    <Divider
+                      sx={{ my: 2, borderColor: "rgba(255,255,255,0.1)" }}
+                    />
+                  </>
+                )}
+
+                {/* 🔹 Документы для rahbar/buxgalter/nazoratbux (на мобильных) */}
                 {(role === "rahbar" ||
                   role === "buxgalter" ||
                   role === "nazoratbux") &&
@@ -1126,7 +1192,7 @@ export default function Navbar() {
                     </>
                   )}
 
-                {/* 🔹 НОВЫЙ РАЗДЕЛ: Ноллаш ва пломбалаш (для admin, electrengineer, nazoratbux) */}
+                {/* 🔹 Ноллаш ва пломбалаш */}
                 {canSeeZeroSeal() && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
@@ -1194,7 +1260,7 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Основные пункты (для admin, buxgalter, rahbar, electrengineer и nazoratbux) */}
+                {/* 🔹 Основные пункты */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "rahbar" ||
@@ -1241,7 +1307,7 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Расчеты по энергоносителям (для admin, buxgalter, rahbar, nazoratbux) */}
+                {/* 🔹 Расчеты по энергоносителям */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "rahbar" ||
@@ -1317,7 +1383,7 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Партнеры (для admin, buxgalter, rahbar, operator, nazoratbux) */}
+                {/* 🔹 Партнеры */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "rahbar" ||
@@ -1407,7 +1473,7 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Ежедневные отчеты (для admin, buxgalter, operator, rahbar, nazoratbux) */}
+                {/* 🔹 Ежедневные отчеты */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "operator" ||
@@ -1493,7 +1559,7 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Документы (для admin и metrolog-hududgaz) - ОБНОВЛЕНО */}
+                {/* 🔹 Документы (admin, metrolog-hududgaz) */}
                 {shouldShowDocumentsSection() && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
@@ -1520,12 +1586,10 @@ export default function Navbar() {
                     </ListItem>
                     <Collapse in={documentsOpen} timeout="auto" unmountOnExit>
                       <List component="div" disablePadding>
-                        {/* Для admin показываем все, для metrolog-hududgaz только подразделы */}
                         <ListItem disablePadding sx={{ pl: 2 }}>
                           <ListItemButton
                             onClick={() => {
                               if (role === "metrolog-hududgaz") {
-                                // Для metrolog-hududgaz показываем только подразделы
                                 handleDocsTimedClick();
                               } else {
                                 handleMenuClick("/doctypepage");
@@ -1722,7 +1786,6 @@ export default function Navbar() {
                           </>
                         )}
 
-                        {/* Для metrolog-hududgaz добавляем подразделы Муддатли хужжатлар */}
                         {role === "metrolog-hududgaz" && (
                           <>
                             <Divider
@@ -1811,7 +1874,7 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Оборудование (для admin и nazoratbux) */}
+                {/* 🔹 Оборудование */}
                 {(role === "admin" || role === "nazoratbux") && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>

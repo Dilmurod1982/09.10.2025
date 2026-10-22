@@ -61,6 +61,8 @@ import {
   GasRequests,
   GasRequestBatch,
 } from "./pages";
+import HomePartner from "./pages/HomePartner";
+import PartnerStatement from "./pages/PartnerStatement";
 import {
   createBrowserRouter,
   Navigate,
@@ -74,6 +76,31 @@ import { auth } from "./firebase/config";
 import SessionWarning from "./components/SessionWarning";
 import { Toaster } from "react-hot-toast";
 import GasSettlementsDataList from "./components/GasSettlements/GasSettlementsDataList";
+
+// 🚦 Редирект после логина — по роли из userData
+const LoginRedirect = () => {
+  const user = useAppStore((s) => s.user);
+  const userData = useAppStore((s) => s.userData);
+
+  if (!user) return <Login />;
+
+  const role = userData?.role;
+
+  if (role === "admin") return <Navigate to="/" replace />;
+  if (role === "buxgalter") return <Navigate to="/homebooker" replace />;
+  if (role === "operator") return <Navigate to="/homeoperator" replace />;
+  if (role === "rahbar") return <Navigate to="/homechief" replace />;
+  if (role === "nazoratbux")
+    return <Navigate to="/homecontrolbooker" replace />;
+  if (role === "tasischi") return <Navigate to="/hometasischi" replace />;
+  if (role === "electrengineer")
+    return <Navigate to="/homeelectronics" replace />;
+  if (role === "metrolog-hududgaz")
+    return <Navigate to="/homehududgazmetrolog" replace />;
+  if (role === "partner") return <Navigate to="/homepartner" replace />;
+
+  return <Navigate to="/" replace />;
+};
 
 function App() {
   const setUser = useAppStore((state) => state.setUser);
@@ -112,8 +139,8 @@ function App() {
 
   const ProtectedLayout = ({ allowedRoles, element }) => {
     if (!user) return <Navigate to="/login" replace />;
-    const userData = useAppStore((state) => state.userData);
-    const role = userData?.role || "guest";
+    const storeUserData = useAppStore((state) => state.userData);
+    const role = storeUserData?.role || "guest";
 
     if (!hasAccess(role, allowedRoles)) {
       if (role === "rahbar") return <Navigate to="/homechief" replace />;
@@ -126,6 +153,7 @@ function App() {
         return <Navigate to="/homeelectronics" replace />;
       if (role === "metrolog-hududgaz")
         return <Navigate to="/homehududgazmetrolog" replace />;
+      if (role === "partner") return <Navigate to="/homepartner" replace />;
       return <Navigate to="/" replace />;
     }
     return element;
@@ -420,7 +448,6 @@ function App() {
             />
           ),
         },
-        // 🔹 ВАЖНО: Добавляем доступ для metrolog-hududgaz к странице документов
         {
           path: "/documents/:id",
           element: (
@@ -613,26 +640,34 @@ function App() {
             />
           ),
         },
+
+        // ============================================================
+        // 🤝 ПАРТНЁР (роль: partner)
+        // ============================================================
+        {
+          path: "/homepartner",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["partner"]}
+              element={<HomePartner />}
+            />
+          ),
+        },
+        {
+          path: "/partner-statement/:contractId",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["partner"]}
+              element={<PartnerStatement />}
+            />
+          ),
+        },
       ],
     },
     {
       path: "/login",
       errorElement: <ErrorPage />,
-      element: user ? (
-        user.role === "admin" ? (
-          <Navigate to="/" replace />
-        ) : user.role === "buxgalter" ? (
-          <Navigate to="/homebooker" replace />
-        ) : user.role === "operator" ? (
-          <Navigate to="/homeoperator" replace />
-        ) : user.role === "metrolog-hududgaz" ? (
-          <Navigate to="/homehududgazmetrolog" replace />
-        ) : (
-          <Navigate to="/" replace />
-        )
-      ) : (
-        <Login />
-      ),
+      element: <LoginRedirect />,
     },
   ]);
 
