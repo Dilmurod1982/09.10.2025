@@ -60,6 +60,11 @@ import {
   GasRequestDocument,
   GasRequests,
   GasRequestBatch,
+  HomeMechanic,
+  ElectricMeters,
+  StationElectricMeters,
+  ElectricReadings,
+  ElectricAnalytics,
 } from "./pages";
 import HomePartner from "./pages/HomePartner";
 import PartnerStatement from "./pages/PartnerStatement";
@@ -98,6 +103,7 @@ const LoginRedirect = () => {
   if (role === "metrolog-hududgaz")
     return <Navigate to="/homehududgazmetrolog" replace />;
   if (role === "partner") return <Navigate to="/homepartner" replace />;
+  if (role === "mechanic") return <Navigate to="/homemechanic" replace />;
 
   return <Navigate to="/" replace />;
 };
@@ -148,6 +154,7 @@ function App() {
         return <Navigate to="/homecontrolbooker" replace />;
       if (role === "buxgalter") return <Navigate to="/homebooker" replace />;
       if (role === "operator") return <Navigate to="/homeoperator" replace />;
+      if (role === "mechanic") return <Navigate to="/homemechanic" replace />;
       if (role === "tasischi") return <Navigate to="/hometasischi" replace />;
       if (role === "electrengineer")
         return <Navigate to="/homeelectronics" replace />;
@@ -307,6 +314,42 @@ function App() {
             <ProtectedLayout
               allowedRoles={["admin"]}
               element={<GasOrganizations />}
+            />
+          ),
+        },
+        {
+          path: "/electric-meters",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["rahbar"]}
+              element={<ElectricMeters />}
+            />
+          ),
+        },
+        {
+          path: "/electric-meters/station/:stationId",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["rahbar"]}
+              element={<StationElectricMeters />}
+            />
+          ),
+        },
+        {
+          path: "/electric-readings",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["mechanic"]}
+              element={<ElectricReadings />}
+            />
+          ),
+        },
+        {
+          path: "/electric-analytics",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["mechanic", "rahbar"]}
+              element={<ElectricAnalytics />}
             />
           ),
         },
@@ -606,6 +649,16 @@ function App() {
         {
           path: "/dailyreportpartners",
           element: <DailyReportPartners />,
+        },
+
+        {
+          path: "/homemechanic",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["mechanic"]}
+              element={<HomeMechanic />}
+            />
+          ),
         },
         {
           path: "/employeesdocdeadline",

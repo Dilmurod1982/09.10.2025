@@ -22,6 +22,7 @@ import {
   ArrowLeftRight,
   Loader,
   Download,
+  Flame,
 } from "lucide-react";
 import { db } from "../firebase/config";
 import { doc, getDoc } from "firebase/firestore";
@@ -40,6 +41,7 @@ import {
   Bar,
   Legend,
   BarChart,
+  Line,
 } from "recharts";
 import * as XLSX from "xlsx";
 
@@ -56,6 +58,23 @@ const COLORS = [
   "#14b8a6",
 ];
 
+const GAS_COLORS = ["#f97316", "#ea580c", "#dc2626", "#f59e0b", "#eab308"];
+
+const MONTH_NAMES = {
+  1: "Январь",
+  2: "Февраль",
+  3: "Март",
+  4: "Апрель",
+  5: "Май",
+  6: "Июнь",
+  7: "Июль",
+  8: "Август",
+  9: "Сентябрь",
+  10: "Октябрь",
+  11: "Ноябрь",
+  12: "Декабрь",
+};
+
 const GasAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
@@ -66,6 +85,13 @@ const GasAnalytics = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [exportLoading, setExportLoading] = useState(false);
   const [comparisonPeriod, setComparisonPeriod] = useState("");
+
+  // 🔥 Фильтры для вкладки "Потребленный газ"
+  const [gasFilterYear, setGasFilterYear] = useState("");
+  const [gasFilterMode, setGasFilterMode] = useState("range");
+  const [gasFilterMonth, setGasFilterMonth] = useState("");
+  const [gasFilterMonthFrom, setGasFilterMonthFrom] = useState("");
+  const [gasFilterMonthTo, setGasFilterMonthTo] = useState("");
 
   // Функция расчета стабильности
   const calculateStability = (monthlyData) => {
@@ -420,6 +446,209 @@ const GasAnalytics = () => {
     }));
   }, [comparisonResult]);
 
+  // ===================== 🔥 ПОТРЕБЛЁННЫЙ ГАЗ =====================
+
+  // Доступные годы
+  const availableYears = useMemo(() => {
+    const years = new Set();
+    uniquePeriods.forEach((p) => {
+      const [year] = p.split("-");
+      years.add(year);
+    });
+    return Array.from(years).sort().reverse();
+  }, [uniquePeriods]);
+
+  // Доступные месяцы для выбранного года
+  const availableMonthsForYear = useMemo(() => {
+    if (!gasFilterYear) return [];
+    const months = new Set();
+    uniquePeriods.forEach((p) => {
+      const [year, month] = p.split("-");
+      if (year === gasFilterYear) {
+        months.add(Number(month));
+      }
+    });
+    return Array.from(months).sort((a, b) => a - b);
+  }, [uniquePeriods, gasFilterYear]);
+
+  // Устанавливаем значения по умолчанию при загрузке
+  useEffect(() => {
+    if (availableYears.length > 0 && !gasFilterYear) {
+      const latestYear = availableYears[0];
+      setGasFilterYear(latestYear);
+    }
+  }, [availableYears]);
+
+  // Сброс месяцев при смене года
+  useEffect(() => {
+    if (!gasFilterYear) return;
+    const months = availableMonthsForYear;
+    if (months.length > 0) {
+      setGasFilterMonthFrom(String(months[0]));
+      setGasFilterMonthTo(String(months[months.length - 1]));
+      setGasFilterMonth(String(months[0]));
+    } else {
+      setGasFilterMonthFrom("");
+      setGasFilterMonthTo("");
+      setGasFilterMonth("");
+    }
+  }, [gasFilterYear]);
+
+  // Получаем выбранные периоды для фильтра
+  const gasSelectedPeriods = useMemo(() => {
+    if (!gasFilterYear) return [];
+
+    if (gasFilterMode === "month") {
+      if (!gasFilterMonth) return [];
+      return [`${gasFilterYear}-${String(gasFilterMonth).padStart(2, "0")}`];
+    } else {
+      if (!gasFilterMonthFrom || !gasFilterMonthTo) return [];
+      const from = Number(gasFilterMonthFrom);
+      const to = Number(gasFilterMonthTo);
+      if (from > to) return [];
+
+      const periods = [];
+      for (let m = from; m <= to; m++) {
+        periods.push(`${gasFilterYear}-${String(m).padStart(2, "0")}`);
+      }
+      return periods;
+    }
+  }, [
+    gasFilterYear,
+    gasFilterMode,
+    gasFilterMonth,
+    gasFilterMonthFrom,
+    gasFilterMonthTo,
+  ]);
+
+  // Данные по потреблённому газу с учётом фильтров
+  const gasFilteredData = useMemo(() => {
+    if (gasSelectedPeriods.length === 0) return [];
+    return data.filter((item) => gasSelectedPeriods.includes(item.period));
+  }, [data, gasSelectedPeriods]);
+
+  // Общая статистика по потреблённому газу
+  const gasOverallStats = useMemo(() => {
+    const totalGas = gasFilteredData.reduce(
+      (sum, item) => sum + (item.totalGas || 0),
+      0
+    );
+    const totalAmount = gasFilteredData.reduce(
+      (sum, item) => sum + (item.amountOfGas || 0),
+      0
+    );
+    const uniqueStations = new Set(
+      gasFilteredData.map((item) => String(item.stationId))
+    );
+
+    const periodsSet = new Set(gasFilteredData.map((item) => item.period));
+    const periods = Array.from(periodsSet).sort();
+
+    let growth = 0;
+    if (periods.length >= 2) {
+      const firstTotal = gasFilteredData
+        .filter((i) => i.period === periods[0])
+        .reduce((sum, i) => sum + (i.totalGas || 0), 0);
+      const lastTotal = gasFilteredData
+        .filter((i) => i.period === periods[periods.length - 1])
+        .reduce((sum, i) => sum + (i.totalGas || 0), 0);
+      growth =
+        firstTotal !== 0 ? ((lastTotal - firstTotal) / firstTotal) * 100 : 0;
+    }
+
+    return {
+      totalGas,
+      totalAmount,
+      avgMonthly: periods.length > 0 ? totalGas / periods.length : 0,
+      growth,
+      periodsCount: periods.length,
+      stationsCount: uniqueStations.size,
+    };
+  }, [gasFilteredData]);
+
+  // Потребление по месяцам (для графика)
+  const gasMonthlyData = useMemo(() => {
+    const stats = {};
+    gasFilteredData.forEach((item) => {
+      if (!stats[item.period]) {
+        stats[item.period] = {
+          period: item.period,
+          totalGas: 0,
+          totalAmount: 0,
+          stations: new Set(),
+        };
+      }
+      stats[item.period].totalGas += item.totalGas || 0;
+      stats[item.period].totalAmount += item.amountOfGas || 0;
+      if (item.stationId) stats[item.period].stations.add(item.stationId);
+    });
+
+    return Object.values(stats)
+      .map((s) => ({
+        ...s,
+        stations: s.stations.size,
+      }))
+      .sort((a, b) => a.period.localeCompare(b.period));
+  }, [gasFilteredData]);
+
+  // Потребление по станциям
+  const gasByStation = useMemo(() => {
+    const stats = {};
+    gasFilteredData.forEach((item) => {
+      const id = String(item.stationId);
+      if (!stats[id]) {
+        const info = getStationInfo(id);
+        stats[id] = {
+          stationId: id,
+          displayName: getStationFullDisplay(id),
+          landmark: info?.landmark || "",
+          fullName: info?.name || "",
+          totalGas: 0,
+          totalAmount: 0,
+          periods: {},
+        };
+      }
+      stats[id].totalGas += item.totalGas || 0;
+      stats[id].totalAmount += item.amountOfGas || 0;
+      stats[id].periods[item.period] = item.totalGas || 0;
+    });
+
+    return Object.values(stats)
+      .map((s) => {
+        const sortedPeriods = Object.keys(s.periods).sort();
+        s.periodsList = sortedPeriods;
+        s.avg = s.totalGas / Math.max(sortedPeriods.length, 1);
+        return s;
+      })
+      .sort((a, b) => b.totalGas - a.totalGas);
+  }, [gasFilteredData, stationsData]);
+
+  // График потребления по месяцам
+  const gasMonthlyChartData = useMemo(() => {
+    return gasMonthlyData.map((m) => {
+      const [year, month] = m.period.split("-");
+      return {
+        period: m.period,
+        label: `${MONTH_NAMES[Number(month)]?.substring(0, 3)} ${year}`,
+        "Объем (м³)": Math.round(m.totalGas),
+        "Сумма (сум)": Math.round(m.totalAmount),
+        Станций: m.stations,
+      };
+    });
+  }, [gasMonthlyData]);
+
+  // Круговая диаграмма потребления по станциям
+  const gasPieData = useMemo(() => {
+    const total = gasByStation.reduce((sum, s) => sum + s.totalGas, 0);
+    return gasByStation
+      .map((s) => ({
+        name: s.displayName,
+        value: Math.round(s.totalGas),
+        percent: total > 0 ? (s.totalGas / total) * 100 : 0,
+      }))
+      .filter((s) => s.value > 0);
+  }, [gasByStation]);
+
   // ===================== ЭКСПОРТ В EXCEL =====================
 
   // 1. Общий обзор
@@ -490,7 +719,7 @@ const GasAnalytics = () => {
     }));
   };
 
-  // 5. Сравнение с прошлым месяцем - ИСПРАВЛЕНО
+  // 5. Сравнение с прошлым месяцем
   const getComparisonExcelData = () => {
     return comparisonResult.map((item) => ({
       Номи: item.name,
@@ -507,6 +736,180 @@ const GasAnalytics = () => {
     }));
   };
 
+  // 6. Потреблённый газ - по месяцам
+  const getGasMonthlyExcelData = () => {
+    return gasMonthlyData.map((m) => {
+      const [year, month] = m.period.split("-");
+      return {
+        Период: m.period,
+        Год: year,
+        Месяц: MONTH_NAMES[Number(month)] || month,
+        "Объем газа (м³)": Math.round(m.totalGas),
+        "Сумма газа (сум)": Math.round(m.totalAmount),
+        "Количество станций": m.stations,
+      };
+    });
+  };
+
+  // 7. Потреблённый газ - по станциям
+  const getGasStationsExcelData = () => {
+    return gasByStation.map((s, index) => ({
+      Место: index + 1,
+      Станция: s.displayName,
+      Ориентир: s.landmark,
+      "Полное название": s.fullName,
+      "Всего потреблено (м³)": Math.round(s.totalGas),
+      "Всего сумма (сум)": Math.round(s.totalAmount),
+      "Средний (м³)": Math.round(s.avg),
+      "Количество месяцев": s.periodsList.length,
+    }));
+  };
+
+  // 8. Потреблённый газ - сводка
+  const getGasSummaryExcelData = () => {
+    return [
+      { Показатель: "Год", Значение: gasFilterYear || "-" },
+      {
+        Показатель: "Режим фильтра",
+        Значение: gasFilterMode === "month" ? "Один месяц" : "Диапазон месяцев",
+      },
+      {
+        Показатель: "Выбранные месяцы",
+        Значение:
+          gasFilterMode === "month"
+            ? MONTH_NAMES[Number(gasFilterMonth)] || "-"
+            : `${MONTH_NAMES[Number(gasFilterMonthFrom)] || "-"} — ${
+                MONTH_NAMES[Number(gasFilterMonthTo)] || "-"
+              }`,
+      },
+      { Показатель: "Периодов", Значение: gasOverallStats.periodsCount },
+      {
+        Показатель: "Станций",
+        Значение: gasOverallStats.stationsCount,
+      },
+      {
+        Показатель: "Общий объем газа (м³)",
+        Значение: Math.round(gasOverallStats.totalGas),
+      },
+      {
+        Показатель: "Средний месячный объем (м³)",
+        Значение: Math.round(gasOverallStats.avgMonthly),
+      },
+      {
+        Показатель: "Сумма газа (сум)",
+        Значение: Math.round(gasOverallStats.totalAmount),
+      },
+      {
+        Показатель: "Изменение за период (%)",
+        Значение:
+          gasOverallStats.growth >= 0
+            ? `+${gasOverallStats.growth.toFixed(1)}%`
+            : `${gasOverallStats.growth.toFixed(1)}%`,
+      },
+    ];
+  };
+
+  // 🔥 9. Детальное потребление по станциям (матрица)
+  const getGasDetailedStationsExcelData = () => {
+    return gasByStation.map((s, index) => {
+      const row = {
+        "№": index + 1,
+        Станция: s.displayName,
+        Ориентир: s.landmark,
+        "Полное название": s.fullName,
+      };
+
+      // Добавляем столбцы по каждому месяцу
+      gasSelectedPeriods.forEach((p) => {
+        const [year, month] = p.split("-");
+        const monthName = MONTH_NAMES[Number(month)] || month;
+        const columnName = `${monthName} ${year} (м³)`;
+        row[columnName] = s.periods[p] ? Math.round(s.periods[p]) : 0;
+      });
+
+      // Добавляем итог
+      row["Всего (м³)"] = Math.round(s.totalGas);
+      row["Сумма (сум)"] = Math.round(s.totalAmount);
+
+      return row;
+    });
+  };
+
+  // 🔥 Экспорт детальной таблицы по станциям
+  const exportDetailedStations = () => {
+    try {
+      setExportLoading(true);
+
+      const wb = XLSX.utils.book_new();
+
+      // Основной лист - детальное потребление по станциям
+      const detailedData = getGasDetailedStationsExcelData();
+      const ws = XLSX.utils.json_to_sheet(detailedData);
+
+      // Настраиваем ширину колонок
+      const colWidths = [
+        { wch: 5 }, // №
+        { wch: 30 }, // Станция
+        { wch: 20 }, // Ориентир
+        { wch: 30 }, // Полное название
+      ];
+      gasSelectedPeriods.forEach(() => {
+        colWidths.push({ wch: 15 });
+      });
+      colWidths.push({ wch: 15 }); // Всего
+      colWidths.push({ wch: 15 }); // Сумма
+      ws["!cols"] = colWidths;
+
+      XLSX.utils.book_append_sheet(wb, ws, "Детальное потребление");
+
+      // Второй лист - итоговая строка
+      const totalsRow = {
+        "№": "—",
+        Станция: "ИТОГО",
+        Ориентир: "",
+        "Полное название": "",
+      };
+      gasSelectedPeriods.forEach((p) => {
+        const [year, month] = p.split("-");
+        const monthName = MONTH_NAMES[Number(month)] || month;
+        const columnName = `${monthName} ${year} (м³)`;
+        const total = gasByStation.reduce(
+          (sum, s) => sum + (s.periods[p] || 0),
+          0
+        );
+        totalsRow[columnName] = Math.round(total);
+      });
+      totalsRow["Всего (м³)"] = Math.round(gasOverallStats.totalGas);
+      totalsRow["Сумма (сум)"] = Math.round(gasOverallStats.totalAmount);
+
+      const wsTotals = XLSX.utils.json_to_sheet([totalsRow]);
+      wsTotals["!cols"] = colWidths;
+      XLSX.utils.book_append_sheet(wb, wsTotals, "Итого");
+
+      // Третий лист - информация о фильтре
+      const infoData = getGasSummaryExcelData();
+      const wsInfo = XLSX.utils.json_to_sheet(infoData);
+      wsInfo["!cols"] = [{ wch: 30 }, { wch: 30 }];
+      XLSX.utils.book_append_sheet(wb, wsInfo, "Информация");
+
+      // Имя файла
+      const fileName = `Детальное_потребление_${gasFilterYear}_${
+        gasFilterMode === "month"
+          ? MONTH_NAMES[Number(gasFilterMonth)]
+          : `${MONTH_NAMES[Number(gasFilterMonthFrom)]}-${
+              MONTH_NAMES[Number(gasFilterMonthTo)]
+            }`
+      }_${new Date().toISOString().split("T")[0]}.xlsx`;
+
+      XLSX.writeFile(wb, fileName);
+
+      setExportLoading(false);
+    } catch (error) {
+      console.error("Ошибка экспорта:", error);
+      setExportLoading(false);
+    }
+  };
+
   // Полный экспорт всех анализов
   const exportFullAnalytics = () => {
     try {
@@ -514,32 +917,55 @@ const GasAnalytics = () => {
 
       const wb = XLSX.utils.book_new();
 
-      // 1. Лист "Общий обзор"
-      const overviewData = getOverviewExcelData();
-      const ws1 = XLSX.utils.json_to_sheet(overviewData);
-      XLSX.utils.book_append_sheet(wb, ws1, "Общий обзор");
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(getOverviewExcelData()),
+        "Общий обзор"
+      );
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(getStationsExcelData()),
+        "Станции"
+      );
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(getRankingExcelData()),
+        "Рейтинг"
+      );
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(getDynamicsExcelData()),
+        "Динамика"
+      );
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(getComparisonExcelData()),
+        "Сравнение"
+      );
 
-      // 2. Лист "Станции"
-      const stationsDataExport = getStationsExcelData();
-      const ws2 = XLSX.utils.json_to_sheet(stationsDataExport);
-      XLSX.utils.book_append_sheet(wb, ws2, "Станции");
+      // Потреблённый газ
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(getGasMonthlyExcelData()),
+        "Потребление по месяцам"
+      );
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(getGasStationsExcelData()),
+        "Потребление по станциям"
+      );
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(getGasDetailedStationsExcelData()),
+        "Детальное потребление"
+      );
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(getGasSummaryExcelData()),
+        "Потребление сводка"
+      );
 
-      // 3. Лист "Рейтинг"
-      const rankingData = getRankingExcelData();
-      const ws3 = XLSX.utils.json_to_sheet(rankingData);
-      XLSX.utils.book_append_sheet(wb, ws3, "Рейтинг");
-
-      // 4. Лист "Динамика"
-      const dynamicsData = getDynamicsExcelData();
-      const ws4 = XLSX.utils.json_to_sheet(dynamicsData);
-      XLSX.utils.book_append_sheet(wb, ws4, "Динамика");
-
-      // 5. Лист "Сравнение"
-      const comparisonDataExport = getComparisonExcelData();
-      const ws5 = XLSX.utils.json_to_sheet(comparisonDataExport);
-      XLSX.utils.book_append_sheet(wb, ws5, "Сравнение");
-
-      // 6. Лист "Сводка"
+      // Сводка
       const summaryData = [
         {
           Показатель: "Общий объем газа",
@@ -583,10 +1009,12 @@ const GasAnalytics = () => {
           Значение: stationStats.filter((s) => s.status === "critical").length,
         },
       ];
-      const ws6 = XLSX.utils.json_to_sheet(summaryData);
-      XLSX.utils.book_append_sheet(wb, ws6, "Сводка");
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(summaryData),
+        "Сводка"
+      );
 
-      // Сохраняем файл
       XLSX.writeFile(
         wb,
         `Газ_аналитика_полная_${new Date().toISOString().split("T")[0]}.xlsx`
@@ -629,13 +1057,38 @@ const GasAnalytics = () => {
           data = getComparisonExcelData();
           sheetName = "Сравнение";
           break;
+        case "consumed":
+          data = getGasMonthlyExcelData();
+          sheetName = "Потребление";
+          break;
         default:
           data = getOverviewExcelData();
           sheetName = "Данные";
       }
 
-      const ws = XLSX.utils.json_to_sheet(data);
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      XLSX.utils.book_append_sheet(
+        wb,
+        XLSX.utils.json_to_sheet(data),
+        sheetName
+      );
+
+      if (activeTab === "consumed") {
+        XLSX.utils.book_append_sheet(
+          wb,
+          XLSX.utils.json_to_sheet(getGasStationsExcelData()),
+          "Потребление по станциям"
+        );
+        XLSX.utils.book_append_sheet(
+          wb,
+          XLSX.utils.json_to_sheet(getGasDetailedStationsExcelData()),
+          "Детальное потребление"
+        );
+        XLSX.utils.book_append_sheet(
+          wb,
+          XLSX.utils.json_to_sheet(getGasSummaryExcelData()),
+          "Сводка"
+        );
+      }
 
       XLSX.writeFile(
         wb,
@@ -744,170 +1197,174 @@ const GasAnalytics = () => {
         </div>
       </motion.div>
 
-      {/* Фильтры */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white rounded-2xl shadow-xl p-6 mb-6 border border-gray-100"
-      >
-        <div className="flex flex-wrap gap-4 items-end">
-          <div className="flex-1 min-w-[150px]">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <Filter className="w-4 h-4 inline mr-1" />
-              Станция
-            </label>
-            <select
-              value={selectedStation}
-              onChange={(e) => setSelectedStation(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-            >
-              <option value="all">Все станции</option>
-              {stationStats.map((s) => (
-                <option key={s.stationId} value={s.stationId}>
-                  {s.displayName || s.landmark || s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-1 min-w-[150px]">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <Calendar className="w-4 h-4 inline mr-1" />
-              Период
-            </label>
-            <select
-              value={selectedPeriod}
-              onChange={(e) => {
-                setSelectedPeriod(e.target.value);
-                const prev = getPreviousMonth(e.target.value);
-                if (prev && uniquePeriods.includes(prev)) {
-                  setComparisonPeriod(prev);
-                } else {
-                  setComparisonPeriod("");
-                }
-              }}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-            >
-              {uniquePeriods.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-          {comparisonPeriod && (
+      {/* Фильтры (для остальных вкладок) */}
+      {activeTab !== "consumed" && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white rounded-2xl shadow-xl p-6 mb-6 border border-gray-100"
+        >
+          <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[150px]">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                <ArrowLeftRight className="w-4 h-4 inline mr-1" />
-                Сравнение с
+                <Filter className="w-4 h-4 inline mr-1" />
+                Станция
               </label>
               <select
-                value={comparisonPeriod}
-                onChange={(e) => setComparisonPeriod(e.target.value)}
+                value={selectedStation}
+                onChange={(e) => setSelectedStation(e.target.value)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
-                {uniquePeriods
-                  .filter((p) => p !== selectedPeriod)
-                  .map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
+                <option value="all">Все станции</option>
+                {stationStats.map((s) => (
+                  <option key={s.stationId} value={s.stationId}>
+                    {s.displayName || s.landmark || s.name}
+                  </option>
+                ))}
               </select>
             </div>
-          )}
-          <button
-            onClick={() => {
-              setSelectedStation("all");
-              if (uniquePeriods.length > 0) {
-                setSelectedPeriod(uniquePeriods[uniquePeriods.length - 1]);
-                const prev = getPreviousMonth(
-                  uniquePeriods[uniquePeriods.length - 1]
-                );
-                if (prev && uniquePeriods.includes(prev)) {
-                  setComparisonPeriod(prev);
-                }
-              }
-            }}
-            className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
-      </motion.div>
-
-      {/* Общая статистика */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
-      >
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Общий объем газа</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {formatNumber(overallStats.totalGas)} м³
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-              <BarChart3 className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Средний месячный объем</p>
-              <p className="text-2xl font-bold text-purple-600">
-                {formatNumber(overallStats.avgMonthly)} м³
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-              <Activity className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Рост/падение</p>
-              <p
-                className={`text-2xl font-bold ${
-                  overallStats.growth >= 0 ? "text-green-600" : "text-red-600"
-                }`}
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <Calendar className="w-4 h-4 inline mr-1" />
+                Период
+              </label>
+              <select
+                value={selectedPeriod}
+                onChange={(e) => {
+                  setSelectedPeriod(e.target.value);
+                  const prev = getPreviousMonth(e.target.value);
+                  if (prev && uniquePeriods.includes(prev)) {
+                    setComparisonPeriod(prev);
+                  } else {
+                    setComparisonPeriod("");
+                  }
+                }}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
-                {formatPercent(overallStats.growth)}
-              </p>
+                {uniquePeriods.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div
-              className={`w-12 h-12 ${
-                overallStats.growth >= 0 ? "bg-green-100" : "bg-red-100"
-              } rounded-xl flex items-center justify-center`}
+            {comparisonPeriod && (
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <ArrowLeftRight className="w-4 h-4 inline mr-1" />
+                  Сравнение с
+                </label>
+                <select
+                  value={comparisonPeriod}
+                  onChange={(e) => setComparisonPeriod(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                >
+                  {uniquePeriods
+                    .filter((p) => p !== selectedPeriod)
+                    .map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                setSelectedStation("all");
+                if (uniquePeriods.length > 0) {
+                  setSelectedPeriod(uniquePeriods[uniquePeriods.length - 1]);
+                  const prev = getPreviousMonth(
+                    uniquePeriods[uniquePeriods.length - 1]
+                  );
+                  if (prev && uniquePeriods.includes(prev)) {
+                    setComparisonPeriod(prev);
+                  }
+                }
+              }}
+              className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all"
             >
-              {overallStats.growth >= 0 ? (
-                <TrendingUp className="w-6 h-6 text-green-600" />
-              ) : (
-                <TrendingDown className="w-6 h-6 text-red-600" />
-              )}
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Общая статистика (для остальных вкладок) */}
+      {activeTab !== "consumed" && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
+        >
+          <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Общий объем газа</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {formatNumber(overallStats.totalGas)} м³
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <BarChart3 className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
           </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Активных станций</p>
-              <p className="text-2xl font-bold text-emerald-600">
-                {overallStats.stationsCount}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
-              <Zap className="w-6 h-6 text-emerald-600" />
+          <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Средний месячный объем</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {formatNumber(overallStats.avgMonthly)} м³
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <Activity className="w-6 h-6 text-purple-600" />
+              </div>
             </div>
           </div>
-        </div>
-      </motion.div>
+          <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Рост/падение</p>
+                <p
+                  className={`text-2xl font-bold ${
+                    overallStats.growth >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {formatPercent(overallStats.growth)}
+                </p>
+              </div>
+              <div
+                className={`w-12 h-12 ${
+                  overallStats.growth >= 0 ? "bg-green-100" : "bg-red-100"
+                } rounded-xl flex items-center justify-center`}
+              >
+                {overallStats.growth >= 0 ? (
+                  <TrendingUp className="w-6 h-6 text-green-600" />
+                ) : (
+                  <TrendingDown className="w-6 h-6 text-red-600" />
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Активных станций</p>
+                <p className="text-2xl font-bold text-emerald-600">
+                  {overallStats.stationsCount}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <Zap className="w-6 h-6 text-emerald-600" />
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Вкладки */}
       <motion.div
@@ -923,6 +1380,7 @@ const GasAnalytics = () => {
             { id: "ranking", label: "🏆 Рейтинг" },
             { id: "dynamics", label: "📈 Динамика" },
             { id: "comparison", label: "📊 Сравнение" },
+            { id: "consumed", label: "🔥 Потреблённый газ" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -939,7 +1397,7 @@ const GasAnalytics = () => {
         </div>
 
         <div className="p-6">
-          {/* Общий обзор */}
+          {/* ============ ОБЩИЙ ОБЗОР ============ */}
           {activeTab === "overview" && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -1098,7 +1556,7 @@ const GasAnalytics = () => {
             </motion.div>
           )}
 
-          {/* Станции - круговая диаграмма */}
+          {/* ============ СТАНЦИИ ============ */}
           {activeTab === "stations" && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -1196,7 +1654,7 @@ const GasAnalytics = () => {
             </motion.div>
           )}
 
-          {/* Рейтинг */}
+          {/* ============ РЕЙТИНГ ============ */}
           {activeTab === "ranking" && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -1398,7 +1856,7 @@ const GasAnalytics = () => {
             </motion.div>
           )}
 
-          {/* Динамика */}
+          {/* ============ ДИНАМИКА ============ */}
           {activeTab === "dynamics" && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -1570,7 +2028,7 @@ const GasAnalytics = () => {
             </motion.div>
           )}
 
-          {/* Сравнение с прошлым месяцем */}
+          {/* ============ СРАВНЕНИЕ ============ */}
           {activeTab === "comparison" && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -1814,6 +2272,607 @@ const GasAnalytics = () => {
                     выбран предыдущий месяц для сравнения
                   </p>
                 </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* ============ 🔥 ПОТРЕБЛЁННЫЙ ГАЗ ============ */}
+          {activeTab === "consumed" && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-6"
+            >
+              {/* Фильтры для потреблённого газа */}
+              <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-5 border border-orange-200">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <Flame className="w-5 h-5 text-orange-600" />
+                  Фильтры потребления газа
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Год */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <Calendar className="w-4 h-4 inline mr-1" />
+                      Год
+                    </label>
+                    <select
+                      value={gasFilterYear}
+                      onChange={(e) => setGasFilterYear(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
+                    >
+                      <option value="">Выберите год</option>
+                      {availableYears.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Режим фильтра */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <Filter className="w-4 h-4 inline mr-1" />
+                      Режим
+                    </label>
+                    <select
+                      value={gasFilterMode}
+                      onChange={(e) => setGasFilterMode(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
+                    >
+                      <option value="range">Диапазон месяцев</option>
+                      <option value="month">Один месяц</option>
+                    </select>
+                  </div>
+
+                  {/* Один месяц */}
+                  {gasFilterMode === "month" && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Месяц
+                      </label>
+                      <select
+                        value={gasFilterMonth}
+                        onChange={(e) => setGasFilterMonth(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
+                      >
+                        <option value="">Выберите месяц</option>
+                        {availableMonthsForYear.map((m) => (
+                          <option key={m} value={String(m)}>
+                            {MONTH_NAMES[m] || m}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Диапазон месяцев */}
+                  {gasFilterMode === "range" && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          С месяца
+                        </label>
+                        <select
+                          value={gasFilterMonthFrom}
+                          onChange={(e) =>
+                            setGasFilterMonthFrom(e.target.value)
+                          }
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
+                        >
+                          <option value="">С месяца</option>
+                          {availableMonthsForYear.map((m) => (
+                            <option key={m} value={String(m)}>
+                              {MONTH_NAMES[m] || m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          По месяц
+                        </label>
+                        <select
+                          value={gasFilterMonthTo}
+                          onChange={(e) => setGasFilterMonthTo(e.target.value)}
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white"
+                        >
+                          <option value="">По месяц</option>
+                          {availableMonthsForYear.map((m) => (
+                            <option key={m} value={String(m)}>
+                              {MONTH_NAMES[m] || m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Информация о выбранных периодах */}
+                <div className="mt-3 text-sm text-gray-600">
+                  Выбрано периодов: <strong>{gasSelectedPeriods.length}</strong>
+                  {gasSelectedPeriods.length > 0 && (
+                    <span className="ml-2 text-gray-500">
+                      ({gasSelectedPeriods.join(", ")})
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Статистика по потреблению */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-500">
+                        Общий потреблённый газ
+                      </p>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {formatNumber(gasOverallStats.totalGas)} м³
+                      </p>
+                    </div>
+                    <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                      <Flame className="w-6 h-6 text-orange-600" />
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-500">
+                        Средний месячный объём
+                      </p>
+                      <p className="text-2xl font-bold text-amber-600">
+                        {formatNumber(gasOverallStats.avgMonthly)} м³
+                      </p>
+                    </div>
+                    <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                      <Activity className="w-6 h-6 text-amber-600" />
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-500">
+                        Изменение за период
+                      </p>
+                      <p
+                        className={`text-2xl font-bold ${
+                          gasOverallStats.growth >= 0
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {formatPercent(gasOverallStats.growth)}
+                      </p>
+                    </div>
+                    <div
+                      className={`w-12 h-12 ${
+                        gasOverallStats.growth >= 0
+                          ? "bg-green-100"
+                          : "bg-red-100"
+                      } rounded-xl flex items-center justify-center`}
+                    >
+                      {gasOverallStats.growth >= 0 ? (
+                        <TrendingUp className="w-6 h-6 text-green-600" />
+                      ) : (
+                        <TrendingDown className="w-6 h-6 text-red-600" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-500">Сумма газа</p>
+                      <p className="text-2xl font-bold text-emerald-600">
+                        {formatNumber(gasOverallStats.totalAmount)}
+                      </p>
+                    </div>
+                    <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                      <Zap className="w-6 h-6 text-emerald-600" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Если периоды не выбраны */}
+              {gasSelectedPeriods.length === 0 && (
+                <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                  <Flame className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-600 mb-2">
+                    Выберите период
+                  </h3>
+                  <p className="text-gray-400">
+                    Выберите год и месяц (или диапазон месяцев) в фильтрах выше
+                  </p>
+                </div>
+              )}
+
+              {/* Если данные есть */}
+              {gasSelectedPeriods.length > 0 && (
+                <>
+                  {/* График по месяцам */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                      📈 Потребление газа по месяцам
+                    </h3>
+                    <div className="h-[400px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={gasMonthlyChartData}>
+                          <defs>
+                            <linearGradient
+                              id="gasGradient"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor="#f97316"
+                                stopOpacity={0.8}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="#f97316"
+                                stopOpacity={0.1}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="#f0f0f0"
+                          />
+                          <XAxis dataKey="label" stroke="#888" fontSize={11} />
+                          <YAxis
+                            yAxisId="left"
+                            stroke="#888"
+                            fontSize={11}
+                            tickFormatter={(v) => formatNumber(v)}
+                          />
+                          <YAxis
+                            yAxisId="right"
+                            orientation="right"
+                            stroke="#888"
+                            fontSize={11}
+                            tickFormatter={(v) => formatNumber(v)}
+                          />
+                          <Tooltip
+                            formatter={(value, name) => [
+                              formatNumber(value),
+                              name,
+                            ]}
+                            contentStyle={{
+                              backgroundColor: "white",
+                              borderRadius: "12px",
+                              border: "1px solid #e5e7eb",
+                            }}
+                          />
+                          <Legend />
+                          <Area
+                            yAxisId="left"
+                            type="monotone"
+                            dataKey="Объем (м³)"
+                            stroke="#f97316"
+                            strokeWidth={3}
+                            fill="url(#gasGradient)"
+                            dot={{ fill: "#f97316", r: 4 }}
+                          />
+                          <Bar
+                            yAxisId="right"
+                            dataKey="Сумма (сум)"
+                            fill="#fbbf24"
+                            opacity={0.4}
+                            barSize={20}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Таблица по месяцам */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                      📋 Потребление по месяцам
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Период
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                              Объем газа (м³)
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                              Сумма газа (сум)
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                              Станций
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                              Изменение
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {gasMonthlyData.map((m, idx) => {
+                            const prev =
+                              idx > 0 ? gasMonthlyData[idx - 1].totalGas : null;
+                            const change =
+                              prev !== null
+                                ? ((m.totalGas - prev) / prev) * 100
+                                : null;
+                            const [year, month] = m.period.split("-");
+                            return (
+                              <tr
+                                key={m.period}
+                                className="hover:bg-gray-50 transition-colors"
+                              >
+                                <td className="px-4 py-3 font-medium">
+                                  {MONTH_NAMES[Number(month)]} {year}
+                                </td>
+                                <td className="px-4 py-3 text-right font-mono text-orange-600 font-bold">
+                                  {formatNumber(m.totalGas)}
+                                </td>
+                                <td className="px-4 py-3 text-right font-mono">
+                                  {formatNumber(m.totalAmount)}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  {m.stations}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  {change !== null ? (
+                                    <span
+                                      className={`inline-flex items-center gap-1 ${
+                                        change >= 0
+                                          ? "text-green-600"
+                                          : "text-red-600"
+                                      }`}
+                                    >
+                                      {change >= 0 ? (
+                                        <ArrowUp className="w-3 h-3" />
+                                      ) : (
+                                        <ArrowDown className="w-3 h-3" />
+                                      )}
+                                      {formatPercent(change)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {/* Итоговая строка */}
+                          <tr className="bg-orange-50 font-bold">
+                            <td className="px-4 py-3">ИТОГО</td>
+                            <td className="px-4 py-3 text-right font-mono text-orange-700">
+                              {formatNumber(gasOverallStats.totalGas)}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-orange-700">
+                              {formatNumber(gasOverallStats.totalAmount)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {gasOverallStats.stationsCount}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {formatPercent(gasOverallStats.growth)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Круговая диаграмма и список станций */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                        🔥 Доля станций в потреблении
+                      </h3>
+                      <div className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RePieChart>
+                            <Pie
+                              data={gasPieData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={120}
+                              paddingAngle={2}
+                              dataKey="value"
+                              label={({ name, percent }) =>
+                                `${name.substring(0, 15)}${
+                                  name.length > 15 ? "..." : ""
+                                } ${(percent * 100).toFixed(1)}%`
+                              }
+                            >
+                              {gasPieData.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={GAS_COLORS[index % GAS_COLORS.length]}
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value, name) => [
+                                `${formatNumber(value)} м³`,
+                                name,
+                              ]}
+                              contentStyle={{
+                                backgroundColor: "white",
+                                borderRadius: "12px",
+                                border: "1px solid #e5e7eb",
+                              }}
+                            />
+                          </RePieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                        🏪 Потребление по станциям
+                      </h3>
+                      <div className="overflow-y-auto max-h-[400px] space-y-2">
+                        {gasByStation.map((s, index) => {
+                          const total = gasByStation.reduce(
+                            (sum, st) => sum + st.totalGas,
+                            0
+                          );
+                          const percent =
+                            total > 0 ? (s.totalGas / total) * 100 : 0;
+                          return (
+                            <div
+                              key={s.stationId}
+                              className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div
+                                  className="w-3 h-3 rounded-full flex-shrink-0"
+                                  style={{
+                                    backgroundColor:
+                                      GAS_COLORS[index % GAS_COLORS.length],
+                                  }}
+                                />
+                                <div className="min-w-0">
+                                  <p className="font-medium text-sm truncate">
+                                    {s.displayName}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {formatNumber(s.totalGas)} м³
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <div className="w-20 bg-gray-200 rounded-full h-1.5">
+                                  <div
+                                    className="h-1.5 rounded-full"
+                                    style={{
+                                      width: `${percent}%`,
+                                      backgroundColor:
+                                        GAS_COLORS[index % GAS_COLORS.length],
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 min-w-[50px] text-right">
+                                  {percent.toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 🔥 Детальная таблица по станциям + Кнопка экспорта */}
+                  <div>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800">
+                          📋 Детальное потребление по станциям
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Матрица потребления по месяцам для каждой станции
+                        </p>
+                      </div>
+                      <button
+                        onClick={exportDetailedStations}
+                        disabled={exportLoading}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl hover:from-orange-700 hover:to-red-700 transition-all disabled:opacity-50 shadow-md hover:shadow-lg font-medium"
+                      >
+                        <FileSpreadsheet className="w-4 h-4" />
+                        {exportLoading ? "Экспорт..." : "Экспорт в Excel"}
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gradient-to-r from-orange-50 to-red-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              №
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Станция
+                            </th>
+                            {gasSelectedPeriods.map((p) => {
+                              const [year, month] = p.split("-");
+                              return (
+                                <th
+                                  key={p}
+                                  className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase"
+                                >
+                                  {MONTH_NAMES[Number(month)]?.substring(0, 3)}{" "}
+                                  {year}
+                                </th>
+                              );
+                            })}
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase bg-orange-100">
+                              Всего (м³)
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {gasByStation.map((s, index) => (
+                            <tr
+                              key={s.stationId}
+                              className="hover:bg-orange-50/30 transition-colors"
+                            >
+                              <td className="px-4 py-3 text-gray-500">
+                                {index + 1}
+                              </td>
+                              <td className="px-4 py-3 font-medium">
+                                {s.displayName}
+                              </td>
+                              {gasSelectedPeriods.map((p) => (
+                                <td
+                                  key={p}
+                                  className="px-4 py-3 text-right font-mono text-sm"
+                                >
+                                  {s.periods[p]
+                                    ? formatNumber(s.periods[p])
+                                    : "-"}
+                                </td>
+                              ))}
+                              <td className="px-4 py-3 text-right font-mono font-bold text-orange-600 bg-orange-50">
+                                {formatNumber(s.totalGas)}
+                              </td>
+                            </tr>
+                          ))}
+                          {/* Итоговая строка */}
+                          <tr className="bg-orange-100 font-bold">
+                            <td className="px-4 py-3">—</td>
+                            <td className="px-4 py-3">ИТОГО</td>
+                            {gasSelectedPeriods.map((p) => {
+                              const total = gasByStation.reduce(
+                                (sum, s) => sum + (s.periods[p] || 0),
+                                0
+                              );
+                              return (
+                                <td
+                                  key={p}
+                                  className="px-4 py-3 text-right font-mono text-orange-700"
+                                >
+                                  {formatNumber(total)}
+                                </td>
+                              );
+                            })}
+                            <td className="px-4 py-3 text-right font-mono text-orange-700 bg-orange-200">
+                              {formatNumber(gasOverallStats.totalGas)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
               )}
             </motion.div>
           )}

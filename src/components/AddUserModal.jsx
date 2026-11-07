@@ -670,6 +670,7 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                     <option value="operator">Оператор</option>
                     <option value="boshmexanik">Бош механик</option>
                     <option value="mehanik">Механик</option>
+                    <option value="mechanic">Механик (заправка)</option>
                     <option value="buxgalter">Бухгалтер</option>
                     <option value="yurist">Юрист</option>
                     <option value="partner">Хамкор</option>
@@ -728,7 +729,6 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                                       : "hover:bg-gray-50"
                                   }`}
                                 >
-                                  {/* Кастомный radio */}
                                   <div
                                     className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                                       isSelected
@@ -783,6 +783,10 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                 <div className="md:col-span-2 space-y-2">
                   <label className="block text-sm font-medium text-gray-700">
                     Прикрепленные станции
+                    {(formData.role === "mechanic" ||
+                      formData.role === "rahbar") && (
+                      <span className="text-red-500 ml-1">*</span>
+                    )}
                   </label>
                   <button
                     type="button"
@@ -791,6 +795,13 @@ const AddUserModal = ({ onClose, onUserCreated }) => {
                   >
                     Выбрать станции ({selectedStations.length})
                   </button>
+                  {(formData.role === "mechanic" ||
+                    formData.role === "rahbar") &&
+                    selectedStations.length === 0 && (
+                      <div className="text-xs text-yellow-600">
+                        ⚠️ Для этой роли нужно привязать хотя бы одну станцию
+                      </div>
+                    )}
                 </div>
               </div>
             </div>

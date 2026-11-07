@@ -21,20 +21,19 @@ const GasSettlementsDataList = () => {
   const [editingData, setEditingData] = useState([]);
   const [saving, setSaving] = useState(false);
 
-  // Новые состояния для режима редактирования
   const [useCalculatedConsumption, setUseCalculatedConsumption] =
     useState(false);
   const [actualConsumptionDays, setActualConsumptionDays] = useState("");
   const [remainingDays, setRemainingDays] = useState("");
 
-  // Функция для получения количества дней в месяце
+  // ====== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ======
+
   const getDaysInMonth = (yearMonth) => {
     if (!yearMonth) return 30;
     const [year, month] = yearMonth.split("-").map(Number);
     return new Date(year, month, 0).getDate();
   };
 
-  // Функция для получения текущей цены на газ для периода
   const getCurrentPriceForPeriod = (period) => {
     if (!priceOfGas || !priceOfGas.length) return 0;
 
@@ -48,7 +47,32 @@ const GasSettlementsDataList = () => {
     return priceEntry ? priceEntry.price : 0;
   };
 
-  // Расчет производных полей с учетом режима расчета
+  const getActPrice = (data) => {
+    const actVolume = parseFloat(
+      String(data.gasAct || "").replace(/[\s,]/g, "")
+    );
+    const actAmount = parseFloat(
+      String(data.gasActAmount || "").replace(/[\s,]/g, "")
+    );
+    if (
+      !isNaN(actVolume) &&
+      !isNaN(actAmount) &&
+      actVolume !== 0 &&
+      actAmount !== 0
+    ) {
+      return actAmount / actVolume;
+    }
+    return 0;
+  };
+
+  // 🔥 Округление: 38.48659 → 38, 38.5948 → 39
+  const roundHalfUp = (value) => {
+    if (value === null || value === undefined || isNaN(value)) return 0;
+    return Math.round(value);
+  };
+
+  // 🔥 Расчёт производных полей
+  // Сумма трёх полей (Ошибка конф. + Низкий предел + Верхний предел) округляется до целого
   const calculateDerivedFields = (data, period) => {
     const getNumericValue = (value) => {
       if (!value || value === "" || value === null || value === undefined)
@@ -61,21 +85,27 @@ const GasSettlementsDataList = () => {
     const gasByMeter = getNumericValue(data.gasByMeter);
     const confError = getNumericValue(data.confError);
     const lowPress = getNumericValue(data.lowPress);
+    const highLimit = getNumericValue(data.highLimit);
     const gasAct = getNumericValue(data.gasAct);
+    const gasActAmount = getNumericValue(data.gasActAmount);
     const limit = getNumericValue(data.limit);
     const actualConsumption = getNumericValue(data.actualConsumption);
 
     const price = getCurrentPriceForPeriod(period);
 
-    // Расчет суммы лимита
     const amountOfLimit = limit !== null ? limit * price : null;
 
-    // Расчет общего газа в зависимости от режима
+    // 🔥 Сумма трёх полей и округление
+    const confLowHighSum =
+      (confError !== null ? confError : 0) +
+      (lowPress !== null ? lowPress : 0) +
+      (highLimit !== null ? highLimit : 0);
+    const roundedConfLowHigh = roundHalfUp(confLowHighSum);
+
     let totalGas = null;
     let calculatedMonthlyConsumption = null;
 
     if (data.useCalculatedConsumption) {
-      // Режим расчетного потребления
       const daysValue = parseInt(actualConsumptionDays) || 0;
       const daysInMonth = getDaysInMonth(period);
 
@@ -85,17 +115,43 @@ const GasSettlementsDataList = () => {
         totalGas = calculatedMonthlyConsumption;
       }
     } else {
-      // Обычный режим
-      const values = [gasByMeter, confError, lowPress, gasAct];
-      const validValues = values.filter((val) => val !== null);
+      // Всего газа = по счётчику + округлённая сумма трёх полей + акт
+      const gasByMeterValue = gasByMeter !== null ? gasByMeter : 0;
+      const actVolume = gasAct !== null ? gasAct : 0;
 
-      if (validValues.length > 0) {
-        totalGas = validValues.reduce((sum, val) => sum + val, 0);
+      const hasAny =
+        gasByMeter !== null ||
+        confError !== null ||
+        lowPress !== null ||
+        highLimit !== null ||
+        gasAct !== null;
+
+      if (hasAny) {
+        totalGas = gasByMeterValue + roundedConfLowHigh + actVolume;
       }
     }
 
-    // Расчет суммы газа
-    const amountOfGas = totalGas !== null ? totalGas * price : null;
+    let amountOfGas = null;
+    if (data.useCalculatedConsumption) {
+      amountOfGas = totalGas !== null ? totalGas * price : null;
+    } else {
+      const gasByMeterValue = gasByMeter !== null ? gasByMeter : 0;
+      const gasWithoutAct = gasByMeterValue + roundedConfLowHigh;
+      const amountWithoutAct = gasWithoutAct * price;
+      const actAmountValue = gasActAmount !== null ? gasActAmount : 0;
+
+      const hasAny =
+        gasByMeter !== null ||
+        confError !== null ||
+        lowPress !== null ||
+        highLimit !== null ||
+        gasActAmount !== null ||
+        gasAct !== null;
+
+      if (hasAny) {
+        amountOfGas = amountWithoutAct + actAmountValue;
+      }
+    }
 
     return {
       totalGas,
@@ -103,64 +159,54 @@ const GasSettlementsDataList = () => {
       amountOfGas,
       price,
       calculatedMonthlyConsumption,
+      gasActAmount,
+      confLowHighSum,
+      roundedConfLowHigh,
     };
   };
 
-  // Функция для расчета сальдо на начало редактируемого месяца
+  // 🔥 Расчёт сальдо на начало для периода
   const calculateBalanceForPeriod = (
     stationId,
     period,
     stationsData,
-    allSettlementsData,
+    allSettlementsData
   ) => {
-    // Находим станцию в mainData
     const station = stationsData.find(
-      (s) => s.id && s.id.toString() === stationId.toString(),
+      (s) => s.id && s.id.toString() === stationId.toString()
     );
 
-    if (!station) {
-      console.log(`Станция с ID ${stationId} не найдена`);
-      return 0;
-    }
+    if (!station) return 0;
 
     let balance = parseFloat(station.startBalance) || 0;
     const currentPeriodDate = new Date(period + "-01");
 
-    // Если у станции нет startDate, используем начало текущего месяца
     const startPeriodDate = station.startDate
       ? new Date(station.startDate + "-01")
       : new Date(period + "-01");
 
-    // Если текущий период раньше стартового периода, возвращаем стартовый баланс
     if (currentPeriodDate < startPeriodDate) {
       return balance;
     }
 
-    // Получаем все данные для этой станции
     const stationSettlements = allSettlementsData.filter(
       (item) =>
         item.stationId &&
         item.stationId.toString() === stationId.toString() &&
-        item.period,
+        item.period
     );
 
-    // Сортируем по дате периода (от старых к новым)
     const sortedData = [...stationSettlements].sort((a, b) => {
       const dateA = new Date(a.period + "-01");
       const dateB = new Date(b.period + "-01");
       return dateA - dateB;
     });
 
-    // Рассчитываем баланс для всех периодов до редактируемого (не включая его)
     for (const dataItem of sortedData) {
       const itemDate = new Date(dataItem.period + "-01");
 
-      // Если период позже или равен текущему редактируемому периоду, останавливаемся
-      if (itemDate >= currentPeriodDate) {
-        break;
-      }
+      if (itemDate >= currentPeriodDate) break;
 
-      // Используем amountOfGas, если оно есть и не равно 0, иначе amountOfLimit
       const gasAmount =
         dataItem.amountOfGas !== undefined &&
         dataItem.amountOfGas !== null &&
@@ -175,14 +221,11 @@ const GasSettlementsDataList = () => {
     return balance;
   };
 
-  // Функция для обновления уникальных периодов
   const updateUniquePeriods = (data) => {
     if (data.length > 0) {
       const periodsMap = {};
       data.forEach((item) => {
-        if (item.period) {
-          periodsMap[item.period] = true;
-        }
+        if (item.period) periodsMap[item.period] = true;
       });
 
       const periods = Object.keys(periodsMap)
@@ -207,7 +250,6 @@ const GasSettlementsDataList = () => {
     updateUniquePeriods(settlementsData);
   }, [settlementsData, refreshKey]);
 
-  // Эффект для расчета оставшихся дней в режиме редактирования
   useEffect(() => {
     if (selectedData?.period && actualConsumptionDays !== "") {
       const daysInMonth = getDaysInMonth(selectedData.period);
@@ -219,41 +261,30 @@ const GasSettlementsDataList = () => {
     }
   }, [selectedData?.period, actualConsumptionDays]);
 
+  // ====== ОТКРЫТИЕ МОДАЛОК ======
+
   const handleView = (period) => {
     const dataForPeriod = settlementsData.filter(
-      (item) => item.period === period,
+      (item) => item.period === period
     );
 
-    setSelectedData({
-      period,
-      data: dataForPeriod,
-    });
+    setSelectedData({ period, data: dataForPeriod });
     setViewModal(true);
   };
 
-  // ИСПРАВЛЕННАЯ ФУНКЦИЯ handleEdit - теперь добавляет новые станции
   const handleEdit = (period) => {
     const dataForPeriod = settlementsData.filter(
-      (item) => item.period === period,
+      (item) => item.period === period
     );
 
-    // Получаем все stationId, для которых уже есть данные
     const existingStationIds = dataForPeriod.map((item) =>
-      item.stationId.toString(),
+      item.stationId.toString()
     );
 
-    // Находим станции, у которых нет данных за этот период
     const missingStations = stations.filter(
-      (station) => !existingStationIds.includes(station.id.toString()),
+      (station) => !existingStationIds.includes(station.id.toString())
     );
 
-    console.log("Existing stations:", existingStationIds);
-    console.log(
-      "Missing stations:",
-      missingStations.map((s) => s.id),
-    );
-
-    // Создаем пустые записи для недостающих станций
     const newEntriesForMissingStations = missingStations.map((station) => {
       return {
         period: period,
@@ -262,7 +293,10 @@ const GasSettlementsDataList = () => {
         gasByMeter: 0,
         confError: 0,
         lowPress: 0,
+        highLimit: 0,
         gasAct: 0,
+        gasActAmount: null,
+        actNote: null,
         payment: 0,
         actualConsumption: null,
         useCalculatedConsumption: false,
@@ -271,42 +305,37 @@ const GasSettlementsDataList = () => {
       };
     });
 
-    // Объединяем существующие данные с новыми записями
     const allDataForPeriod = [
       ...dataForPeriod,
       ...newEntriesForMissingStations,
     ];
 
-    // Проверяем, есть ли в данных режим расчетного потребления
     const hasCalculatedConsumption = allDataForPeriod.some(
-      (item) => item.useCalculatedConsumption === true,
+      (item) => item.useCalculatedConsumption === true
     );
 
     if (hasCalculatedConsumption) {
       const firstItemWithCalc = allDataForPeriod.find(
-        (item) => item.useCalculatedConsumption === true,
+        (item) => item.useCalculatedConsumption === true
       );
       setUseCalculatedConsumption(true);
       setActualConsumptionDays(
-        firstItemWithCalc?.actualConsumptionDays?.toString() || "",
+        firstItemWithCalc?.actualConsumptionDays?.toString() || ""
       );
     } else {
       setUseCalculatedConsumption(false);
       setActualConsumptionDays("");
     }
 
-    setSelectedData({
-      period,
-      data: allDataForPeriod,
-    });
+    setSelectedData({ period, data: allDataForPeriod });
 
-    // Создаем копию данных для редактирования с рассчитанным сальдо на начало
+    // 🔥 Обогащаем данные расчётным сальдо на начало
     const editingDataWithBalance = allDataForPeriod.map((item) => {
       const startBalance = calculateBalanceForPeriod(
         item.stationId,
         period,
         stations,
-        settlementsData,
+        settlementsData
       );
 
       return {
@@ -315,7 +344,6 @@ const GasSettlementsDataList = () => {
       };
     });
 
-    // Сортируем по ID станции
     editingDataWithBalance.sort((a, b) => {
       const idA = parseInt(a.stationId) || 0;
       const idB = parseInt(b.stationId) || 0;
@@ -326,20 +354,19 @@ const GasSettlementsDataList = () => {
     setEditModal(true);
   };
 
-  // Обработка изменений в форме редактирования
+  // ====== ИЗМЕНЕНИЯ В РЕДАКТОРЕ ======
+
   const handleEditChange = (index, field, value) => {
     const newEditingData = [...editingData];
-    const numericValue = value || 0;
 
     newEditingData[index] = {
       ...newEditingData[index],
-      [field]: numericValue,
+      [field]: value,
     };
 
-    // Пересчитываем производные поля
     const derived = calculateDerivedFields(
       newEditingData[index],
-      selectedData.period,
+      selectedData.period
     );
 
     newEditingData[index] = {
@@ -349,21 +376,19 @@ const GasSettlementsDataList = () => {
       calculatedMonthlyConsumption: derived.calculatedMonthlyConsumption,
     };
 
-    // Пересчитываем amountOfLimit на основе лимита и текущей цены
     if (field === "limit") {
       const price = getCurrentPriceForPeriod(selectedData.period);
-      newEditingData[index].amountOfLimit = numericValue * price;
+      const numLimit = parseFloat(value) || 0;
+      newEditingData[index].amountOfLimit = numLimit * price;
     }
 
     setEditingData(newEditingData);
   };
 
-  // Обработка изменений режима расчета
   const handleModeChange = (e) => {
     const newMode = e.target.checked;
     setUseCalculatedConsumption(newMode);
 
-    // Обновляем данные при смене режима
     if (editingData.length > 0) {
       const newEditingData = editingData.map((item) => {
         const updatedItem = {
@@ -373,7 +398,7 @@ const GasSettlementsDataList = () => {
 
         const derived = calculateDerivedFields(
           updatedItem,
-          selectedData.period,
+          selectedData.period
         );
 
         return {
@@ -388,7 +413,8 @@ const GasSettlementsDataList = () => {
     }
   };
 
-  // Сохранение отредактированных данных
+  // ====== СОХРАНЕНИЕ ======
+
   const handleSaveEdit = async () => {
     if (!selectedData || !editingData.length) return;
 
@@ -398,12 +424,11 @@ const GasSettlementsDataList = () => {
       const mainDocRef = doc(db, "gasSettlements", "main");
       const currentData = [...settlementsData];
 
-      // Обновляем или добавляем данные
       editingData.forEach((editedItem) => {
         const index = currentData.findIndex(
           (item) =>
             item.period === editedItem.period &&
-            item.stationId.toString() === editedItem.stationId.toString(),
+            item.stationId.toString() === editedItem.stationId.toString()
         );
 
         const price = getCurrentPriceForPeriod(editedItem.period);
@@ -415,6 +440,9 @@ const GasSettlementsDataList = () => {
           amountOfGas: derived.amountOfGas,
           totalGas: derived.totalGas,
           calculatedMonthlyConsumption: derived.calculatedMonthlyConsumption,
+          highLimit: editedItem.highLimit || null,
+          gasActAmount: editedItem.gasActAmount || null,
+          actNote: editedItem.actNote || null,
           useCalculatedConsumption: useCalculatedConsumption,
           actualConsumptionDays: useCalculatedConsumption
             ? parseInt(actualConsumptionDays)
@@ -422,14 +450,12 @@ const GasSettlementsDataList = () => {
           updatedAt: new Date().toISOString(),
         };
 
-        // Удаляем временные поля перед сохранением
+        // 🔥 Удаляем временное поле перед сохранением
         delete updatedItem.calculatedStartBalance;
 
         if (index !== -1) {
-          // Обновляем существующую запись
           currentData[index] = updatedItem;
         } else {
-          // Добавляем новую запись
           currentData.push({
             ...updatedItem,
             createdAt: new Date().toISOString(),
@@ -437,17 +463,14 @@ const GasSettlementsDataList = () => {
         }
       });
 
-      // Сохраняем обновленные данные в Firebase
       await updateDoc(mainDocRef, {
         data: currentData,
         updatedAt: new Date().toISOString(),
       });
 
-      // Обновляем локальные данные
       await reloadData();
       setRefreshKey((prev) => prev + 1);
 
-      // Закрываем модальное окно
       setEditModal(false);
       alert("Данные успешно сохранены!");
     } catch (error) {
@@ -458,14 +481,12 @@ const GasSettlementsDataList = () => {
     }
   };
 
-  // Обработка закрытия модального окна добавления данных
   const handleAddModalClose = async () => {
     setOpenModal(false);
     await reloadData();
     setRefreshKey((prev) => prev + 1);
   };
 
-  // Функция для принудительного обновления данных
   const handleRefresh = async () => {
     await reloadData();
     setRefreshKey((prev) => prev + 1);
@@ -474,7 +495,7 @@ const GasSettlementsDataList = () => {
   const filteredPeriods = uniquePeriods.filter(
     (period) =>
       period.monthName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      period.year.toString().includes(searchTerm),
+      period.year.toString().includes(searchTerm)
   );
 
   if (loading && settlementsData.length === 0) {
@@ -487,6 +508,7 @@ const GasSettlementsDataList = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+      {/* ====== ЗАГОЛОВОК ====== */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h2 className="text-2xl font-semibold text-gray-800 mb-1">
@@ -502,22 +524,8 @@ const GasSettlementsDataList = () => {
             </span>
             <button
               onClick={handleRefresh}
-              className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
-              title="Обновить данные"
+              className="text-sm text-blue-600 hover:text-blue-800"
             >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
               Обновить
             </button>
           </div>
@@ -527,7 +535,7 @@ const GasSettlementsDataList = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => navigate("/gassettlements")}
-            className="bg-gray-600 text-white px-5 py-2.5 rounded-xl shadow-md hover:bg-gray-700 transition-colors"
+            className="bg-gray-600 text-white px-5 py-2.5 rounded-xl shadow-md hover:bg-gray-700"
           >
             ← Назад
           </motion.button>
@@ -535,85 +543,48 @@ const GasSettlementsDataList = () => {
             onClick={() => setOpenModal(true)}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-5 py-2.5 rounded-xl shadow-md hover:from-blue-700 hover:to-blue-800 transition-all"
+            className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-5 py-2.5 rounded-xl shadow-md"
           >
             + Добавление новых данных
           </motion.button>
         </div>
       </div>
 
-      {/* Поле поиска */}
+      {/* Поиск */}
       <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg
-              className="w-5 h-5 text-gray-400"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-          <input
-            type="text"
-            placeholder="Поиск по месяцу или году..."
-            className="w-full pl-10 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        <input
+          type="text"
+          placeholder="Поиск по месяцу или году..."
+          className="w-full p-3 border border-gray-300 rounded-xl"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
-      {/* Индикатор загрузки */}
-      {loading && settlementsData.length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-2xl">
-          <div className="flex items-center gap-2 text-blue-700">
-            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500"></div>
-            <span className="text-sm">Обновление данных...</span>
-          </div>
-        </div>
-      )}
-
-      {/* ТАБЛИЦА СО СПИСКОМ ПЕРИОДОВ */}
+      {/* ТАБЛИЦА ПЕРИОДОВ */}
       <div className="bg-white rounded-2xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full text-sm">
             <thead className="bg-gradient-to-r from-blue-50 to-blue-100">
               <tr>
-                <th className="p-4 text-left font-semibold text-gray-700">№</th>
-                <th className="p-4 text-left font-semibold text-gray-700">
-                  Год
-                </th>
-                <th className="p-4 text-left font-semibold text-gray-700">
-                  Месяц
-                </th>
-                <th className="p-4 text-left font-semibold text-gray-700">
-                  Количество записей
-                </th>
-                <th className="p-4 text-left font-semibold text-gray-700">
-                  Режим расчета
-                </th>
-                <th className="p-4 text-left font-semibold text-gray-700">
-                  Действия
-                </th>
+                <th className="p-4 text-left">№</th>
+                <th className="p-4 text-left">Год</th>
+                <th className="p-4 text-left">Месяц</th>
+                <th className="p-4 text-left">Количество записей</th>
+                <th className="p-4 text-left">Режим расчета</th>
+                <th className="p-4 text-left">Действия</th>
               </tr>
             </thead>
             <tbody>
               {filteredPeriods.length > 0 ? (
                 filteredPeriods.map((item, index) => {
                   const dataForPeriod = settlementsData.filter(
-                    (d) => d.period === item.period,
+                    (d) => d.period === item.period
                   );
                   const count = dataForPeriod.length;
                   const hasCalculatedConsumption = dataForPeriod.some(
-                    (d) => d.useCalculatedConsumption === true,
+                    (d) => d.useCalculatedConsumption === true
                   );
-
-                  // Показываем, сколько станций не имеют данных
                   const missingStationsCount = stations.length - count;
 
                   return (
@@ -621,114 +592,53 @@ const GasSettlementsDataList = () => {
                       key={`${item.period}-${refreshKey}`}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      transition={{ delay: index * 0.05 }}
-                      className={`border-t hover:bg-blue-50 transition-colors ${
+                      className={`border-t hover:bg-blue-50 ${
                         index % 2 === 0 ? "bg-gray-50" : "bg-white"
                       }`}
                     >
                       <td className="p-4 font-medium">{index + 1}</td>
                       <td className="p-4">
-                        <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 font-medium">
+                        <span className="px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 font-medium">
                           {item.year}
-                        </div>
+                        </span>
                       </td>
-                      <td className="p-4 font-medium text-gray-800">
-                        {item.monthName}
-                      </td>
+                      <td className="p-4 font-medium">{item.monthName}</td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-bold">{count}</span>
                           <span className="text-gray-500">заправок</span>
                           {missingStationsCount > 0 && (
-                            <span className="text-xs text-orange-500 ml-2">
-                              (нет данных для {missingStationsCount} шт.)
+                            <span className="text-xs text-orange-500">
+                              (нет данных: {missingStationsCount})
                             </span>
                           )}
                         </div>
                       </td>
                       <td className="p-4">
                         {hasCalculatedConsumption ? (
-                          <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800 font-medium">
-                            <svg
-                              className="w-3 h-3 mr-1"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
+                          <span className="px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800 font-medium">
                             Расчетный
-                          </div>
+                          </span>
                         ) : (
-                          <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800 font-medium">
-                            <svg
-                              className="w-3 h-3 mr-1"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
+                          <span className="px-3 py-1 rounded-full text-sm bg-green-100 text-green-800 font-medium">
                             Обычный
-                          </div>
+                          </span>
                         )}
                       </td>
                       <td className="p-4">
                         <div className="flex gap-2">
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
+                          <button
                             onClick={() => handleView(item.period)}
-                            className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center gap-2"
+                            className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                              />
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                              />
-                            </svg>
                             Просмотр
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
+                          </button>
+                          <button
                             onClick={() => handleEdit(item.period)}
-                            className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors flex items-center gap-2"
+                            className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
                           >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                              />
-                            </svg>
                             Редактировать
-                          </motion.button>
+                          </button>
                         </div>
                       </td>
                     </motion.tr>
@@ -737,63 +647,16 @@ const GasSettlementsDataList = () => {
               ) : (
                 <tr>
                   <td colSpan={6} className="p-8 text-center">
-                    <div className="text-gray-400 mb-4">
-                      <svg
-                        className="w-16 h-16 mx-auto"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1}
-                          d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-600 mb-2">
-                      {searchTerm
-                        ? "По вашему запросу ничего не найдено"
-                        : "Нет введенных данных"}
-                    </h3>
-                    <p className="text-gray-400 mb-4">
-                      {searchTerm
-                        ? "Попробуйте изменить поисковый запрос"
-                        : "Добавьте данные для начала работы"}
-                    </p>
-                    {!searchTerm && (
-                      <motion.button
-                        onClick={() => setOpenModal(true)}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Добавить первые данные
-                      </motion.button>
-                    )}
+                    {searchTerm ? "Ничего не найдено" : "Нет данных"}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-
-        {filteredPeriods.length > 0 && (
-          <div className="bg-gray-50 px-6 py-4 border-t flex justify-between items-center text-sm text-gray-600">
-            <div>
-              <span className="font-medium">Показано:</span>{" "}
-              {filteredPeriods.length} из {uniquePeriods.length} периодов
-            </div>
-            <div>
-              <span className="font-medium">Записей:</span>{" "}
-              {settlementsData.length}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Модальное окно добавления данных */}
+      {/* МОДАЛКА ДОБАВЛЕНИЯ */}
       <AnimatePresence>
         {openModal && (
           <AddNewGasSettlementsData
@@ -803,7 +666,7 @@ const GasSettlementsDataList = () => {
         )}
       </AnimatePresence>
 
-      {/* Модальное окно просмотра данных */}
+      {/* ==================== ПРОСМОТР ==================== */}
       <AnimatePresence>
         {viewModal && selectedData && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -815,359 +678,152 @@ const GasSettlementsDataList = () => {
             >
               <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6">
                 <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-xl font-semibold text-white mb-1">
-                      Данные за{" "}
-                      {new Date(selectedData.period + "-01").toLocaleString(
-                        "ru",
-                        {
-                          month: "long",
-                          year: "numeric",
-                        },
-                      )}
-                    </h3>
-                    <p className="text-blue-100 text-sm">
-                      {selectedData.data.length} заправок, период:{" "}
-                      {selectedData.period}
-                    </p>
-                    {selectedData.data.some(
-                      (d) => d.useCalculatedConsumption,
-                    ) && (
-                      <p className="text-blue-100 text-sm mt-1">
-                        <svg
-                          className="w-4 h-4 inline mr-1"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        Режим: Расчетное потребление
-                      </p>
+                  <h3 className="text-xl font-semibold text-white">
+                    Данные за{" "}
+                    {new Date(selectedData.period + "-01").toLocaleString(
+                      "ru",
+                      { month: "long", year: "numeric" }
                     )}
-                  </div>
+                  </h3>
                   <button
                     onClick={() => setViewModal(false)}
-                    className="text-white hover:bg-blue-800 p-2 rounded-full transition-colors"
+                    className="text-white hover:bg-blue-800 p-2 rounded-full"
                   >
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
+                    ✕
                   </button>
                 </div>
               </div>
+              <div className="p-6 overflow-y-auto max-h-[70vh]">
+                {selectedData.data.map((item, index) => {
+                  const station = stations.find(
+                    (s) => String(s.id) === String(item.stationId)
+                  );
+                  const actPrice = getActPrice(item);
 
-              <div className="p-6 overflow-y-auto max-h-[60vh]">
-                <div className="grid grid-cols-1 gap-4">
-                  {selectedData.data.map((item, index) => {
-                    const station = stations.find(
-                      (s) =>
-                        s.id && s.id.toString() === item.stationId.toString(),
-                    );
-
-                    return (
-                      <motion.div
-                        key={`${item.stationId}-${item.period}`}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="bg-gray-50 rounded-xl p-4 border border-gray-200"
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h4 className="font-medium text-lg text-blue-600">
-                              {station?.name || "Неизвестно"}
-                            </h4>
-                            <p className="text-sm text-gray-500">
-                              {station?.landmark || "Нет ориентира"}
-                            </p>
+                  return (
+                    <div
+                      key={index}
+                      className="bg-gray-50 rounded-xl p-4 border mb-4"
+                    >
+                      <h4 className="font-medium text-lg text-blue-600">
+                        {station?.name || "Неизвестно"}
+                      </h4>
+                      <p className="text-sm text-gray-500 mb-3">
+                        {station?.landmark || ""}
+                      </p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div>
+                          <div className="text-xs text-gray-500">
+                            По счётчику
                           </div>
-                          <div className="text-right">
-                            <div className="text-sm text-gray-500">
-                              ID: {item.stationId}
-                            </div>
-                            {item.useCalculatedConsumption && (
-                              <div className="text-xs text-purple-600 font-medium mt-1">
-                                <svg
-                                  className="w-3 h-3 inline mr-1"
-                                  fill="currentColor"
-                                  viewBox="0 0 20 20"
-                                >
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
-                                Расчетный режим
-                              </div>
-                            )}
+                          <div className="font-mono">
+                            {item.gasByMeter || 0}
                           </div>
                         </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                          <div className="bg-white p-3 rounded-lg border">
-                            <div className="text-sm text-gray-500 mb-1">
-                              Лимит
-                            </div>
-                            <div className="font-mono font-medium">
-                              {item.limit ? (
-                                <NumericFormat
-                                  value={item.limit}
-                                  displayType="text"
-                                  thousandSeparator=" "
-                                  decimalScale={0}
-                                />
-                              ) : (
-                                "-"
-                              )}
-                            </div>
+                        <div>
+                          <div className="text-xs text-gray-500">
+                            Ошибка конф.
                           </div>
-
-                          <div className="bg-white p-3 rounded-lg border">
-                            <div className="text-sm text-gray-500 mb-1">
-                              Сумма по лимиту
-                            </div>
-                            <div className="font-mono font-medium">
-                              {item.amountOfLimit ? (
-                                <NumericFormat
-                                  value={item.amountOfLimit}
-                                  displayType="text"
-                                  thousandSeparator=" "
-                                  decimalScale={0}
-                                  suffix=" сум"
-                                />
-                              ) : (
-                                "-"
-                              )}
-                            </div>
+                          <div className="font-mono">{item.confError || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">
+                            Низкий предел
                           </div>
-
-                          {item.useCalculatedConsumption && (
-                            <>
-                              <div className="bg-white p-3 rounded-lg border">
-                                <div className="text-sm text-gray-500 mb-1">
-                                  Факт. потребление
-                                </div>
-                                <div className="font-mono font-medium">
-                                  {item.actualConsumption ? (
-                                    <NumericFormat
-                                      value={item.actualConsumption}
-                                      displayType="text"
-                                      thousandSeparator=" "
-                                      decimalScale={0}
-                                    />
-                                  ) : (
-                                    "-"
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="bg-white p-3 rounded-lg border">
-                                <div className="text-sm text-gray-500 mb-1">
-                                  Расчет на месяц
-                                </div>
-                                <div className="font-mono font-medium">
-                                  {item.calculatedMonthlyConsumption ? (
-                                    <NumericFormat
-                                      value={item.calculatedMonthlyConsumption}
-                                      displayType="text"
-                                      thousandSeparator=" "
-                                      decimalScale={0}
-                                    />
-                                  ) : (
-                                    "-"
-                                  )}
-                                </div>
-                              </div>
-                            </>
-                          )}
-
-                          <div className="bg-white p-3 rounded-lg border">
-                            <div className="text-sm text-gray-500 mb-1">
-                              Всего получено газа
-                            </div>
-                            <div className="font-mono font-medium">
-                              {item.totalGas ? (
-                                <NumericFormat
-                                  value={item.totalGas}
-                                  displayType="text"
-                                  thousandSeparator=" "
-                                  decimalScale={0}
-                                />
-                              ) : (
-                                "-"
-                              )}
-                            </div>
-
-                            {!item.useCalculatedConsumption && (
-                              <div className="mt-3 space-y-1">
-                                <div className="text-xs text-gray-500">
-                                  В том числе:
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div>
-                                    <div className="text-xs text-gray-500">
-                                      По счетчику
-                                    </div>
-                                    <div className="text-xs font-mono">
-                                      {item.gasByMeter ? (
-                                        <NumericFormat
-                                          value={item.gasByMeter}
-                                          displayType="text"
-                                          thousandSeparator=" "
-                                          decimalScale={0}
-                                        />
-                                      ) : (
-                                        "-"
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div className="text-xs text-gray-500">
-                                      Ошибка конфигурации
-                                    </div>
-                                    <div className="text-xs font-mono">
-                                      {item.confError ? (
-                                        <NumericFormat
-                                          value={item.confError}
-                                          displayType="text"
-                                          thousandSeparator=" "
-                                          decimalScale={0}
-                                        />
-                                      ) : (
-                                        "-"
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div className="text-xs text-gray-500">
-                                      Низкий предел
-                                    </div>
-                                    <div className="text-xs font-mono">
-                                      {item.lowPress ? (
-                                        <NumericFormat
-                                          value={item.lowPress}
-                                          displayType="text"
-                                          thousandSeparator=" "
-                                          decimalScale={0}
-                                        />
-                                      ) : (
-                                        "-"
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div className="text-xs text-gray-500">
-                                      По акту
-                                    </div>
-                                    <div className="text-xs font-mono">
-                                      {item.gasAct ? (
-                                        <NumericFormat
-                                          value={item.gasAct}
-                                          displayType="text"
-                                          thousandSeparator=" "
-                                          decimalScale={0}
-                                        />
-                                      ) : (
-                                        "-"
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+                          <div className="font-mono">{item.lowPress || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-pink-600">
+                            Верхний предел
                           </div>
-
-                          <div className="bg-white p-3 rounded-lg border">
-                            <div className="text-sm text-gray-500 mb-1">
-                              Сумма газа
-                            </div>
-                            <div className="font-mono font-medium">
-                              {item.amountOfGas ? (
-                                <NumericFormat
-                                  value={item.amountOfGas}
-                                  displayType="text"
-                                  thousandSeparator=" "
-                                  decimalScale={0}
-                                  suffix=" сум"
-                                />
-                              ) : (
-                                "-"
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="bg-white p-3 rounded-lg border">
-                            <div className="text-sm text-gray-500 mb-1">
-                              Оплата
-                            </div>
-                            <div className="font-mono font-medium text-green-600">
-                              {item.payment ? (
-                                <NumericFormat
-                                  value={item.payment}
-                                  displayType="text"
-                                  thousandSeparator=" "
-                                  decimalScale={0}
-                                  suffix=" сум"
-                                />
-                              ) : (
-                                "-"
-                              )}
-                            </div>
+                          <div className="font-mono text-pink-700">
+                            {item.highLimit || 0}
                           </div>
                         </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
+                        <div>
+                          <div className="text-xs text-orange-600">
+                            По акту (м³)
+                          </div>
+                          <div className="font-mono text-orange-600">
+                            {item.gasAct || 0}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-orange-600">
+                            Сумма акта
+                          </div>
+                          <div className="font-mono text-orange-700">
+                            {item.gasActAmount || 0}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-orange-600">
+                            Цена акта
+                          </div>
+                          <div className="font-mono text-orange-700">
+                            {actPrice !== 0 ? actPrice.toFixed(2) : "-"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">
+                            Всего газа
+                          </div>
+                          <div className="font-mono font-bold">
+                            {item.totalGas || 0}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">
+                            Сумма газа
+                          </div>
+                          <div className="font-mono text-blue-600 font-bold">
+                            {item.amountOfGas || 0}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500">Оплата</div>
+                          <div className="font-mono text-green-600">
+                            {item.payment || 0}
+                          </div>
+                        </div>
+                      </div>
+                      {item.actNote && (
+                        <div className="mt-2 p-2 bg-amber-50 rounded border border-amber-200">
+                          <span className="text-xs font-semibold text-amber-700">
+                            📝 Примечание:
+                          </span>{" "}
+                          <span className="text-xs text-amber-800">
+                            {item.actNote}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-
-              <div className="bg-gray-50 px-6 py-4 border-t flex justify-between items-center">
-                <div className="text-sm text-gray-600">
-                  Всего заправок в этом периоде: {selectedData.data.length}
-                </div>
-                <div className="flex gap-3">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      setViewModal(false);
-                      handleEdit(selectedData.period);
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Редактировать
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setViewModal(false)}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    Закрыть
-                  </motion.button>
-                </div>
+              <div className="bg-gray-50 px-6 py-4 border-t flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setViewModal(false);
+                    handleEdit(selectedData.period);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+                >
+                  Редактировать
+                </button>
+                <button
+                  onClick={() => setViewModal(false)}
+                  className="px-4 py-2 border rounded-lg"
+                >
+                  Закрыть
+                </button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Модальное окно редактирования данных */}
+      {/* ==================== РЕДАКТИРОВАНИЕ ==================== */}
       <AnimatePresence>
         {editModal && selectedData && editingData.length > 0 && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-1">
@@ -1184,139 +840,103 @@ const GasSettlementsDataList = () => {
                       Редактирование данных за{" "}
                       {new Date(selectedData.period + "-01").toLocaleString(
                         "ru",
-                        {
-                          month: "long",
-                          year: "numeric",
-                        },
+                        { month: "long", year: "numeric" }
                       )}
                     </h3>
                     <p className="text-green-100 text-sm">
-                      Текущая цена на газ:{" "}
-                      <NumericFormat
-                        value={getCurrentPriceForPeriod(selectedData.period)}
-                        displayType="text"
-                        thousandSeparator=" "
-                        decimalScale={0}
-                      />{" "}
+                      Цена газа: {getCurrentPriceForPeriod(selectedData.period)}{" "}
                       сум/м³ • Всего станций: {editingData.length}
                     </p>
                   </div>
                   <button
                     onClick={() => setEditModal(false)}
-                    className="text-white hover:bg-green-800 p-2 rounded-full transition-colors"
+                    className="text-white hover:bg-green-800 p-2 rounded-full"
                   >
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
+                    ✕
                   </button>
                 </div>
               </div>
 
-              {/* Блок настройки режима расчета */}
+              {/* Блок режима */}
               <div className="bg-blue-50 p-4 border-b">
-                <div className="max-w-4xl mx-auto">
-                  <div className="grid grid-cols-3 gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={useCalculatedConsumption}
-                        onChange={handleModeChange}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                        disabled={saving}
-                      />
-                      <span className="text-sm font-medium text-gray-700">
-                        Использовать расчетное потребление
-                      </span>
+                <div className="grid grid-cols-3 gap-4 max-w-4xl mx-auto">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={useCalculatedConsumption}
+                      onChange={handleModeChange}
+                      disabled={saving}
+                    />
+                    <span className="text-sm">Расчетное потребление</span>
+                  </label>
+                  <div>
+                    <label className="block text-xs mb-1">
+                      Кол-во дней потребления
                     </label>
-                    <div
-                      className={`${!useCalculatedConsumption ? "opacity-50" : ""}`}
-                    >
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Кол-во дней потребления газа
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max={
-                          selectedData.period
-                            ? getDaysInMonth(selectedData.period)
-                            : 31
-                        }
-                        value={actualConsumptionDays}
-                        onChange={(e) =>
-                          setActualConsumptionDays(e.target.value)
-                        }
-                        className={`w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          !useCalculatedConsumption
-                            ? "bg-gray-100 cursor-not-allowed"
-                            : ""
-                        }`}
-                        disabled={saving || !useCalculatedConsumption}
-                      />
-                    </div>
-
-                    <div
-                      className={`${!useCalculatedConsumption ? "opacity-50" : ""}`}
-                    >
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Оставшиеся дни месяца
-                      </label>
-                      <input
-                        type="text"
-                        value={remainingDays}
-                        className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
-                        readOnly
-                        disabled
-                      />
-                    </div>
+                    <input
+                      type="number"
+                      min="1"
+                      value={actualConsumptionDays}
+                      onChange={(e) => setActualConsumptionDays(e.target.value)}
+                      disabled={saving || !useCalculatedConsumption}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs mb-1">Оставшиеся дни</label>
+                    <input
+                      type="text"
+                      value={remainingDays}
+                      readOnly
+                      className="w-full p-2 border rounded bg-gray-50"
+                    />
                   </div>
                 </div>
               </div>
 
-              <div className="p-6 overflow-y-auto max-h-[50vh]">
+              <div className="p-6 overflow-y-auto max-h-[55vh]">
                 <div className="space-y-6">
                   {editingData.map((item, index) => {
                     const station = stations.find(
-                      (s) =>
-                        s.id && s.id.toString() === item.stationId.toString(),
+                      (s) => String(s.id) === String(item.stationId)
                     );
                     const derived = calculateDerivedFields(
                       item,
-                      selectedData.period,
+                      selectedData.period
                     );
 
-                    // Рассчитываем сальдо на конец периода
+                    // 🔥 САЛЬДО НА НАЧАЛО
                     const startBalance = item.calculatedStartBalance || 0;
                     const gasAmount =
                       derived.amountOfGas || derived.amountOfLimit || 0;
+                    // 🔥 САЛЬДО НА КОНЕЦ
                     const endBalance =
                       startBalance + gasAmount - (item.payment || 0);
 
-                    // Проверяем, есть ли уже данные для этой станции
                     const hasExistingData = settlementsData.some(
                       (d) =>
                         d.period === selectedData.period &&
-                        d.stationId.toString() === item.stationId.toString(),
+                        d.stationId.toString() === item.stationId.toString()
                     );
+
+                    const actPrice = getActPrice(item);
 
                     return (
                       <div
                         key={`${item.stationId}-${item.period}`}
-                        className={`rounded-xl p-6 border ${hasExistingData ? "bg-gray-50 border-gray-200" : "bg-yellow-50 border-yellow-300"}`}
+                        className={`rounded-xl p-6 border ${
+                          hasExistingData
+                            ? "bg-gray-50 border-gray-200"
+                            : "bg-yellow-50 border-yellow-300"
+                        }`}
                       >
                         <div className="flex items-center gap-3 mb-6">
                           <div
-                            className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg ${hasExistingData ? "bg-blue-100 text-blue-600" : "bg-yellow-100 text-yellow-600"}`}
+                            className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg ${
+                              hasExistingData
+                                ? "bg-blue-100 text-blue-600"
+                                : "bg-yellow-100 text-yellow-600"
+                            }`}
                           >
                             {index + 1}
                           </div>
@@ -1329,134 +949,85 @@ const GasSettlementsDataList = () => {
                             </p>
                           </div>
                           {!hasExistingData && (
-                            <div className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded-full text-xs font-medium">
+                            <div className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded-full text-xs">
                               Новые данные
                             </div>
                           )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
-                          {/* Лимит газа */}
-                          <div className="bg-white p-4 rounded-lg border border-gray-300">
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <div className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-6">
+                          {/* Лимит */}
+                          <div className="bg-white p-4 rounded-lg border">
+                            <label className="block text-xs font-semibold mb-2">
                               Лимит газа (м³)
                             </label>
                             <NumericFormat
                               value={item.limit || ""}
-                              onValueChange={(values) => {
-                                const { floatValue } = values;
+                              onValueChange={({ floatValue }) =>
                                 handleEditChange(
                                   index,
                                   "limit",
-                                  floatValue || "",
-                                );
-                              }}
+                                  floatValue || ""
+                                )
+                              }
                               thousandSeparator=" "
-                              decimalScale={2}
-                              allowNegative={false}
-                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg font-mono"
-                              placeholder="0.00"
+                              decimalScale={5}
+                              className="w-full p-3 border rounded font-mono"
+                              placeholder="0.00000"
                             />
                           </div>
 
                           {/* Сумма по лимиту */}
-                          <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                              Сумма по лимиту (сум)
+                          <div className="bg-gray-100 p-4 rounded-lg border">
+                            <label className="block text-xs font-semibold mb-2">
+                              Сумма по лимиту
                             </label>
-                            <div className="text-xl font-mono text-gray-800">
-                              {derived.amountOfLimit ? (
-                                <NumericFormat
-                                  value={derived.amountOfLimit}
-                                  displayType="text"
-                                  thousandSeparator=" "
-                                  decimalScale={0}
-                                />
-                              ) : (
-                                "-"
-                              )}
+                            <div className="text-xl font-mono">
+                              {derived.amountOfLimit
+                                ? Math.round(
+                                    derived.amountOfLimit
+                                  ).toLocaleString("ru-RU")
+                                : "-"}
                             </div>
-                            {item.limit && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                <NumericFormat
-                                  value={item.limit}
-                                  displayType="text"
-                                  thousandSeparator=" "
-                                  decimalScale={2}
-                                />{" "}
-                                м³ ×{" "}
-                                <NumericFormat
-                                  value={derived.price}
-                                  displayType="text"
-                                  thousandSeparator=" "
-                                  decimalScale={0}
-                                />{" "}
-                                сум/м³
-                              </p>
-                            )}
                           </div>
 
-                          {/* Поля в зависимости от режима */}
+                          {/* Компоненты газа или режим расчёта */}
                           {useCalculatedConsumption ? (
                             <>
-                              <div className="bg-white p-4 rounded-lg border border-gray-300">
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                  Фактическое потребление газа (м³)
+                              <div className="bg-white p-4 rounded-lg border">
+                                <label className="block text-xs font-semibold mb-2">
+                                  Факт. потребление
                                 </label>
                                 <NumericFormat
                                   value={item.actualConsumption || ""}
-                                  onValueChange={(values) => {
-                                    const { floatValue } = values;
+                                  onValueChange={({ floatValue }) =>
                                     handleEditChange(
                                       index,
                                       "actualConsumption",
-                                      floatValue || "",
-                                    );
-                                  }}
+                                      floatValue || ""
+                                    )
+                                  }
                                   thousandSeparator=" "
-                                  decimalScale={2}
-                                  allowNegative={false}
-                                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg font-mono"
-                                  placeholder="0.00"
+                                  decimalScale={5}
+                                  className="w-full p-3 border rounded font-mono"
                                 />
                               </div>
-
-                              <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                  Расчетное потребление газа в месяц (м³)
+                              <div className="bg-gray-100 p-4 rounded-lg border">
+                                <label className="block text-xs font-semibold mb-2">
+                                  Расчет на месяц
                                 </label>
-                                <div className="text-xl font-mono text-gray-800">
-                                  {derived.calculatedMonthlyConsumption ? (
-                                    <NumericFormat
-                                      value={
-                                        derived.calculatedMonthlyConsumption
-                                      }
-                                      displayType="text"
-                                      thousandSeparator=" "
-                                      decimalScale={2}
-                                    />
-                                  ) : (
-                                    "-"
-                                  )}
+                                <div className="text-xl font-mono">
+                                  {derived.calculatedMonthlyConsumption
+                                    ? derived.calculatedMonthlyConsumption.toFixed(
+                                        2
+                                      )
+                                    : "-"}
                                 </div>
-                                {item.actualConsumption &&
-                                  actualConsumptionDays && (
-                                    <p className="text-xs text-gray-500 mt-1">
-                                      <NumericFormat
-                                        value={item.actualConsumption}
-                                        displayType="text"
-                                        thousandSeparator=" "
-                                        decimalScale={2}
-                                      />{" "}
-                                      ÷ {actualConsumptionDays} ×{" "}
-                                      {getDaysInMonth(selectedData.period)}
-                                    </p>
-                                  )}
                               </div>
                             </>
                           ) : (
-                            <div className="bg-white p-4 rounded-lg border border-gray-300 col-span-2">
-                              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                            <div className="bg-white p-4 rounded-lg border col-span-3">
+                              <label className="block text-xs font-semibold mb-3">
                                 Компоненты газа (м³)
                               </label>
                               <div className="grid grid-cols-2 gap-3">
@@ -1466,19 +1037,17 @@ const GasSettlementsDataList = () => {
                                   </label>
                                   <NumericFormat
                                     value={item.gasByMeter || ""}
-                                    onValueChange={(values) => {
-                                      const { floatValue } = values;
+                                    onValueChange={({ floatValue }) =>
                                       handleEditChange(
                                         index,
                                         "gasByMeter",
-                                        floatValue || "",
-                                      );
-                                    }}
+                                        floatValue || ""
+                                      )
+                                    }
                                     thousandSeparator=" "
-                                    decimalScale={2}
-                                    allowNegative={false}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                    placeholder="0.00"
+                                    decimalScale={5}
+                                    className="w-full p-2 border rounded"
+                                    placeholder="0.00000"
                                   />
                                 </div>
                                 <div>
@@ -1486,20 +1055,21 @@ const GasSettlementsDataList = () => {
                                     Ошибка конфигурации
                                   </label>
                                   <NumericFormat
-                                    value={item.confError || ""}
-                                    onValueChange={(values) => {
-                                      const { floatValue } = values;
+                                    value={item.confError ?? ""}
+                                    onValueChange={({ floatValue }) =>
                                       handleEditChange(
                                         index,
                                         "confError",
-                                        floatValue || "",
-                                      );
-                                    }}
+                                        floatValue === undefined
+                                          ? ""
+                                          : floatValue
+                                      )
+                                    }
                                     thousandSeparator=" "
-                                    decimalScale={2}
-                                    allowNegative={false}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                    placeholder="0.00"
+                                    decimalScale={5}
+                                    allowNegative={true}
+                                    className="w-full p-2 border rounded"
+                                    placeholder="0.00000"
                                   />
                                 </div>
                                 <div>
@@ -1508,49 +1078,100 @@ const GasSettlementsDataList = () => {
                                   </label>
                                   <NumericFormat
                                     value={item.lowPress || ""}
-                                    onValueChange={(values) => {
-                                      const { floatValue } = values;
+                                    onValueChange={({ floatValue }) =>
                                       handleEditChange(
                                         index,
                                         "lowPress",
-                                        floatValue || "",
-                                      );
-                                    }}
+                                        floatValue || ""
+                                      )
+                                    }
                                     thousandSeparator=" "
-                                    decimalScale={2}
-                                    allowNegative={false}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                    placeholder="0.00"
+                                    decimalScale={5}
+                                    className="w-full p-2 border rounded"
+                                    placeholder="0.00000"
                                   />
                                 </div>
+                                {/* 🔥 Верхний предел */}
                                 <div>
-                                  <label className="block text-xs text-gray-600 mb-1">
-                                    По акту
+                                  <label className="block text-xs text-pink-600 font-semibold mb-1">
+                                    Верхний предел (зашкал)
                                   </label>
                                   <NumericFormat
-                                    value={item.gasAct || ""}
-                                    onValueChange={(values) => {
-                                      const { floatValue } = values;
+                                    value={item.highLimit || ""}
+                                    onValueChange={({ floatValue }) =>
+                                      handleEditChange(
+                                        index,
+                                        "highLimit",
+                                        floatValue || ""
+                                      )
+                                    }
+                                    thousandSeparator=" "
+                                    decimalScale={5}
+                                    className="w-full p-2 border border-pink-300 rounded bg-pink-50"
+                                    placeholder="0.00000"
+                                  />
+                                </div>
+                                {/* 🔥 По акту — можно минус */}
+                                <div>
+                                  <label className="block text-xs text-gray-600 mb-1">
+                                    По акту (м³)
+                                  </label>
+                                  <NumericFormat
+                                    value={item.gasAct ?? ""}
+                                    onValueChange={({ floatValue }) =>
                                       handleEditChange(
                                         index,
                                         "gasAct",
-                                        floatValue || "",
-                                      );
-                                    }}
+                                        floatValue === undefined
+                                          ? ""
+                                          : floatValue
+                                      )
+                                    }
                                     thousandSeparator=" "
-                                    decimalScale={4}
-                                    allowNegative={false}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                    placeholder="0.00"
+                                    decimalScale={5}
+                                    allowNegative={true}
+                                    className="w-full p-2 border rounded"
+                                    placeholder="0.00000"
                                   />
+                                </div>
+                                {/* 🔥 Сумма акта — можно минус */}
+                                <div>
+                                  <label className="block text-xs text-orange-600 font-semibold mb-1">
+                                    Сумма акта (сум)
+                                  </label>
+                                  <NumericFormat
+                                    value={item.gasActAmount ?? ""}
+                                    onValueChange={({ floatValue }) =>
+                                      handleEditChange(
+                                        index,
+                                        "gasActAmount",
+                                        floatValue === undefined
+                                          ? ""
+                                          : floatValue
+                                      )
+                                    }
+                                    thousandSeparator=" "
+                                    decimalScale={5}
+                                    allowNegative={true}
+                                    className="w-full p-2 border border-orange-300 rounded bg-orange-50"
+                                    placeholder="0.00000"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-orange-600 font-semibold mb-1">
+                                    Цена акта (сум/м³)
+                                  </label>
+                                  <div className="w-full p-2 border border-orange-200 rounded bg-orange-50 font-mono text-sm text-orange-700">
+                                    {actPrice !== 0 ? actPrice.toFixed(2) : "-"}
+                                  </div>
                                 </div>
                               </div>
                             </div>
                           )}
 
-                          {/* Расчетные поля */}
-                          <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
-                            <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          {/* Расчётные значения */}
+                          <div className="bg-gray-100 p-4 rounded-lg border">
+                            <label className="block text-xs font-semibold mb-3">
                               Расчетные значения
                             </label>
                             <div className="space-y-3">
@@ -1559,79 +1180,65 @@ const GasSettlementsDataList = () => {
                                   Всего газа (м³)
                                 </div>
                                 <div className="text-lg font-mono font-bold">
-                                  {derived.totalGas ? (
-                                    <NumericFormat
-                                      value={derived.totalGas}
-                                      displayType="text"
-                                      thousandSeparator=" "
-                                      decimalScale={2}
-                                    />
-                                  ) : (
-                                    "-"
-                                  )}
+                                  {derived.totalGas
+                                    ? derived.totalGas.toFixed(2)
+                                    : "-"}
                                 </div>
-                              </div>
-                              <div>
-                                <div className="text-xs text-gray-600 mb-1">
-                                  Сумма газа (сум)
-                                </div>
-                                <div className="text-lg font-mono font-bold text-blue-600">
-                                  {derived.amountOfGas ? (
-                                    <NumericFormat
-                                      value={derived.amountOfGas}
-                                      displayType="text"
-                                      thousandSeparator=" "
-                                      decimalScale={0}
-                                    />
-                                  ) : (
-                                    "-"
-                                  )}
-                                </div>
-                                {derived.totalGas && (
-                                  <p className="text-xs text-gray-500">
-                                    <NumericFormat
-                                      value={derived.totalGas}
-                                      displayType="text"
-                                      thousandSeparator=" "
-                                      decimalScale={2}
-                                    />{" "}
-                                    м³ ×{" "}
-                                    <NumericFormat
-                                      value={derived.price}
-                                      displayType="text"
-                                      thousandSeparator=" "
-                                      decimalScale={0}
-                                    />{" "}
-                                    сум/м³
+                                {!useCalculatedConsumption && (
+                                  <p className="text-[10px] text-gray-500 leading-tight mt-1">
+                                    = по счётчику +{" "}
+                                    <span className="text-orange-600 font-semibold">
+                                      округл. сумма (
+                                      {derived.roundedConfLowHigh})
+                                    </span>{" "}
+                                    + акт
                                   </p>
                                 )}
                               </div>
                               <div>
                                 <div className="text-xs text-gray-600 mb-1">
-                                  Оплата (сум)
+                                  Сумма газа
+                                </div>
+                                <div className="text-lg font-mono font-bold text-blue-600">
+                                  {derived.amountOfGas
+                                    ? Math.round(
+                                        derived.amountOfGas
+                                      ).toLocaleString("ru-RU")
+                                    : "-"}
+                                </div>
+                                {!useCalculatedConsumption && (
+                                  <p className="text-[10px] text-gray-500 leading-tight mt-1">
+                                    = (по счётчику +{" "}
+                                    <span className="text-orange-600 font-semibold">
+                                      округл. сумма
+                                    </span>
+                                    ) × цена + сумма акта
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-600 mb-1">
+                                  Оплата
                                 </div>
                                 <NumericFormat
                                   value={item.payment || ""}
-                                  onValueChange={(values) => {
-                                    const { floatValue } = values;
+                                  onValueChange={({ floatValue }) =>
                                     handleEditChange(
                                       index,
                                       "payment",
-                                      floatValue || "",
-                                    );
-                                  }}
+                                      floatValue || ""
+                                    )
+                                  }
                                   thousandSeparator=" "
-                                  decimalScale={0}
-                                  allowNegative={false}
-                                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 font-mono"
-                                  placeholder="0"
+                                  decimalScale={2}
+                                  className="w-full p-2 border rounded font-mono"
                                 />
                               </div>
                             </div>
                           </div>
                         </div>
 
-                        {/* Сводка по станции */}
+                        {/* 🔥 САЛЬДО НА НАЧАЛО И НА КОНЕЦ */}
                         <div className="mt-4 pt-4 border-t border-blue-200">
                           <div className="grid grid-cols-2 gap-4">
                             <div>
@@ -1639,14 +1246,15 @@ const GasSettlementsDataList = () => {
                                 Сальдо на начало:
                               </span>
                               <span
-                                className={`font-bold ml-2 ${startBalance >= 0 ? "text-red-600" : "text-green-600"}`}
+                                className={`font-bold ml-2 ${
+                                  startBalance >= 0
+                                    ? "text-red-600"
+                                    : "text-green-600"
+                                }`}
                               >
-                                <NumericFormat
-                                  value={startBalance}
-                                  displayType="text"
-                                  thousandSeparator=" "
-                                  decimalScale={0}
-                                />{" "}
+                                {Math.round(startBalance).toLocaleString(
+                                  "ru-RU"
+                                )}{" "}
                                 сум
                               </span>
                             </div>
@@ -1655,14 +1263,13 @@ const GasSettlementsDataList = () => {
                                 Сальдо на конец:
                               </span>
                               <span
-                                className={`font-bold ml-2 ${endBalance >= 0 ? "text-red-600" : "text-green-600"}`}
+                                className={`font-bold ml-2 ${
+                                  endBalance >= 0
+                                    ? "text-red-600"
+                                    : "text-green-600"
+                                }`}
                               >
-                                <NumericFormat
-                                  value={endBalance}
-                                  displayType="text"
-                                  thousandSeparator=" "
-                                  decimalScale={0}
-                                />{" "}
+                                {Math.round(endBalance).toLocaleString("ru-RU")}{" "}
                                 сум
                               </span>
                             </div>
@@ -1675,34 +1282,20 @@ const GasSettlementsDataList = () => {
               </div>
 
               <div className="bg-gray-50 px-6 py-4 border-t flex justify-between items-center">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                <button
                   onClick={() => setEditModal(false)}
                   disabled={saving}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                  className="px-6 py-3 border rounded-lg"
                 >
                   Отмена
-                </motion.button>
-
-                <div className="flex items-center gap-4">
-                  {saving && (
-                    <div className="flex items-center gap-2 text-blue-600">
-                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500"></div>
-                      <span className="text-sm">Сохранение...</span>
-                    </div>
-                  )}
-
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleSaveEdit}
-                    disabled={saving}
-                    className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {saving ? "Сохранение..." : "Сохранить изменения"}
-                  </motion.button>
-                </div>
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={saving}
+                  className="px-8 py-3 bg-green-600 text-white rounded-lg disabled:opacity-50"
+                >
+                  {saving ? "Сохранение..." : "Сохранить изменения"}
+                </button>
               </div>
             </motion.div>
           </div>

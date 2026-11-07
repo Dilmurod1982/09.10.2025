@@ -451,6 +451,26 @@ export default function Navbar() {
       icon: <AccountBalanceWalletIcon />,
       path: "/controlpayments",
     },
+    // 🔥 НОВЫЙ ПУНКТ для rahbar
+    {
+      text: "Электр энергия ҳисоблагичлари",
+      icon: <BoltIcon />,
+      path: "/electric-meters",
+      roles: ["rahbar"],
+    },
+    // 🔥 НОВЫЕ ПУНКТЫ для mechanic
+    {
+      text: "Кунлик электр ҳисоблагич кўрсаткичлари",
+      icon: <BoltIcon />,
+      path: "/electric-readings",
+      roles: ["mechanic"],
+    },
+    {
+      text: "Электр кўрсаткичлари тахлили",
+      icon: <AnalyticsIcon />,
+      path: "/electric-analytics",
+      roles: ["mechanic"],
+    },
   ];
 
   const energySettlementsItems = [
@@ -588,12 +608,25 @@ export default function Navbar() {
         return [];
       case "partner":
         return []; // У партнёра своё меню ниже
+      case "mechanic":
+        return []; // 🔥 У механика Drawer пустой по основным пунктам
       default:
         return [];
     }
   };
 
   const filteredMenuItems = getFilteredMenuItems();
+
+  // 🔥 Фильтр dailyReportsItems по роли
+  const getFilteredDailyReportsItems = () => {
+    if (!role) return [];
+    return dailyReportsItems.filter((item) => {
+      if (!item.roles) return true;
+      return item.roles.includes(role);
+    });
+  };
+
+  const filteredDailyReportsItems = getFilteredDailyReportsItems();
 
   const canSeeZeroSeal = () => {
     if (!role) return false;
@@ -602,6 +635,10 @@ export default function Navbar() {
 
   const shouldShowDocumentButtonsInNavbar = () => {
     if (!role) return false;
+
+    // 🔥 Механик — всегда видит верхние кнопки с документами
+    if (role === "mechanic") return true;
+
     const isRahbarOrBooker = ["rahbar", "buxgalter", "nazoratbux"].includes(
       role
     );
@@ -624,6 +661,7 @@ export default function Navbar() {
       "nazoratbux",
       "metrolog-hududgaz",
       "partner",
+      "mechanic", // 🔥 ДОБАВЛЕНО
     ].includes(role);
   };
 
@@ -637,6 +675,7 @@ export default function Navbar() {
       nazoratbux: { color: "#ec4899", text: "Назорат бухгалтер" },
       "metrolog-hududgaz": { color: "#06b6d4", text: "Метролог Ҳудудгаз" },
       partner: { color: "#0ea5e9", text: "Ҳамкор" },
+      mechanic: { color: "#f97316", text: "🔧 Механик" },
     };
 
     const config = roleConfig[role] || { color: "#6b7280", text: role };
@@ -1121,6 +1160,100 @@ export default function Navbar() {
                   </>
                 )}
 
+                {/* 🔧 МЕНЮ МЕХАНИКА — кундалик электр ҳисоботлари */}
+                {role === "mechanic" && (
+                  <>
+                    <ListItem disablePadding sx={{ mb: 1 }}>
+                      <ListItemButton
+                        onClick={() => handleMenuClick("/homemechanic")}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                            transform: "translateX(5px)",
+                          },
+                        }}
+                      >
+                        <ListItemIcon sx={{ color: "white" }}>
+                          <DashboardIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="🏠 Асосий саҳифа"
+                          primaryTypographyProps={{
+                            fontSize: "15px",
+                            fontWeight: "500",
+                            color: "white",
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+
+                    <Divider
+                      sx={{ my: 2, borderColor: "rgba(255,255,255,0.1)" }}
+                    />
+
+                    <ListItem disablePadding sx={{ mb: 1 }}>
+                      <ListItemButton
+                        onClick={() => handleMenuClick("/electric-readings")}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                            transform: "translateX(5px)",
+                          },
+                        }}
+                      >
+                        <ListItemIcon sx={{ color: "white" }}>
+                          <BoltIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="⚡ Кунлик электр ҳисоблагич кўрсаткичлари"
+                          primaryTypographyProps={{
+                            fontSize: "14px",
+                            fontWeight: "500",
+                            color: "white",
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+
+                    <ListItem disablePadding sx={{ mb: 1 }}>
+                      <ListItemButton
+                        onClick={() => handleMenuClick("/electric-analytics")}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                            transform: "translateX(5px)",
+                          },
+                        }}
+                      >
+                        <ListItemIcon sx={{ color: "white" }}>
+                          <AnalyticsIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="📊 Электр кўрсаткичлари тахлили"
+                          primaryTypographyProps={{
+                            fontSize: "14px",
+                            fontWeight: "500",
+                            color: "white",
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+
+                    <Divider
+                      sx={{ my: 2, borderColor: "rgba(255,255,255,0.1)" }}
+                    />
+                  </>
+                )}
+
                 {/* 🔹 Документы для rahbar/buxgalter/nazoratbux (на мобильных) */}
                 {(role === "rahbar" ||
                   role === "buxgalter" ||
@@ -1473,91 +1606,91 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Ежедневные отчеты */}
+                {/* 🔹 Ежедневные отчеты (Кундалик ҳисоботлар) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "operator" ||
                   role === "rahbar" ||
-                  role === "nazoratbux") && (
-                  <>
-                    <ListItem disablePadding sx={{ mb: 1 }}>
-                      <ListItemButton
-                        onClick={handleDailyReportsClick}
-                        sx={{
-                          borderRadius: "12px",
-                          py: 1.5,
-                          transition: "all 0.3s ease",
-                          "&:hover": {
-                            backgroundColor: "rgba(255,255,255,0.1)",
-                          },
-                        }}
+                  role === "nazoratbux" ||
+                  role === "mechanic") &&
+                  filteredDailyReportsItems.length > 0 && (
+                    <>
+                      <ListItem disablePadding sx={{ mb: 1 }}>
+                        <ListItemButton
+                          onClick={handleDailyReportsClick}
+                          sx={{
+                            borderRadius: "12px",
+                            py: 1.5,
+                            transition: "all 0.3s ease",
+                            "&:hover": {
+                              backgroundColor: "rgba(255,255,255,0.1)",
+                            },
+                          }}
+                        >
+                          <ListItemIcon sx={{ color: "white" }}>
+                            <SummarizeIcon />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary="📊 Кундалик ҳисоботлар"
+                            primaryTypographyProps={{ fontWeight: "500" }}
+                          />
+                          {dailyReportsOpen ? <ExpandLess /> : <ExpandMore />}
+                        </ListItemButton>
+                      </ListItem>
+                      <Collapse
+                        in={dailyReportsOpen}
+                        timeout="auto"
+                        unmountOnExit
                       >
-                        <ListItemIcon sx={{ color: "white" }}>
-                          <SummarizeIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="📊 Кундалик ҳисоботлар"
-                          primaryTypographyProps={{ fontWeight: "500" }}
-                        />
-                        {dailyReportsOpen ? <ExpandLess /> : <ExpandMore />}
-                      </ListItemButton>
-                    </ListItem>
-                    <Collapse
-                      in={dailyReportsOpen}
-                      timeout="auto"
-                      unmountOnExit
-                    >
-                      <List component="div" disablePadding>
-                        {dailyReportsItems
-                          .filter((item) => {
-                            if (role === "nazoratbux") {
+                        <List component="div" disablePadding>
+                          {filteredDailyReportsItems
+                            .filter((item) => {
+                              if (role === "nazoratbux") return true;
+                              if (role === "operator") {
+                                return item.text !== "Назорат суммалар";
+                              }
                               return true;
-                            }
-                            if (role === "operator") {
-                              return item.text !== "Назорат суммалар";
-                            }
-                            return true;
-                          })
-                          .map((item) => (
-                            <ListItem
-                              key={item.text}
-                              disablePadding
-                              sx={{ pl: 2 }}
-                            >
-                              <ListItemButton
-                                onClick={() => handleMenuClick(item.path)}
-                                sx={{
-                                  borderRadius: "8px",
-                                  py: 1.2,
-                                  transition: "all 0.3s ease",
-                                  "&:hover": {
-                                    backgroundColor: "rgba(255,255,255,0.08)",
-                                    transform: "translateX(5px)",
-                                  },
-                                }}
+                            })
+                            .map((item) => (
+                              <ListItem
+                                key={item.text}
+                                disablePadding
+                                sx={{ pl: 2 }}
                               >
-                                <ListItemIcon
+                                <ListItemButton
+                                  onClick={() => handleMenuClick(item.path)}
                                   sx={{
-                                    minWidth: "40px",
-                                    color: "rgba(255,255,255,0.8)",
+                                    borderRadius: "8px",
+                                    py: 1.2,
+                                    transition: "all 0.3s ease",
+                                    "&:hover": {
+                                      backgroundColor: "rgba(255,255,255,0.08)",
+                                      transform: "translateX(5px)",
+                                    },
                                   }}
                                 >
-                                  {item.icon}
-                                </ListItemIcon>
-                                <ListItemText
-                                  primary={item.text}
-                                  primaryTypographyProps={{
-                                    fontSize: "14px",
-                                    color: "rgba(255,255,255,0.9)",
-                                  }}
-                                />
-                              </ListItemButton>
-                            </ListItem>
-                          ))}
-                      </List>
-                    </Collapse>
-                  </>
-                )}
+                                  <ListItemIcon
+                                    sx={{
+                                      minWidth: "40px",
+                                      color: "rgba(255,255,255,0.8)",
+                                    }}
+                                  >
+                                    {item.icon}
+                                  </ListItemIcon>
+                                  <ListItemText
+                                    primary={item.text}
+                                    primaryTypographyProps={{
+                                      fontSize: "14px",
+                                      color: "rgba(255,255,255,0.9)",
+                                    }}
+                                  />
+                                </ListItemButton>
+                              </ListItem>
+                            ))}
+                        </List>
+                      </Collapse>
+                    </>
+                  )}
 
                 {/* 🔹 Документы (admin, metrolog-hududgaz) */}
                 {shouldShowDocumentsSection() && (
