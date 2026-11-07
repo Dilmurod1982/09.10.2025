@@ -65,3 +65,4 @@ export { default as ElectricAnalytics } from "./ElectricAnalytics";
 export { default as ElectricMeters } from "./ElectricMeters";
 export { default as ElectricReadings } from "./ElectricReadings";
 export { default as StationElectricMeters } from "./StationElectricMeters";
+export { default as ElectricMeterReadings } from "./ElectricMeterReadings";

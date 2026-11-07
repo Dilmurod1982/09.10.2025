@@ -65,6 +65,7 @@ import {
   StationElectricMeters,
   ElectricReadings,
   ElectricAnalytics,
+  ElectricMeterReadings,
 } from "./pages";
 import HomePartner from "./pages/HomePartner";
 import PartnerStatement from "./pages/PartnerStatement";
@@ -323,6 +324,15 @@ function App() {
             <ProtectedLayout
               allowedRoles={["rahbar"]}
               element={<ElectricMeters />}
+            />
+          ),
+        },
+        {
+          path: "/electric-readings/:meterId",
+          element: (
+            <ProtectedLayout
+              allowedRoles={["mechanic"]}
+              element={<ElectricMeterReadings />}
             />
           ),
         },

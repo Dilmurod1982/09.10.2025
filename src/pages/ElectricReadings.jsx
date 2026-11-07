@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAppStore } from "../lib/zustand";
 import { db } from "../firebase/config";
@@ -10,15 +11,14 @@ import {
   doc,
   getDoc,
 } from "firebase/firestore";
-import AddElectricReadingModal from "../components/electric/AddElectricReadingModal";
 
 const ElectricReadings = () => {
+  const navigate = useNavigate();
   const userData = useAppStore((state) => state.userData);
   const managedStations = userData?.stations || [];
 
   const [meters, setMeters] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMeter, setSelectedMeter] = useState(null);
 
   const loadData = async () => {
     try {
@@ -115,9 +115,9 @@ const ElectricReadings = () => {
               );
               lastReading = readings[0];
             }
-            return { ...m, lastReading };
+            return { ...m, lastReading, readingsCount: rSnap.size };
           } catch (e) {
-            return { ...m, lastReading: null };
+            return { ...m, lastReading: null, readingsCount: 0 };
           }
         })
       );
@@ -149,7 +149,7 @@ const ElectricReadings = () => {
           ⚡ Кунлик электр ҳисоблагич кўрсаткичлари
         </h1>
         <p className="text-sm sm:text-base text-gray-500 mt-1">
-          Ҳисоблагични танлаб, янги кўрсаткич киритинг
+          Ҳисоблагични танланг — кўрсаткичлар рўйхати очилади
         </p>
       </div>
 
@@ -171,7 +171,7 @@ const ElectricReadings = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.03 }}
-              onClick={() => setSelectedMeter(m)}
+              onClick={() => navigate(`/electric-readings/${m.id}`)}
               className="bg-white rounded-2xl shadow-md p-4 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all border border-gray-100 active:scale-95"
             >
               <div className="flex items-start gap-3 mb-3">
@@ -209,25 +209,22 @@ const ElectricReadings = () => {
                       : "—"}
                   </span>
                 </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-gray-500 flex-shrink-0">
+                    Кўрсаткичлар:
+                  </span>
+                  <span className="font-mono text-gray-700">
+                    {m.readingsCount || 0}
+                  </span>
+                </div>
               </div>
 
               <div className="mt-3 pt-3 border-t border-gray-100 text-sm text-blue-600 font-medium">
-                Кўрсаткич киритиш →
+                Кўрсаткичлар рўйхати →
               </div>
             </motion.div>
           ))}
         </div>
-      )}
-
-      {selectedMeter && (
-        <AddElectricReadingModal
-          meter={selectedMeter}
-          onClose={() => setSelectedMeter(null)}
-          onSaved={() => {
-            setSelectedMeter(null);
-            loadData();
-          }}
-        />
       )}
     </div>
   );
