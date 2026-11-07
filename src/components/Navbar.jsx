@@ -451,14 +451,12 @@ export default function Navbar() {
       icon: <AccountBalanceWalletIcon />,
       path: "/controlpayments",
     },
-    // 🔥 НОВЫЙ ПУНКТ для rahbar
     {
       text: "Электр энергия ҳисоблагичлари",
       icon: <BoltIcon />,
       path: "/electric-meters",
       roles: ["rahbar"],
     },
-    // 🔥 НОВЫЕ ПУНКТЫ для mechanic
     {
       text: "Кунлик электр ҳисоблагич кўрсаткичлари",
       icon: <BoltIcon />,
@@ -579,7 +577,6 @@ export default function Navbar() {
     },
   ];
 
-  // ⚙️ ФИЛЬТРАЦИЯ ПУНКТОВ ПО РОЛИ
   const getFilteredMenuItems = () => {
     if (!role) return [];
 
@@ -607,9 +604,9 @@ export default function Navbar() {
       case "metrolog-hududgaz":
         return [];
       case "partner":
-        return []; // У партнёра своё меню ниже
+        return [];
       case "mechanic":
-        return []; // 🔥 У механика Drawer пустой по основным пунктам
+        return [];
       default:
         return [];
     }
@@ -617,7 +614,6 @@ export default function Navbar() {
 
   const filteredMenuItems = getFilteredMenuItems();
 
-  // 🔥 Фильтр dailyReportsItems по роли
   const getFilteredDailyReportsItems = () => {
     if (!role) return [];
     return dailyReportsItems.filter((item) => {
@@ -636,7 +632,6 @@ export default function Navbar() {
   const shouldShowDocumentButtonsInNavbar = () => {
     if (!role) return false;
 
-    // 🔥 Механик — всегда видит верхние кнопки с документами
     if (role === "mechanic") return true;
 
     const isRahbarOrBooker = ["rahbar", "buxgalter", "nazoratbux"].includes(
@@ -650,7 +645,6 @@ export default function Navbar() {
     return role === "admin" || role === "metrolog-hududgaz";
   };
 
-  // Список ролей, у которых есть доступ к Drawer
   const hasDrawerAccess = () => {
     return [
       "admin",
@@ -661,7 +655,7 @@ export default function Navbar() {
       "nazoratbux",
       "metrolog-hududgaz",
       "partner",
-      "mechanic", // 🔥 ДОБАВЛЕНО
+      "mechanic",
     ].includes(role);
   };
 
@@ -694,6 +688,7 @@ export default function Navbar() {
           fontSize: "0.75rem",
           fontWeight: "600",
           ml: 1,
+          whiteSpace: "nowrap",
         }}
       >
         {config.text}
@@ -710,7 +705,15 @@ export default function Navbar() {
           boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
         }}
       >
-        <Toolbar sx={{ minHeight: { xs: "64px", md: "70px" } }}>
+        <Toolbar
+          sx={{
+            minHeight: { xs: "56px", sm: "64px", md: "70px" },
+            px: { xs: 1, sm: 2 },
+            gap: { xs: 0.5, sm: 1 },
+            flexWrap: "nowrap",
+            overflow: "hidden",
+          }}
+        >
           {hasDrawerAccess() ? (
             <IconButton
               size="large"
@@ -718,7 +721,9 @@ export default function Navbar() {
               color="inherit"
               aria-label="menu"
               sx={{
-                mr: 2,
+                mr: { xs: 0.5, sm: 1.5, md: 2 },
+                p: { xs: 0.75, sm: 1 },
+                flexShrink: 0,
                 transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 "&:hover": {
                   transform: "rotate(90deg)",
@@ -727,10 +732,19 @@ export default function Navbar() {
               }}
               onClick={toggleDrawer(true)}
             >
-              <MenuIcon />
+              <MenuIcon fontSize="small" />
             </IconButton>
           ) : null}
-          <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
+
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              flexGrow: 1,
+              minWidth: 0,
+              overflow: "hidden",
+            }}
+          >
             <Typography
               variant="h6"
               component="div"
@@ -747,29 +761,50 @@ export default function Navbar() {
                   transform: "translateY(-1px)",
                   filter: "brightness(1.1)",
                 },
-                fontSize: { xs: "1.1rem", md: "1.25rem" },
+                fontSize: { xs: "0.95rem", sm: "1.1rem", md: "1.25rem" },
                 display: "flex",
                 alignItems: "center",
-                gap: 1,
+                gap: { xs: 0.5, sm: 1 },
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
             >
               <DashboardIcon
-                sx={{ fontSize: { xs: "1.2rem", md: "1.5rem" } }}
+                sx={{ fontSize: { xs: "1rem", sm: "1.2rem", md: "1.5rem" } }}
               />
-              Метан Система
+              <Box
+                component="span"
+                sx={{
+                  display: { xs: "none", sm: "inline" },
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Метан Система
+              </Box>
             </Typography>
 
-            {!isMobile && getRoleBadge()}
+            <Box sx={{ display: { xs: "none", md: "block" } }}>
+              {getRoleBadge()}
+            </Box>
           </Box>
+
           {shouldShowDocumentButtonsInNavbar() && (
-            <Box sx={{ display: "flex", gap: 1, mr: 3 }}>
+            <Box
+              sx={{
+                display: { xs: "none", lg: "flex" },
+                gap: 1,
+                mr: { sm: 1, md: 3 },
+                flexShrink: 0,
+              }}
+            >
               <Button
                 color="inherit"
                 onClick={() => navigate("/employeesdocdeadline")}
                 sx={{
                   textTransform: "none",
                   borderRadius: "25px",
-                  padding: "8px 20px",
+                  padding: "8px 16px",
                   transition: "all 0.3s ease",
                   background: "rgba(255,255,255,0.1)",
                   backdropFilter: "blur(10px)",
@@ -779,11 +814,12 @@ export default function Navbar() {
                     transform: "translateY(-2px)",
                     boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                   },
-                  fontSize: "0.9rem",
+                  fontSize: "0.85rem",
                   fontWeight: "500",
+                  whiteSpace: "nowrap",
                 }}
               >
-                📄 Муддатлар бўйича хужжатлар
+                📄 Муддатлар бўйича
               </Button>
               <Button
                 color="inherit"
@@ -791,7 +827,7 @@ export default function Navbar() {
                 sx={{
                   textTransform: "none",
                   borderRadius: "25px",
-                  padding: "8px 20px",
+                  padding: "8px 16px",
                   transition: "all 0.3s ease",
                   background: "rgba(255,255,255,0.1)",
                   backdropFilter: "blur(10px)",
@@ -801,40 +837,46 @@ export default function Navbar() {
                     transform: "translateY(-2px)",
                     boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                   },
-                  fontSize: "0.9rem",
+                  fontSize: "0.85rem",
                   fontWeight: "500",
+                  whiteSpace: "nowrap",
                 }}
               >
-                ∞ Муддатсиз хужжатлар
+                ∞ Муддатсиз
               </Button>
             </Box>
           )}
+
           {userData && (
-            <div className="relative inline-block">
+            <div className="relative inline-block flex-shrink-0">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setUserMenuOpen(!userMenuOpen);
                 }}
-                className="flex items-center gap-2 mr-4 text-white rounded-full px-3 py-2 md:px-4 md:py-2 transition-all duration-300 hover:bg-white/20 hover:translate-y-[-2px] hover:shadow-lg backdrop-blur-sm border border-white/20 min-w-0"
+                className="flex items-center gap-1 sm:gap-2 mr-1 sm:mr-2 md:mr-4 text-white rounded-full px-2 py-1.5 sm:px-3 sm:py-2 md:px-4 md:py-2 transition-all duration-300 hover:bg-white/20 hover:translate-y-[-2px] hover:shadow-lg backdrop-blur-sm border border-white/20 min-w-0 max-w-[140px] sm:max-w-none"
                 style={{
                   background: "rgba(255,255,255,0.1)",
                 }}
               >
-                <PersonIcon className="w-4 h-4 md:w-5 md:h-5" />
-                <span
-                  className={`font-medium text-sm md:text-base ${
-                    isMobile ? "hidden sm:block" : "block"
-                  } truncate max-w-[80px] sm:max-w-[120px] md:max-w-[150px]`}
-                >
-                  {isMobile ? getShortName() : getUserFullName()}
+                <PersonIcon className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                <span className="font-medium text-xs sm:text-sm md:text-base hidden sm:block truncate max-w-[70px] sm:max-w-[100px] md:max-w-[150px]">
+                  {getShortName()}
                 </span>
-                {isMobile && getRoleBadge()}
               </button>
 
               {userMenuOpen && (
                 <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-in fade-in-0 zoom-in-95">
                   <div className="p-0">
+                    <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {getUserFullName()}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {userData?.email}
+                      </p>
+                    </div>
+
                     <button
                       onClick={() => {
                         setUserMenuOpen(false);
@@ -865,12 +907,14 @@ export default function Navbar() {
               )}
             </div>
           )}
+
           <Button
             onClick={signOutProfile}
             color="inherit"
             sx={{
               borderRadius: "25px",
-              padding: { xs: "6px 12px", md: "8px 20px" },
+              padding: { xs: "6px 8px", sm: "6px 12px", md: "8px 20px" },
+              minWidth: { xs: "36px", sm: "auto" },
               transition: "all 0.3s ease",
               background: "rgba(255,255,255,0.1)",
               backdropFilter: "blur(10px)",
@@ -881,14 +925,21 @@ export default function Navbar() {
                 boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
               },
               fontWeight: "600",
-              fontSize: { xs: "0.8rem", md: "0.9rem" },
+              fontSize: { xs: "0.75rem", sm: "0.8rem", md: "0.9rem" },
               display: "flex",
               alignItems: "center",
-              gap: 1,
+              gap: { xs: 0, sm: 1 },
+              flexShrink: 0,
+              whiteSpace: "nowrap",
             }}
           >
-            {!isMobile && <LogoutIcon sx={{ fontSize: 18 }} />}
-            {isMobile ? "Чиқиш" : "ЧИҚИШ"}
+            <LogoutIcon sx={{ fontSize: { xs: 16, sm: 18 } }} />
+            <Box
+              component="span"
+              sx={{ display: { xs: "none", sm: "inline" } }}
+            >
+              ЧИҚИШ
+            </Box>
           </Button>
         </Toolbar>
       </AppBar>
@@ -1097,7 +1148,6 @@ export default function Navbar() {
 
             <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
               <List sx={{ padding: "8px" }}>
-                {/* 🤝 МЕНЮ ПАРТНЁРА — только оборотка */}
                 {role === "partner" && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
@@ -1160,7 +1210,6 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔧 МЕНЮ МЕХАНИКА — кундалик электр ҳисоботлари */}
                 {role === "mechanic" && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
@@ -1254,7 +1303,6 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Документы для rahbar/buxgalter/nazoratbux (на мобильных) */}
                 {(role === "rahbar" ||
                   role === "buxgalter" ||
                   role === "nazoratbux") &&
@@ -1325,7 +1373,6 @@ export default function Navbar() {
                     </>
                   )}
 
-                {/* 🔹 Ноллаш ва пломбалаш */}
                 {canSeeZeroSeal() && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
@@ -1393,7 +1440,6 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Основные пункты */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "rahbar" ||
@@ -1440,7 +1486,6 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Расчеты по энергоносителям */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "rahbar" ||
@@ -1516,7 +1561,6 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Партнеры */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "rahbar" ||
@@ -1606,7 +1650,6 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Ежедневные отчеты (Кундалик ҳисоботлар) */}
                 {(role === "admin" ||
                   role === "buxgalter" ||
                   role === "operator" ||
@@ -1692,7 +1735,6 @@ export default function Navbar() {
                     </>
                   )}
 
-                {/* 🔹 Документы (admin, metrolog-hududgaz) */}
                 {shouldShowDocumentsSection() && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
@@ -2007,7 +2049,6 @@ export default function Navbar() {
                   </>
                 )}
 
-                {/* 🔹 Оборудование */}
                 {(role === "admin" || role === "nazoratbux") && (
                   <>
                     <ListItem disablePadding sx={{ mb: 1 }}>
