@@ -440,16 +440,20 @@ export default function Navbar() {
     },
   ];
 
+  // 🔥 ИСПРАВЛЕНО: у «Кундалик ҳисобот» и «Назорат суммалар» добавлены roles
+  // чтобы механик их не видел
   const dailyReportsItems = [
     {
       text: "Кундалик ҳисобот",
       icon: <SummarizeIcon />,
       path: "/generaldailyreport",
+      roles: ["admin", "buxgalter", "operator", "rahbar", "nazoratbux"],
     },
     {
       text: "Назорат суммалар",
       icon: <AccountBalanceWalletIcon />,
       path: "/controlpayments",
+      roles: ["admin", "buxgalter", "nazoratbux"],
     },
     {
       text: "Электр энергия ҳисоблагичлари",
@@ -614,6 +618,7 @@ export default function Navbar() {
 
   const filteredMenuItems = getFilteredMenuItems();
 
+  // 🔥 Фильтр dailyReportsItems по роли
   const getFilteredDailyReportsItems = () => {
     if (!role) return [];
     return dailyReportsItems.filter((item) => {
@@ -1650,90 +1655,76 @@ export default function Navbar() {
                   </>
                 )}
 
-                {(role === "admin" ||
-                  role === "buxgalter" ||
-                  role === "operator" ||
-                  role === "rahbar" ||
-                  role === "nazoratbux" ||
-                  role === "mechanic") &&
-                  filteredDailyReportsItems.length > 0 && (
-                    <>
-                      <ListItem disablePadding sx={{ mb: 1 }}>
-                        <ListItemButton
-                          onClick={handleDailyReportsClick}
-                          sx={{
-                            borderRadius: "12px",
-                            py: 1.5,
-                            transition: "all 0.3s ease",
-                            "&:hover": {
-                              backgroundColor: "rgba(255,255,255,0.1)",
-                            },
-                          }}
-                        >
-                          <ListItemIcon sx={{ color: "white" }}>
-                            <SummarizeIcon />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary="📊 Кундалик ҳисоботлар"
-                            primaryTypographyProps={{ fontWeight: "500" }}
-                          />
-                          {dailyReportsOpen ? <ExpandLess /> : <ExpandMore />}
-                        </ListItemButton>
-                      </ListItem>
-                      <Collapse
-                        in={dailyReportsOpen}
-                        timeout="auto"
-                        unmountOnExit
+                {filteredDailyReportsItems.length > 0 && (
+                  <>
+                    <ListItem disablePadding sx={{ mb: 1 }}>
+                      <ListItemButton
+                        onClick={handleDailyReportsClick}
+                        sx={{
+                          borderRadius: "12px",
+                          py: 1.5,
+                          transition: "all 0.3s ease",
+                          "&:hover": {
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                          },
+                        }}
                       >
-                        <List component="div" disablePadding>
-                          {filteredDailyReportsItems
-                            .filter((item) => {
-                              if (role === "nazoratbux") return true;
-                              if (role === "operator") {
-                                return item.text !== "Назорат суммалар";
-                              }
-                              return true;
-                            })
-                            .map((item) => (
-                              <ListItem
-                                key={item.text}
-                                disablePadding
-                                sx={{ pl: 2 }}
+                        <ListItemIcon sx={{ color: "white" }}>
+                          <SummarizeIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="📊 Кундалик ҳисоботлар"
+                          primaryTypographyProps={{ fontWeight: "500" }}
+                        />
+                        {dailyReportsOpen ? <ExpandLess /> : <ExpandMore />}
+                      </ListItemButton>
+                    </ListItem>
+                    <Collapse
+                      in={dailyReportsOpen}
+                      timeout="auto"
+                      unmountOnExit
+                    >
+                      <List component="div" disablePadding>
+                        {filteredDailyReportsItems.map((item) => (
+                          <ListItem
+                            key={item.text}
+                            disablePadding
+                            sx={{ pl: 2 }}
+                          >
+                            <ListItemButton
+                              onClick={() => handleMenuClick(item.path)}
+                              sx={{
+                                borderRadius: "8px",
+                                py: 1.2,
+                                transition: "all 0.3s ease",
+                                "&:hover": {
+                                  backgroundColor: "rgba(255,255,255,0.08)",
+                                  transform: "translateX(5px)",
+                                },
+                              }}
+                            >
+                              <ListItemIcon
+                                sx={{
+                                  minWidth: "40px",
+                                  color: "rgba(255,255,255,0.8)",
+                                }}
                               >
-                                <ListItemButton
-                                  onClick={() => handleMenuClick(item.path)}
-                                  sx={{
-                                    borderRadius: "8px",
-                                    py: 1.2,
-                                    transition: "all 0.3s ease",
-                                    "&:hover": {
-                                      backgroundColor: "rgba(255,255,255,0.08)",
-                                      transform: "translateX(5px)",
-                                    },
-                                  }}
-                                >
-                                  <ListItemIcon
-                                    sx={{
-                                      minWidth: "40px",
-                                      color: "rgba(255,255,255,0.8)",
-                                    }}
-                                  >
-                                    {item.icon}
-                                  </ListItemIcon>
-                                  <ListItemText
-                                    primary={item.text}
-                                    primaryTypographyProps={{
-                                      fontSize: "14px",
-                                      color: "rgba(255,255,255,0.9)",
-                                    }}
-                                  />
-                                </ListItemButton>
-                              </ListItem>
-                            ))}
-                        </List>
-                      </Collapse>
-                    </>
-                  )}
+                                {item.icon}
+                              </ListItemIcon>
+                              <ListItemText
+                                primary={item.text}
+                                primaryTypographyProps={{
+                                  fontSize: "14px",
+                                  color: "rgba(255,255,255,0.9)",
+                                }}
+                              />
+                            </ListItemButton>
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Collapse>
+                  </>
+                )}
 
                 {shouldShowDocumentsSection() && (
                   <>
