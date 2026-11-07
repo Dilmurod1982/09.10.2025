@@ -34,7 +34,6 @@ const getQuarterFromDate = (dateString) => {
   return "IV";
 };
 
-// 🔥 Первое число месяца из строки YYYY-MM-DD
 const getFirstDayOfMonth = (dateStr) => {
   if (!dateStr) return "";
   const [year, month] = dateStr.split("-");
@@ -49,9 +48,7 @@ const ElectricAnalytics = () => {
   const [allReadings, setAllReadings] = useState([]);
   const [gasReports, setGasReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [debugInfo, setDebugInfo] = useState(null);
 
-  // 🔥 Тип периода по умолчанию — "custom"
   const [periodType, setPeriodType] = useState("custom");
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -62,10 +59,8 @@ const ElectricAnalytics = () => {
   const [dateTo, setDateTo] = useState("");
   const [selectedMeterId, setSelectedMeterId] = useState("all");
 
-  // Флаг инициализации
-  const initializedFromLastReport = useRef(false);
+  const initializedFromLastReading = useRef(false);
 
-  // Загрузка данных
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -81,7 +76,6 @@ const ElectricAnalytics = () => {
           .filter(Boolean);
 
         if (managedUids.length === 0) {
-          setDebugInfo({ message: "Нет привязанных станций" });
           setLoading(false);
           return;
         }
@@ -143,7 +137,7 @@ const ElectricAnalytics = () => {
         }
         setMeters(metersList);
 
-        // 🔥 Показания счётчиков
+        // Показания
         const allReadingsList = [];
         if (metersList.length > 0) {
           const meterIds = metersList.map((m) => m.id);
@@ -164,7 +158,7 @@ const ElectricAnalytics = () => {
         }
         setAllReadings(allReadingsList);
 
-        // Газовые отчёты (для расчёта "Актив / Автопилот")
+        // Газовые отчёты
         const currentDate = new Date();
         const currentYear = currentDate.getFullYear();
         const currentMonth = currentDate.getMonth() + 1;
@@ -201,7 +195,6 @@ const ElectricAnalytics = () => {
           try {
             const collectionRef = collection(db, collectionName);
             const snapshot = await getDocs(collectionRef);
-
             snapshot.docs.forEach((d) => {
               const data = d.data();
               const reportStationId = String(data.stationId ?? "");
@@ -214,65 +207,31 @@ const ElectricAnalytics = () => {
               }
             });
           } catch (error) {
-            if (
-              error.code !== "not-found" &&
-              error.code !== "failed-precondition"
-            ) {
-              console.warn(`Ошибка в ${collectionName}:`, error.message);
-            }
+            /* пропускаем */
           }
         }
 
-        console.log("✅ Газовых отчётов:", gasReportsList.length);
-        console.log("✅ Показаний счётчиков:", allReadingsList.length);
-
         setGasReports(gasReportsList);
 
-        // 🔥 ИНИЦИАЛИЗАЦИЯ ФИЛЬТРОВ ПО ПОСЛЕДНЕМУ ПОКАЗАНИЮ СЧЁТЧИКА
-        if (allReadingsList.length > 0 && !initializedFromLastReport.current) {
-          // Сортируем показания по дате по убыванию
+        // 🔥 Инициализация фильтров по последнему показанию счётчика
+        if (allReadingsList.length > 0 && !initializedFromLastReading.current) {
           const sortedReadings = [...allReadingsList].sort((a, b) => {
             const da = a.readingDate || "";
             const db_ = b.readingDate || "";
             return db_.localeCompare(da);
           });
 
-          const lastReading = sortedReadings[0];
-          const lastReadingDate = lastReading.readingDate;
-
-          console.log("📅 Последнее показание счётчика:", lastReadingDate);
+          const lastReadingDate = sortedReadings[0]?.readingDate;
 
           if (lastReadingDate) {
-            const firstDayOfMonth = getFirstDayOfMonth(lastReadingDate);
-
-            console.log("📅 Дата от:", firstDayOfMonth);
-            console.log("📅 Дата до:", lastReadingDate);
-
             setPeriodType("custom");
-            setDateFrom(firstDayOfMonth);
+            setDateFrom(getFirstDayOfMonth(lastReadingDate));
             setDateTo(lastReadingDate);
-            initializedFromLastReport.current = true;
+            initializedFromLastReading.current = true;
           }
         }
-
-        setDebugInfo({
-          managedUids,
-          resolvedStationIds,
-          metersCount: metersList.length,
-          readingsCount: allReadingsList.length,
-          gasReportsCount: gasReportsList.length,
-          lastReadingDate:
-            allReadingsList.length > 0
-              ? [...allReadingsList].sort((a, b) => {
-                  const da = a.readingDate || "";
-                  const db_ = b.readingDate || "";
-                  return db_.localeCompare(da);
-                })[0]?.readingDate
-              : null,
-        });
       } catch (err) {
         console.error("Ошибка загрузки:", err);
-        setDebugInfo({ error: err.message });
       } finally {
         setLoading(false);
       }
@@ -280,7 +239,6 @@ const ElectricAnalytics = () => {
     loadData();
   }, [managedStations]);
 
-  // Границы периода
   const { startDate, endDate, periodLabel, isSingleDay } = useMemo(() => {
     if (periodType === "daily") {
       const d = new Date(selectedDate);
@@ -315,29 +273,21 @@ const ElectricAnalytics = () => {
     };
   }, [periodType, selectedDate, selectedYear, selectedMonth, dateFrom, dateTo]);
 
-  // Автопилот за период
   const totalAutopilotReading = useMemo(() => {
     if (!startDate || !endDate) return 0;
 
-    let reportsInPeriod = [];
+    const reportsInPeriod = gasReports.filter((r) =>
+      isSingleDay
+        ? r.reportDate === selectedDate
+        : r.reportDate >= startDate && r.reportDate <= endDate
+    );
 
-    if (isSingleDay) {
-      reportsInPeriod = gasReports.filter((r) => r.reportDate === selectedDate);
-    } else {
-      reportsInPeriod = gasReports.filter(
-        (r) => r.reportDate >= startDate && r.reportDate <= endDate
-      );
-    }
-
-    const total = reportsInPeriod.reduce(
+    return reportsInPeriod.reduce(
       (sum, r) => sum + (Number(r.generalData?.autopilotReading) || 0),
       0
     );
-
-    return total;
   }, [gasReports, startDate, endDate, selectedDate, isSingleDay]);
 
-  // Расчёт показаний
   const analysisData = useMemo(() => {
     if (!startDate || !endDate) return [];
 
@@ -414,38 +364,27 @@ const ElectricAnalytics = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800 leading-tight">
           📊 Электр кўрсаткичлари тахлили
         </h1>
+        <p className="text-sm sm:text-base text-gray-500 mt-1">
+          Давр бўйича сарфланган электр энергияси
+        </p>
       </div>
 
-      {/* Диагностика */}
-      {debugInfo && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800">
-          <details>
-            <summary className="cursor-pointer font-medium">
-              🔍 Диагностика
-            </summary>
-            <pre className="mt-2 whitespace-pre-wrap break-all max-h-96 overflow-y-auto">
-              {JSON.stringify(debugInfo, null, 2)}
-            </pre>
-          </details>
-        </div>
-      )}
-
       {/* Фильтры */}
-      <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="bg-white rounded-2xl shadow-md p-4 sm:p-6 mb-4 sm:mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
               Ҳисобот даври
             </label>
             <select
               value={periodType}
               onChange={(e) => setPeriodType(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
             >
               <option value="daily">Кунлик</option>
               <option value="monthly">Ойлик</option>
@@ -454,13 +393,13 @@ const ElectricAnalytics = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
               Ҳисоблагич
             </label>
             <select
               value={selectedMeterId}
               onChange={(e) => setSelectedMeterId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
             >
               <option value="all">Барча ҳисоблагичлар</option>
               {meters.map((m) => (
@@ -473,14 +412,14 @@ const ElectricAnalytics = () => {
 
           {periodType === "daily" && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                 Сана
               </label>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
           )}
@@ -488,13 +427,13 @@ const ElectricAnalytics = () => {
           {periodType === "monthly" && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                   Йил
                 </label>
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                 >
                   {[2023, 2024, 2025, 2026].map((y) => (
                     <option key={y} value={y}>
@@ -504,13 +443,13 @@ const ElectricAnalytics = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                   Ой
                 </label>
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                 >
                   {MONTH_NAMES.map((name, i) => (
                     <option key={i + 1} value={i + 1}>
@@ -525,65 +464,131 @@ const ElectricAnalytics = () => {
           {periodType === "custom" && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                   ...дан
                 </label>
                 <input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                   ...гача
                 </label>
                 <input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
             </>
           )}
         </div>
 
-        <div className="mt-3 text-sm text-gray-600">
+        <div className="mt-3 text-xs sm:text-sm text-gray-600">
           <strong>Давр:</strong> {periodLabel}
         </div>
       </div>
 
       {/* Итоги */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-2xl shadow-md p-5 border-l-4 border-blue-500">
-          <p className="text-sm text-gray-500">Актив энергия (жами)</p>
-          <p className="text-2xl font-bold text-blue-600 font-mono">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="bg-white rounded-2xl shadow-md p-4 sm:p-5 border-l-4 border-blue-500">
+          <p className="text-xs sm:text-sm text-gray-500">Актив энергия</p>
+          <p className="text-xl sm:text-2xl font-bold text-blue-600 font-mono">
             {totals.active.toFixed(2)}
           </p>
         </div>
-        <div className="bg-white rounded-2xl shadow-md p-5 border-l-4 border-purple-500">
-          <p className="text-sm text-gray-500">
-            Автопилот кўрсаткичи (сумма за период)
+        <div className="bg-white rounded-2xl shadow-md p-4 sm:p-5 border-l-4 border-purple-500">
+          <p className="text-xs sm:text-sm text-gray-500">
+            Автопилот кўрсаткичи
           </p>
-          <p className="text-2xl font-bold text-purple-600 font-mono">
+          <p className="text-xl sm:text-2xl font-bold text-purple-600 font-mono">
             {totalAutopilotReading.toLocaleString("ru-RU", {
               maximumFractionDigits: 2,
             })}{" "}
             м³
           </p>
         </div>
-        <div className="bg-white rounded-2xl shadow-md p-5 border-l-4 border-green-500">
-          <p className="text-sm text-gray-500">Актив / Автопилот (жами)</p>
-          <p className="text-2xl font-bold text-green-600 font-mono">
+        <div className="bg-white rounded-2xl shadow-md p-4 sm:p-5 border-l-4 border-green-500">
+          <p className="text-xs sm:text-sm text-gray-500">Актив / Автопилот</p>
+          <p className="text-xl sm:text-2xl font-bold text-green-600 font-mono">
             {totals.activePerAutopilot.toFixed(4)}
           </p>
         </div>
       </div>
 
-      {/* Таблица */}
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+      {/* 🔥 Мобильная карточная версия */}
+      <div className="sm:hidden space-y-3">
+        {analysisData.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow p-6 text-center text-gray-500 text-sm">
+            Маълумотлар топилмади
+          </div>
+        ) : (
+          analysisData.map((row) => (
+            <div
+              key={row.meter.id}
+              className="bg-white rounded-2xl shadow-md p-4 border border-gray-100"
+            >
+              <div className="flex justify-between items-start gap-2 mb-3">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold text-gray-800 text-sm truncate">
+                    {row.meter.name}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Коэф: {Number(row.meter.coefficient || 0).toFixed(5)}
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-xs text-gray-500">Актив / Автопилот</div>
+                  <div className="font-mono font-bold text-purple-600 text-sm">
+                    {row.activePerAutopilot > 0
+                      ? row.activePerAutopilot.toFixed(4)
+                      : "—"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-gray-50 p-2 rounded-lg">
+                  <div className="text-gray-500 mb-0.5">Нач.</div>
+                  <div className="font-mono text-gray-800">
+                    {row.startReading
+                      ? row.startReading.activeEnergy.toFixed(2)
+                      : "—"}
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-2 rounded-lg">
+                  <div className="text-gray-500 mb-0.5">Кон.</div>
+                  <div className="font-mono text-gray-800">
+                    {row.endReading
+                      ? row.endReading.activeEnergy.toFixed(2)
+                      : "—"}
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-2 rounded-lg">
+                  <div className="text-gray-500 mb-0.5">Разница</div>
+                  <div className="font-mono text-gray-800">
+                    {row.activeDiff.toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-blue-50 p-2 rounded-lg">
+                  <div className="text-blue-600 mb-0.5">× коэф.</div>
+                  <div className="font-mono font-bold text-blue-700">
+                    {row.activeResult.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* 🔥 Табличная версия для планшетов/десктопов */}
+      <div className="hidden sm:block bg-white rounded-2xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
